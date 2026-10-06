@@ -493,23 +493,38 @@ export default function App() {
       return;
     }
 
+    let preparedFile = file;
+    let optimizationMessage = "";
+    if (file.type.startsWith("image/")) {
+      try {
+        const optimized = await optimizeEvidenceImage(file);
+        preparedFile = optimized.file;
+        if (optimized.optimizedBytes < optimized.originalBytes) {
+          optimizationMessage =
+            ` Imagem otimizada de ${formatBytes(optimized.originalBytes)} para ${formatBytes(optimized.optimizedBytes)}.`;
+        }
+      } catch {
+        preparedFile = file;
+      }
+    }
+
     const operationId = uuid();
     await queueUpload({
       id: operationId,
       visitId,
-      filename: file.name || `evidencia-${operationId}`,
-      contentType: file.type,
-      sizeBytes: file.size,
-      blob: file,
+      filename: preparedFile.name || `evidencia-${operationId}`,
+      contentType: preparedFile.type,
+      sizeBytes: preparedFile.size,
+      blob: preparedFile,
       createdAt: new Date().toISOString(),
     });
-    setMessage("Evidencia salva no aparelho.");
+    setMessage("Evidencia salva com seguranca no aparelho." + optimizationMessage);
     await refreshPending();
 
     if (navigator.onLine) {
       const synced = await syncOutbox();
       if (synced > 0) {
-        setMessage("Evidencia enviada e confirmada.");
+        setMessage("Evidencia enviada e confirmada." + optimizationMessage);
         await loadFieldData();
       }
       await refreshPending();
