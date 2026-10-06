@@ -188,3 +188,44 @@ button:disabled { cursor: wait; opacity: .65; }
   .segmented button { flex: 1; }
   .inline-save input { max-width: none; width: 100%; }
 }
+
+
+.management-metrics { grid-template-columns: repeat(6, 1fr); }
+.danger-metric { border-color: #efc8bf; background: #fff8f6; }
+.danger-metric svg, .danger-metric strong { color: #a84a39; }
+.management-grid { display: grid; grid-template-columns: 1.25fr .75fr; gap: 18px; align-items: start; }
+.ops-list { display: grid; gap: 9px; }
+.ops-row, .review-row {
+  display: flex; justify-content: space-between; align-items: center; gap: 14px;
+  padding: 13px 0; border-bottom: 1px solid #edf1ee;
+}
+.ops-row:last-child, .review-row:last-child { border-bottom: 0; }
+.ops-row > div:first-child, .review-row > div:first-child { display: grid; gap: 4px; min-width: 0; }
+.ops-row > div:first-child span, .review-row > div:first-child span {
+  color: #6d7971; font-size: 12px; overflow: hidden; text-overflow: ellipsis;
+}
+.ops-meta { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.priority, .sla {
+  border-radius: 999px; padding: 6px 9px; font-size: 10px; font-weight: 850;
+  text-transform: uppercase; letter-spacing: .04em; white-space: nowrap;
+}
+.priority { background: #edf2ef; color: #4d5d53; }
+.priority-critica { background: #fde1dc; color: #9a3528; }
+.priority-alta { background: #fff0ce; color: #875e0a; }
+.priority-media { background: #e5eefb; color: #315f9a; }
+.priority-baixa { background: #e7f3eb; color: #2d6842; }
+.sla { background: #f0f2f0; color: #67736b; }
+.sla.overdue { background: #fde1dc; color: #9a3528; }
+.review-actions { display: flex; gap: 7px; }
+.warning-button { background: #fff0ce; color: #7a580e; }
+
+@media (max-width: 980px) {
+  .management-metrics { grid-template-columns: repeat(3, 1fr); }
+  .management-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 600px) {
+  .management-metrics { grid-template-columns: repeat(2, 1fr); }
+  .ops-row, .review-row { align-items: flex-start; flex-direction: column; }
+  .ops-meta, .review-actions { justify-content: flex-start; width: 100%; }
+}
