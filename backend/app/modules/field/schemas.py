@@ -5,7 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.models.field import AnswerType, MeasurementStatus, VisitStatus
+from app.models.field import AnswerType, MeasurementStatus
 
 
 class ORMModel(BaseModel):
