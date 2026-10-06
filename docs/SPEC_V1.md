@@ -4,7 +4,7 @@
 
 Criar uma PWA para controlar o ciclo operacional da VW Engenharia:
 
-`Cliente -> Empreendimento -> Estacao -> Ativo -> Planejamento -> Visita -> Checklist -> Ocorrencia -> OS -> Manutencao -> Evidencia -> Revisao -> Indicadores`
+`Cliente -> Empreendimento -> Estacao -> Ativo -> Planejamento -> Visita -> Checklist -> Ocorrencia -> OS -> Manutencao -> Evidencia -> Revisao`
 
 A planilha historica serve como fonte de requisitos e migracao, nao como modelo de dados definitivo.
 
@@ -174,8 +174,6 @@ Entidades principais:
 - attachments
 - reviews
 - audit_events
-- ai_runs
-- ai_tool_calls
 
 Todas as entidades operacionais devem possuir identificador UUID.
 
@@ -269,48 +267,36 @@ Base: `/api/v1`
 - GET `/dashboard/stations-health`
 - GET `/dashboard/sla`
 
-### IA
+### Integracao com iAnalisys
 
-- POST `/ai/chat`
-- GET `/ai/runs/{id}`
+O ERP devera disponibilizar contratos de leitura estaveis para o iAnalisys, mantendo o isolamento por tenant.
 
-## 10. IA operacional
+Escopo inicial:
 
-Criar `LLMGateway` multi-provider. O dominio nao deve depender diretamente de Kimi, OpenAI ou Anthropic.
+- estacoes
+- ativos
+- visitas
+- medicoes
+- ocorrencias
+- ordens de servico
+- SLA
+- historico de status
+- revisoes
 
-Ferramentas read-only iniciais:
+A integracao pode evoluir para API dedicada, views de leitura ou eventos, mas o ERP continua sendo a fonte transacional de verdade.
 
-- list_stations
-- get_station
-- get_latest_visit
-- list_visits
-- list_occurrences
-- list_open_work_orders
-- get_sla_summary
-- get_asset_history
-- compare_stations
+O ERP nao implementara:
 
-Ferramentas mutaveis futuras:
+- chat
+- agentes
+- LLMGateway
+- RAG
+- embeddings
+- prompts
+- ferramentas de IA
+- previsoes por modelo generativo
 
-- create_occurrence
-- create_work_order
-- assign_work_order
-
-Ferramentas mutaveis exigem RBAC e confirmacao humana.
-
-## 11. RAG
-
-Fontes possiveis:
-
-- POPs
-- manuais de equipamentos
-- procedimentos internos
-- contratos
-- normas tecnicas autorizadas
-
-O RAG e complementar aos dados transacionais; nao deve substituir consulta estruturada para fatos operacionais.
-
-## 12. Auditoria
+## 10. Auditoria
 
 Registrar no minimo:
 
@@ -324,16 +310,7 @@ Registrar no minimo:
 - timestamp
 - origem/dispositivo
 
-IA deve registrar:
-
-- provider/modelo
-- prompt/contexto essencial
-- ferramentas chamadas
-- resultados das ferramentas
-- aprovacao humana quando houver
-- custo/uso de tokens quando disponivel
-
-## 13. Migracao da planilha
+## 11. Migracao da planilha
 
 Criar camada de staging antes da normalizacao.
 
@@ -350,19 +327,19 @@ Fluxo:
 
 Nunca transformar automaticamente valores ambiguos sem regra aprovada.
 
-## 14. Seguranca
+## 12. Seguranca
 
 - tenant isolation fail-closed;
 - RBAC por membership;
 - senhas com hash forte;
 - refresh token com rotacao/revogacao;
 - anexos com URLs temporarias;
-- rate limiting em auth e IA;
+- rate limiting em autenticacao e APIs sensiveis;
 - logs sem segredos;
 - segredo apenas em ambiente/secret manager;
 - trilha de auditoria para mudancas relevantes.
 
-## 15. Estrategia de entrega
+## 13. Estrategia de entrega
 
 ### Fase 0 - Fundacao
 
@@ -403,12 +380,12 @@ Nunca transformar automaticamente valores ambiguos sem regra aprovada.
 - filtros
 - exportacoes
 
-### Fase 5 - IA
+### Fase 5 - Integracao com iAnalisys
 
-- chat
-- tools read-only
-- resumo de estacao
-- extracao assistida de pendencias de texto
+- contratos de leitura
+- endpoints/exportacoes tenant-scoped
+- documentacao de integracao
+- dados consistentes para BI e IA externos
 
 ### Fase 6 - Migracao e homologacao
 
@@ -418,7 +395,7 @@ Nunca transformar automaticamente valores ambiguos sem regra aprovada.
 - paralelo Excel + novo sistema
 - reconciliacao
 
-## 16. Criterios de aceite do MVP
+## 14. Criterios de aceite do MVP
 
 1. Tecnico consegue executar visita inteira sem internet apos sincronizar sua agenda.
 2. Ao recuperar conexao, dados sincronizam sem duplicar registros.
@@ -429,17 +406,29 @@ Nunca transformar automaticamente valores ambiguos sem regra aprovada.
 7. Toda leitura/escrita de negocio respeita tenant_id.
 8. Usuario de um tenant nao acessa dados de outro tenant.
 9. Fotos ficam fora do PostgreSQL e vinculadas por metadados.
-10. IA read-only responde usando tools autorizadas e nao executa SQL livre.
-11. Acoes mutaveis da IA nao sao executadas sem fluxo de aprovacao.
+10. APIs de integracao respeitam tenant e RBAC.
+11. O ERP nao possui dependencia de LLM/IA generativa.
 12. Migracao historica fornece contagem de entrada, sucesso, erro e reconciliacao.
 
-## 17. Fora do MVP
+## 15. Fora do MVP
 
 - financeiro completo
 - compras completas
 - estoque completo
 - roteirizacao otimizada
-- manutencao preditiva ML
-- visao computacional avancada
+- manutencao preditiva
+- visao computacional
+- chat/IA generativa
+- RAG
 - fine-tuning
-- autonomia total de agentes
+- agentes
+- BI analitico avancado
+
+
+## 16. Fronteira definitiva com o iAnalisys
+
+O VW Engenharia e o ERP operacional e fonte transacional.
+
+O iAnalisys e a camada de inteligencia.
+
+Nenhuma funcionalidade de IA deve ser adicionada a este repositorio sem uma decisao arquitetural explicita que revise esta fronteira.
