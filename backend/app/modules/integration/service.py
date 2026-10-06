@@ -295,10 +295,17 @@ async def export_resource(
     resource: IntegrationResource,
     *,
     updated_since: datetime | None,
+    snapshot_at: datetime | None,
     limit: int,
     offset: int,
 ) -> dict:
-    generated_at = datetime.now(UTC)
+    now = datetime.now(UTC)
+    if snapshot_at is not None and snapshot_at > now:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="snapshot_at_cannot_be_future",
+        )
+    generated_at = snapshot_at or now
     model, watermark_column = _RESOURCE_CONFIG[resource]
 
     stmt = select(model).where(
