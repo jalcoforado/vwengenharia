@@ -8,6 +8,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.models.field import (
     Attachment,
     ChecklistTemplate,
@@ -20,10 +21,8 @@ from app.models.field import (
 )
 from app.models.identity import Membership, Role
 from app.models.operations import Asset, AssetStatus, AssetType, Station
-from app.core.config import settings
 from app.modules.auth.dependencies import AuthContext
 from app.modules.core_registers.service import add_audit, tenant_get_or_404
-from app.services.storage import get_storage
 from app.modules.field.schemas import (
     AttachmentRegisterCreate,
     ChecklistItemCreate,
@@ -32,6 +31,7 @@ from app.modules.field.schemas import (
     VisitAnswerUpsert,
     VisitCreate,
 )
+from app.services.storage import get_storage
 
 MANAGEMENT_ROLES = {
     Role.SUPERADMIN.value,
