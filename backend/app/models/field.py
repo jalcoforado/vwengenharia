@@ -166,6 +166,23 @@ class Measurement(TimestampMixin, Base):
     client_operation_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
 
 
+class SyncOperation(Base):
+    __tablename__ = "sync_operations"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "client_operation_id", name="uq_sync_operation"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    client_operation_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    operation_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    entity_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    entity_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 class Attachment(TimestampMixin, Base):
     __tablename__ = "attachments"
     __table_args__ = (
