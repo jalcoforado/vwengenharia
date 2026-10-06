@@ -8,6 +8,7 @@ from app.modules.maintenance.router import router as maintenance_router
 from app.modules.materials.router import router as materials_router
 from app.modules.operations.router import router as operations_router
 from app.modules.reports.router import router as reports_router
+from app.modules.station_overview.router import router as station_overview_router
 from app.modules.team.router import router as team_router
 
 api_router = APIRouter()
@@ -19,6 +20,7 @@ api_router.include_router(maintenance_router)
 api_router.include_router(materials_router)
 api_router.include_router(operations_router)
 api_router.include_router(reports_router)
+api_router.include_router(station_overview_router)
 api_router.include_router(team_router)
 
 
