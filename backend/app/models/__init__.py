@@ -36,7 +36,7 @@ from app.models.materials import (
     RequestPriority,
     RequestStatus,
 )
-from app.models.operations import Asset, AssetStatus, AssetType, Client, Development, Station
+from app.models.operations import Asset, AssetStatus, AssetType, Client, ClientMembershipAccess, Development, Station
 
 __all__ = [
     "AnswerType",
@@ -49,6 +49,7 @@ __all__ = [
     "ChecklistTemplate",
     "ChecklistTemplateItem",
     "Client",
+    "ClientMembershipAccess",
     "Development",
     "IntegrationCredential",
     "LegacyStationMapping",
