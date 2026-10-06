@@ -12,7 +12,6 @@ from app.modules.ai.tools import TOOL_DEFINITIONS, execute_tool, result_count
 from app.modules.auth.dependencies import AuthContext
 from app.modules.core_registers.service import add_audit
 
-
 SYSTEM_PROMPT = """Voce e a SonIA Operacional da VW Engenharia.
 Seu papel e responder perguntas sobre a operacao usando exclusivamente as ferramentas disponibilizadas.
 
