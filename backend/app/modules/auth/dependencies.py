@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Annotated
 from uuid import UUID
 
 import jwt
@@ -13,6 +14,8 @@ from app.db.session import get_session
 from app.models.identity import Membership, Tenant, User
 
 bearer = HTTPBearer(auto_error=False)
+BearerCredentials = Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)]
+SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
 @dataclass(slots=True)
@@ -23,8 +26,8 @@ class AuthContext:
 
 
 async def get_auth_context(
-    credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
-    session: AsyncSession = Depends(get_session),
+    credentials: BearerCredentials,
+    session: SessionDep,
 ) -> AuthContext:
     if credentials is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="missing_token")
@@ -60,8 +63,11 @@ async def get_auth_context(
     return AuthContext(user=membership.user, membership=membership, tenant=membership.tenant)
 
 
+AuthContextDep = Annotated[AuthContext, Depends(get_auth_context)]
+
+
 def require_roles(*roles: str):
-    async def dependency(context: AuthContext = Depends(get_auth_context)) -> AuthContext:
+    async def dependency(context: AuthContextDep) -> AuthContext:
         if context.membership.role not in roles:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="insufficient_role")
         return context
