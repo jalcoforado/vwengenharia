@@ -9,10 +9,6 @@ services:
       APP_ENV: homologation
       REFRESH_COOKIE_SECURE: "false"
 
-  frontend:
-    ports:
-      - "${HOMOLOGATION_APP_PORT:-18080}:80"
-
   seed:
     build:
       context: ./backend
