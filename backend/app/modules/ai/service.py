@@ -1,7 +1,7 @@
 import json
 from datetime import UTC, datetime
 
-from anthropic import AsyncAnthropic
+from anthropic import APIError, AsyncAnthropic
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -160,7 +160,7 @@ async def ask_sonia(
         )
     except HTTPException:
         raise
-    except Exception:
+    except (APIError, TypeError, ValueError):
         run.status = "FAILED"
         run.error_code = "ai_provider_error"
         run.tool_trace = trace
