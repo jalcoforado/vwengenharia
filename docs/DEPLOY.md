@@ -12,7 +12,7 @@ A arquitetura inicial suporta bem um deployment em VPS unica, desde que CPU, mem
 
 - PostgreSQL
 - Redis
-- MinIO
+- object storage S3 compativel externo
 - migrate (execucao unica de Alembic)
 - backend FastAPI
 - frontend Nginx + PWA
@@ -31,6 +31,7 @@ Preencha obrigatoriamente:
 
 - POSTGRES_PASSWORD
 - JWT_SECRET
+- S3_ENDPOINT
 - S3_PUBLIC_ENDPOINT
 - S3_ACCESS_KEY
 - S3_SECRET_KEY
@@ -46,11 +47,10 @@ docker compose --env-file .env.production -f docker-compose.app.yml up -d --buil
 O fluxo e:
 
 1. PostgreSQL inicia e passa no healthcheck.
-2. MinIO inicia.
-3. O bucket e criado idempotentemente.
-4. O servico `migrate` executa `alembic upgrade head`.
-5. O backend inicia somente se a migration concluir.
-6. O frontend inicia e publica a aplicacao.
+2. O object storage S3 compativel configurado ja deve estar disponivel e com o bucket criado.
+3. O servico `migrate` executa `alembic upgrade head`.
+4. O backend inicia somente se a migration concluir.
+5. O frontend inicia e publica a aplicacao.
 
 ## Primeiro admin
 
@@ -80,10 +80,10 @@ Requisitos:
 - `REFRESH_COOKIE_SECURE=true`;
 - dominio estavel;
 - encaminhar `X-Forwarded-Proto`;
-- restringir portas internas do PostgreSQL, Redis e MinIO;
-- nao expor o console MinIO publicamente.
+- restringir portas internas do PostgreSQL e Redis;
+- restringir o object storage conforme a politica do provedor.
 
-O compose de aplicacao nao publica PostgreSQL, Redis ou MinIO diretamente na interface externa.
+O compose de aplicacao nao publica PostgreSQL nem Redis diretamente na interface externa.
 
 ## Evidencias e S3_PUBLIC_ENDPOINT
 
@@ -95,13 +95,10 @@ Exemplo:
 https://arquivos.vw.exemplo.com
 ```
 
-O endereco interno do backend permanece:
+`S3_ENDPOINT` e o endpoint usado pelo backend para consultar metadados dos objetos.
+`S3_PUBLIC_ENDPOINT` e o endpoint usado para gerar URLs presigned acessiveis pelo navegador.
 
-```text
-http://minio:9000
-```
-
-Nunca use uma URL interna Docker como endpoint publico do navegador.
+Eles podem apontar para o mesmo host ou para endpoints diferentes, dependendo do provedor.
 
 ## Healthcheck
 
@@ -132,9 +129,9 @@ docker compose --env-file .env.production -f docker-compose.app.yml exec -T post
   pg_dump -U vw -d vwengenharia > vwengenharia.sql
 ```
 
-### MinIO
+### Object storage
 
-O volume/object storage de evidencias deve possuir backup independente do PostgreSQL.
+O bucket de evidencias deve possuir politica de backup/versionamento independente do PostgreSQL.
 
 O banco guarda metadados; fotos e arquivos nao estao dentro do dump SQL.
 
