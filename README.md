@@ -1,66 +1,208 @@
 # VW Engenharia - ERP Operacional
 
-ERP/PWA para gestao operacional da VW Engenharia: cadastros, visitas tecnicas, ativos, ocorrencias, ordens de servico, manutencao, SLA, evidencias e revisoes.
+ERP/PWA mobile-first e offline-first para a operacao da VW Engenharia.
 
-## Objetivo
+O produto cobre o ciclo:
 
-Substituir gradualmente o controle operacional hoje realizado em planilha por um ERP mobile-first e offline-first.
+`Cliente -> Empreendimento -> Estacao -> Ativo -> Planejamento -> Visita -> Checklist -> Ocorrencia -> OS -> Manutencao -> Evidencia -> Revisao`
 
-Este repositorio e exclusivamente transacional/operacional.
+O ERP e a fonte transacional oficial. BI, analytics avancado, IA conversacional e agentes pertencem ao iAnalisys.
 
-A camada de BI, analytics, IA conversacional, agentes e inteligencia gerencial pertence ao iAnalisys e nao deve ser implementada aqui.
+## Estado atual
 
-## Responsabilidade do ERP VW
+A V1 possui:
 
-- usuarios e perfis
-- clientes
-- empreendimentos
-- estacoes
-- ativos/equipamentos
-- programacao de visitas
-- visitas e checklists
-- medicoes
-- ocorrencias
-- ordens de servico
-- manutencao
-- SLA
-- evidencias
-- revisoes
-- auditoria
-- APIs de integracao
-- exportacao/consulta operacional
+- autenticacao, tenant e RBAC;
+- clientes, empreendimentos, estacoes, tipos de ativo e ativos;
+- equipe e perfis;
+- planos recorrentes e geracao idempotente de agenda;
+- PWA de campo com IndexedDB e outbox offline;
+- checklists configuraveis e versionados;
+- medicoes estruturadas;
+- evidencias em object storage;
+- ocorrencias;
+- materiais/servicos/terceiros;
+- ordens de servico com prioridade, SLA e maquina de estados;
+- manutencao preventiva/corretiva;
+- revisao de visitas;
+- Minha Fila por perfil;
+- alertas operacionais;
+- Visao 360 da estacao;
+- exportacoes CSV;
+- auditoria consultavel;
+- API read-only versionada para iAnalisys;
+- migracao historica XLSX com staging, reconciliacao e carga em lotes.
 
-## Responsabilidade do iAnalisys
-
-- BI
-- dashboards analiticos avancados
-- analises historicas
-- IA conversacional
-- agentes
-- RAG
-- comparacoes e tendencias
-- previsoes
-- alertas inteligentes
-- insights gerenciais
+Consulte:
+- `docs/SPEC_V1.md`
+- `docs/ARCHITECTURE.md`
+- `docs/RBAC_V1.md`
+- `docs/RELEASE_V1.md`
+- `docs/INTEGRATION_IANALISYS.md`
 
 ## Stack
 
 - Frontend: React + TypeScript + Vite + PWA
-- Backend: Python + FastAPI
+- Backend: Python 3.12 + FastAPI
 - Banco: PostgreSQL
-- Cache/filas: Redis
+- Cache/apoio operacional: Redis
 - Evidencias: S3 compativel / MinIO
-- Infra: Docker Compose no inicio
+- Migrations: Alembic
+- Infra local: Docker Compose
+- CI: GitHub Actions
 
-## Principios
+## Subida local
 
-1. Nao reproduzir a planilha em formato web.
-2. Visita, ativo, medicao, ocorrencia e OS sao entidades separadas.
-3. Offline-first para operacao de campo.
+### 1. Dependencias de infraestrutura
+
+Na raiz:
+
+```bash
+docker compose up -d
+```
+
+Isso sobe PostgreSQL, Redis e MinIO conforme `docker-compose.yml`.
+
+### 2. Backend
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -e '.[dev]'
+alembic upgrade head
+uvicorn app.main:app --reload
+```
+
+No Windows PowerShell, ative o ambiente virtual com o comando equivalente do PowerShell.
+
+### 3. Frontend
+
+Em outro terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+## Variaveis de ambiente
+
+Use `.env.example` como referencia.
+
+Nunca versione:
+- JWT secret real;
+- senha de banco de producao;
+- credenciais S3/MinIO de producao;
+- chave de integracao iAnalisys;
+- qualquer segredo operacional.
+
+## Primeiro administrador
+
+Com o banco migrado, configure:
+
+- `BOOTSTRAP_TENANT_NAME`
+- `BOOTSTRAP_TENANT_SLUG`
+- `BOOTSTRAP_ADMIN_EMAIL`
+- `BOOTSTRAP_ADMIN_NAME`
+- `BOOTSTRAP_ADMIN_PASSWORD`
+
+Depois execute:
+
+```bash
+cd backend
+python scripts/bootstrap_admin.py
+```
+
+O script e idempotente para tenant/usuario ja existentes.
+
+## Migracao historica da planilha
+
+A forma recomendada e usar a area **Governanca > Migracao** no ERP:
+
+1. enviar o XLSX;
+2. validar contagens do staging;
+3. executar auto-mapeamento apenas para nomes exatos;
+4. mapear manualmente os rotulos restantes;
+5. revisar erros;
+6. materializar uma amostra;
+7. reconciliar;
+8. importar os lotes restantes.
+
+Alternativamente:
+
+```bash
+cd backend
+python scripts/stage_legacy_visits.py --tenant-id <UUID> --file "/caminho/Visitas MW.xlsx"
+```
+
+Por padrao, registros historicos nao sao transformados em backlog atual de revisao.
+
+## Integracao com iAnalisys
+
+ADMIN/SUPERADMIN cria a credencial em **Governanca > iAnalisys**.
+
+O segredo e exibido uma unica vez.
+
+O consumidor envia:
+
+```text
+X-Integration-Key: <segredo>
+```
+
+Recursos read-only estao sob:
+
+```text
+/api/v1/integration/v1/{resource}
+```
+
+A V1 nao permite escrita do iAnalisys no ERP.
+
+## Testes e gate de CI
+
+Backend:
+
+```bash
+cd backend
+ruff check app tests scripts alembic
+alembic upgrade head
+pytest -q
+```
+
+Frontend:
+
+```bash
+cd frontend
+npm install
+npm run build
+```
+
+O GitHub Actions executa esses gates automaticamente.
+
+A jornada integrada da V1 esta em `backend/tests/test_v1_acceptance.py`.
+
+## Principios arquiteturais
+
+1. Nao reproduzir a planilha como sistema.
+2. Visita, ativo, medicao, ocorrencia, solicitacao e OS sao entidades distintas.
+3. Offline-first para o tecnico.
 4. Multi-tenant desde a fundacao.
-5. O ERP e a fonte transacional oficial.
-6. O iAnalisys consome o ERP por APIs/views/eventos autorizados.
-7. Nenhuma dependencia direta de LLM no ERP.
-8. Toda operacao relevante deve ser auditavel.
+5. Tenant nunca e escolhido livremente pelo frontend.
+6. Historico operacional nao e apagado para simplificar cadastro.
+7. Alertas e Minha Fila sao derivados da fonte transacional, evitando estado duplicado.
+8. Evidencias ficam fora do PostgreSQL.
+9. Integracao iAnalisys e read-only na V1.
+10. Nenhuma dependencia de LLM/IA generativa existe no ERP.
 
-Consulte docs/SPEC_V1.md e docs/ARCHITECTURE.md.
+## Responsabilidade do iAnalisys
+
+- BI;
+- dashboards analiticos avancados;
+- analises historicas;
+- IA conversacional;
+- agentes;
+- RAG;
+- comparacoes e tendencias;
+- previsoes e insights gerenciais.
+
+O ERP VW Engenharia permanece focado em executar e registrar corretamente a operacao.

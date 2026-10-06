@@ -1,6 +1,6 @@
 [project]
 name = "vwengenharia-backend"
-version = "0.2.0"
+version = "1.0.0"
 description = "Backend da plataforma operacional VW Engenharia"
 requires-python = ">=3.12"
 dependencies = [

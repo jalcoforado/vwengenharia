@@ -51,3 +51,15 @@ jobs:
           node-version: "22"
       - run: npm install
       - run: npm run build
+
+
+  containers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate application compose
+        run: docker compose --env-file .env.production.example -f docker-compose.app.yml config > /dev/null
+      - name: Build backend image
+        run: docker build -t vwengenharia-backend:ci ./backend
+      - name: Build frontend image
+        run: docker build -t vwengenharia-frontend:ci ./frontend
