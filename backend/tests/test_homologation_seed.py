@@ -1,4 +1,3 @@
-import os
 from uuid import uuid4
 
 import pytest
@@ -6,7 +5,7 @@ from sqlalchemy import select
 
 from app.core.security import verify_password
 from app.db.session import get_session_factory
-from app.models.identity import Role, Tenant, User
+from app.models.identity import Tenant, User
 from scripts import seed_homologation
 
 
