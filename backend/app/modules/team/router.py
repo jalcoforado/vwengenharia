@@ -1,4 +1,5 @@
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Response, status
 
@@ -77,7 +78,7 @@ async def post_team_member(
 
 @router.patch("/team/{membership_id}", response_model=TeamMemberRead)
 async def patch_team_member(
-    membership_id,
+    membership_id: UUID,
     payload: TeamMemberUpdate,
     context: AdminContextDep,
     session: SessionDep,
