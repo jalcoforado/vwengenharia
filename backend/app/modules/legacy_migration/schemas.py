@@ -3,6 +3,14 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 
+class StageWorkbookResponse(BaseModel):
+    source_file: str
+    sheet: str
+    staged: int
+    skipped_existing: int
+    errors: int
+
+
 class LegacyMigrationSummary(BaseModel):
     total: int
     staged: int
