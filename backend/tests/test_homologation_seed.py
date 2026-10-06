@@ -1,3 +1,5 @@
+import importlib.util
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -6,11 +8,21 @@ from sqlalchemy import select
 from app.core.security import verify_password
 from app.db.session import get_session_factory
 from app.models.identity import Tenant, User
-from scripts import seed_homologation
+
+
+def load_seed_module():
+    module_path = Path(__file__).resolve().parents[1] / "scripts" / "seed_homologation.py"
+    spec = importlib.util.spec_from_file_location("seed_homologation_test_module", module_path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 @pytest.mark.asyncio
 async def test_homologation_seed_resets_existing_demo_password(monkeypatch) -> None:
+    seed_homologation = load_seed_module()
+
     suffix = uuid4().hex[:10]
     slug = f"homolog-seed-{suffix}"
     email = f"homolog-admin-{suffix}@example.com"
