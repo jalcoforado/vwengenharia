@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Boolean,
     DateTime,
     ForeignKey,
@@ -41,6 +42,11 @@ class MeasurementStatus(str, enum.Enum):
     MEDIDO = "MEDIDO"
     NAO_MEDIDO = "NAO_MEDIDO"
     NAO_APLICAVEL = "NAO_APLICAVEL"
+
+
+class AttachmentStatus(str, enum.Enum):
+    PENDING_UPLOAD = "PENDING_UPLOAD"
+    UPLOADED = "UPLOADED"
 
 
 class ChecklistTemplate(TimestampMixin, Base):
@@ -153,6 +159,33 @@ class Measurement(TimestampMixin, Base):
     unit: Mapped[str | None] = mapped_column(String(40), nullable=True)
     reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
     taken_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class Attachment(TimestampMixin, Base):
+    __tablename__ = "attachments"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "object_key", name="uq_attachment_tenant_object_key"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    visit_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("visits.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    asset_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("assets.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    object_key: Mapped[str] = mapped_column(String(512), nullable=False)
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    content_type: Mapped[str] = mapped_column(String(120), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(24), nullable=False, default=AttachmentStatus.PENDING_UPLOAD.value
+    )
+    uploaded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class OperationReceipt(Base):
