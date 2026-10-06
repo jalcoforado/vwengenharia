@@ -32,6 +32,7 @@ import InboxPanel from "./components/InboxPanel";
 import LegacyMigrationAdmin from "./components/LegacyMigrationAdmin";
 import ChecklistAdmin from "./components/ChecklistAdmin";
 import ClientPortal from "./components/ClientPortal";
+import ClientAccessAdmin from "./components/ClientAccessAdmin";
 import WorkOrdersAdmin from "./components/WorkOrdersAdmin";
 import StationOverview from "./components/StationOverview";
 import { AccountSettings, IntegrationSettings } from "./components/SettingsPanels";
@@ -1744,6 +1745,9 @@ function SupervisorHome({ me }: { me: Me }) {
       {managementView === "CONFIG" && (
         <>
           <ChecklistAdmin templates={templates} onChanged={load} />
+          {["SUPERADMIN", "ADMIN"].includes(me.role) && (
+            <ClientAccessAdmin clients={clients} team={team} />
+          )}
           <AccountSettings />
         </>
       )}
@@ -2211,6 +2215,7 @@ function TeamMemberForm({ onCreated }: { onCreated: () => Promise<void> }) {
             <option value="MANUTENCAO">Manutencao</option>
             <option value="SUPERVISOR">Supervisor</option>
             <option value="GESTOR">Gestor</option>
+            <option value="CLIENTE">Cliente</option>
           </select>
         </label>
         <label>
