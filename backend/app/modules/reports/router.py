@@ -12,7 +12,7 @@ from sqlalchemy import select
 from app.models.field import Attachment, ChecklistTemplateItem, Measurement, Visit, VisitAnswer
 from app.models.identity import Membership, Role, User
 from app.models.maintenance import MaintenancePlan, Occurrence, VisitReview, WorkOrder
-from app.models.operations import Client, Development, Station
+from app.models.operations import Client, ClientMembershipAccess, Development, Station
 from app.modules.auth.dependencies import AuthContext, SessionDep, require_roles
 
 router = APIRouter(prefix="/reports", tags=["relatorios"])
@@ -179,7 +179,7 @@ async def maintenance_csv(
     )
 
 
-REPORT_ROLES = MANAGEMENT_ROLES + (Role.TECNICO.value,)
+REPORT_ROLES = MANAGEMENT_ROLES + (Role.TECNICO.value, Role.CLIENTE.value)
 ReportContextDep = Annotated[AuthContext, Depends(require_roles(*REPORT_ROLES))]
 
 
@@ -246,6 +246,21 @@ async def visit_report_html(
             )
         )
     ).scalar_one()
+
+    if context.membership.role == Role.CLIENTE.value:
+        if visit.status != "REVISADA":
+            return Response(status_code=404)
+        allowed = (
+            await session.execute(
+                select(ClientMembershipAccess.id).where(
+                    ClientMembershipAccess.tenant_id == context.tenant.id,
+                    ClientMembershipAccess.membership_id == context.membership.id,
+                    ClientMembershipAccess.client_id == client.id,
+                )
+            )
+        ).scalar_one_or_none()
+        if allowed is None:
+            return Response(status_code=404)
     technician = (
         await session.execute(
             select(User)
