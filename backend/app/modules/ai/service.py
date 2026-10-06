@@ -3,13 +3,14 @@ from datetime import UTC, datetime
 
 from anthropic import AsyncAnthropic
 from fastapi import HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models.ai import AiRun
+from app.modules.ai.tools import TOOL_DEFINITIONS, execute_tool, result_count
 from app.modules.auth.dependencies import AuthContext
 from app.modules.core_registers.service import add_audit
-from app.modules.ai.tools import TOOL_DEFINITIONS, execute_tool, result_count
 
 
 SYSTEM_PROMPT = """Voce e a SonIA Operacional da VW Engenharia.
@@ -46,8 +47,6 @@ async def ask_sonia(
     )
     session.add(run)
     await session.flush()
-    run_id = run.id
-
     if provider == "disabled":
         run.status = "FAILED"
         run.error_code = "ai_provider_disabled"
@@ -178,8 +177,6 @@ async def get_run(
     context: AuthContext,
     run_id,
 ) -> AiRun:
-    from sqlalchemy import select
-
     run = (
         await session.execute(
             select(AiRun).where(
