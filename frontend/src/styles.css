@@ -382,3 +382,53 @@ button:disabled { cursor: wait; opacity: .65; }
   color: #17231c;
   outline: none;
 }
+
+
+.quick-actions {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+  margin: 0 0 18px;
+}
+.alert-center { border-color: #dfebe3; }
+.admin-actions {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.text-button {
+  border: 0;
+  background: transparent;
+  color: #376149;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 5px;
+}
+.text-button:hover { text-decoration: underline; }
+.asset-actions select {
+  min-height: 34px;
+  border: 1px solid #d8e2db;
+  border-radius: 9px;
+  background: white;
+  padding: 6px 8px;
+  color: #324b3c;
+  max-width: 180px;
+}
+.type-list { display: flex; gap: 7px; flex-wrap: wrap; }
+.type-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #f4f7f5;
+  border: 1px solid #e1e9e4;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
+@media (max-width: 650px) {
+  .admin-actions { justify-content: flex-start; width: 100%; }
+  .admin-row { align-items: flex-start; flex-direction: column; }
+}

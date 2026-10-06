@@ -117,3 +117,13 @@ class SlaBucket(BaseModel):
 
 class DashboardSla(BaseModel):
     buckets: list[SlaBucket]
+
+
+class OperationalAlert(BaseModel):
+    kind: str
+    severity: str
+    title: str
+    message: str
+    entity_type: str
+    entity_id: UUID
+    due_at: datetime | None = None
