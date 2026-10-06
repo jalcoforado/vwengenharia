@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.db.session import get_session_factory
 
@@ -21,6 +22,6 @@ async def ready() -> dict[str, str]:
     try:
         async with session_factory() as session:
             await session.execute(text("SELECT 1"))
-    except Exception as exc:
+    except SQLAlchemyError as exc:
         raise HTTPException(status_code=503, detail="database_unavailable") from exc
     return {"status": "ready"}
