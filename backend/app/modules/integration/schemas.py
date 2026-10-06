@@ -35,6 +35,8 @@ class IntegrationResource(StrEnum):
     WORK_ORDERS = "work-orders"
     WORK_ORDER_HISTORY = "work-order-history"
     REVIEWS = "reviews"
+    INVENTORY_ITEMS = "inventory-items"
+    INVENTORY_MOVEMENTS = "inventory-movements"
 
 
 class IntegrationEnvelope(BaseModel):
