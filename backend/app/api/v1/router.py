@@ -6,6 +6,7 @@ from app.modules.core_registers.router import router as core_registers_router
 from app.modules.field.router import router as field_router
 from app.modules.inbox.router import router as inbox_router
 from app.modules.integration.router import router as integration_router
+from app.modules.legacy_migration.router import router as legacy_migration_router
 from app.modules.maintenance.router import router as maintenance_router
 from app.modules.materials.router import router as materials_router
 from app.modules.operations.router import router as operations_router
@@ -20,6 +21,7 @@ api_router.include_router(core_registers_router)
 api_router.include_router(field_router)
 api_router.include_router(inbox_router)
 api_router.include_router(integration_router)
+api_router.include_router(legacy_migration_router)
 api_router.include_router(maintenance_router)
 api_router.include_router(materials_router)
 api_router.include_router(operations_router)
