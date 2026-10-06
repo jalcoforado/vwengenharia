@@ -29,6 +29,12 @@ from app.models.maintenance import (
     WorkOrderStatus,
     WorkOrderStatusHistory,
 )
+from app.models.materials import (
+    MaterialRequest,
+    RequestCategory,
+    RequestPriority,
+    RequestStatus,
+)
 from app.models.operations import Asset, AssetStatus, AssetType, Client, Development, Station
 
 __all__ = [
@@ -47,6 +53,7 @@ __all__ = [
     "MaintenanceExecution",
     "MaintenancePlan",
     "MaintenanceType",
+    "MaterialRequest",
     "Measurement",
     "MeasurementStatus",
     "Membership",
@@ -54,6 +61,9 @@ __all__ = [
     "OccurrenceSeverity",
     "OccurrenceStatus",
     "RefreshToken",
+    "RequestCategory",
+    "RequestPriority",
+    "RequestStatus",
     "ReviewDecision",
     "Role",
     "Station",
