@@ -54,6 +54,14 @@ async def get_or_create_user(
         )
         session.add(user)
         await session.flush()
+    else:
+        # Homologation seed is authoritative for demo credentials.
+        # This intentionally resets demo-user credentials so the launcher
+        # always displays credentials that actually work.
+        user.name = name
+        user.password_hash = hash_password(password)
+        user.is_active = True
+        await session.flush()
 
     membership = (
         await session.execute(
