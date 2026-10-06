@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -76,10 +76,8 @@ async def refresh(
 ) -> TokenResponse:
     cookie_token = request.cookies.get(settings.refresh_cookie_name)
     body_token = payload.refresh_token if payload is not None else None
-    raw_token = cookie_token or (None if settings.is_production else body_token)
+    raw_token = cookie_token if settings.is_production else (body_token or cookie_token)
     if not raw_token:
-        from fastapi import HTTPException
-
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="missing_refresh_token",
