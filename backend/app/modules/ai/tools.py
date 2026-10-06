@@ -17,7 +17,6 @@ from app.modules.auth.dependencies import AuthContext
 from app.modules.core_registers.service import tenant_get_or_404
 from app.modules.operations.service import dashboard_overview
 
-
 TOOL_DEFINITIONS = [
     {
         "name": "operational_overview",
