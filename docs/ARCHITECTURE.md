@@ -89,3 +89,18 @@ O ERP nao deve conter LLMGateway, prompts, tools de agentes, embeddings, RAG ou 
 - Integracoes de leitura devem respeitar tenant, RBAC e auditoria.
 - O banco operacional nao deve ser acessado diretamente por LLMs.
 - Analise/IA pertence ao iAnalisys.
+
+
+## Integração com iAnalisys
+
+A fronteira é implementada por API somente leitura e credenciais próprias por tenant.
+
+- o iAnalisys não acessa o banco do ERP;
+- não utiliza login humano;
+- cada credencial pertence a um único tenant;
+- o ERP armazena somente o hash da chave;
+- a sincronização é incremental e paginada;
+- o contrato externo é versionado em /integration/v1;
+- IA, BI e agentes continuam fora deste repositório.
+
+Detalhes: docs/INTEGRATION_IANALISYS.md.
