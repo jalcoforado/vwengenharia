@@ -346,6 +346,18 @@ async def test_v1_complete_operational_journey() -> None:
         )
         assert review.status_code == 200
 
+        report = await http.get(
+            f"/api/v1/reports/visits/{visit_id}.html",
+            headers=admin_headers,
+        )
+        assert report.status_code == 200
+        assert report.headers["content-type"].startswith("text/html")
+        assert "Relatorio de visita tecnica" in report.text
+        assert f"ETE Acceptance {suffix}" in report.text
+        assert "Grade limpa?" in report.text
+        assert "FALHA_EQUIPAMENTO" in report.text
+        assert "APROVAR" in report.text
+
         station_view = await http.get(
             f"/api/v1/stations/{station_id}/overview",
             headers=admin_headers,
