@@ -12,7 +12,6 @@ from app.models.field import (
     ChecklistTemplate,
     ChecklistTemplateItem,
     Measurement,
-    MeasurementStatus,
     SyncOperation,
     Visit,
     VisitAnswer,
@@ -485,10 +484,6 @@ async def upsert_answer(
     payload: VisitAnswerUpsert,
 ) -> VisitAnswer:
     visit = await get_accessible_visit(session, context, visit_id)
-    if visit.status != VisitStatus.EM_EXECUCAO.value:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="visit_not_in_progress")
-    if visit.checklist_template_id is None:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="visit_has_no_template")
 
     replay = await _sync_replay_entity(
         session,
@@ -505,6 +500,11 @@ async def upsert_answer(
                 detail="client_operation_id_conflict",
             )
         return replay
+
+    if visit.status != VisitStatus.EM_EXECUCAO.value:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="visit_not_in_progress")
+    if visit.checklist_template_id is None:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="visit_has_no_template")
 
     item = (
         await session.execute(
@@ -570,8 +570,6 @@ async def add_measurement(
     payload: MeasurementCreate,
 ) -> Measurement:
     visit = await get_accessible_visit(session, context, visit_id)
-    if visit.status != VisitStatus.EM_EXECUCAO.value:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="visit_not_in_progress")
 
     replay = await _sync_replay_entity(
         session,
@@ -588,6 +586,9 @@ async def add_measurement(
                 detail="client_operation_id_conflict",
             )
         return replay
+
+    if visit.status != VisitStatus.EM_EXECUCAO.value:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="visit_not_in_progress")
 
     data = payload.model_dump()
     data["status"] = payload.status.value
