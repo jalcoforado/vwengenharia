@@ -203,5 +203,7 @@ class Attachment(TimestampMixin, Base):
     object_key: Mapped[str] = mapped_column(String(512), nullable=False)
     content_type: Mapped[str] = mapped_column(String(120), nullable=False)
     size_bytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    storage_status: Mapped[str] = mapped_column(String(20), nullable=False, default="PENDING")
+    uploaded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     caption: Mapped[str | None] = mapped_column(String(255), nullable=True)
     client_operation_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
