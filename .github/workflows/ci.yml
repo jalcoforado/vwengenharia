@@ -7,6 +7,24 @@ on:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: vwengenharia
+          POSTGRES_USER: vw
+          POSTGRES_PASSWORD: vw
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U vw -d vwengenharia"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      APP_ENV: test
+      DATABASE_URL: postgresql+asyncpg://vw:vw@localhost:5432/vwengenharia
+      JWT_SECRET: test-secret-must-have-at-least-32-bytes-long
     defaults:
       run:
         working-directory: backend
@@ -17,7 +35,8 @@ jobs:
           python-version: "3.12"
       - run: python -m pip install --upgrade pip
       - run: pip install -e '.[dev]'
-      - run: ruff check app tests
+      - run: ruff check app tests scripts alembic
+      - run: alembic upgrade head
       - run: pytest -q
 
   frontend:
