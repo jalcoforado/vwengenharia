@@ -1,3 +1,4 @@
+import { Search } from "lucide-react";
 import { useState } from "react";
 
 import { api } from "../lib/api";
@@ -101,6 +102,9 @@ export default function WorkOrdersAdmin({
   const [description, setDescription] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [priorityFilter, setPriorityFilter] = useState("ALL");
 
   const stationMap = new Map(stations.map((item) => [item.id, item]));
   const assetMap = new Map(assets.map((item) => [item.id, item]));
@@ -207,6 +211,23 @@ export default function WorkOrdersAdmin({
   const sortedOrders = [...orders].sort(
     (a, b) => new Date(a.sla_due_at).getTime() - new Date(b.sla_due_at).getTime(),
   );
+  const filteredOrders = sortedOrders.filter((order) => {
+    const haystack = [
+      stationMap.get(order.station_id)?.name,
+      assetMap.get(order.asset_id ?? "")?.name,
+      memberMap.get(order.assigned_membership_id ?? "")?.name,
+      order.description,
+      order.status,
+      order.priority,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+    const matchesSearch = !search.trim() || haystack.includes(search.trim().toLowerCase());
+    const matchesStatus = statusFilter === "ALL" || order.status === statusFilter;
+    const matchesPriority = priorityFilter === "ALL" || order.priority === priorityFilter;
+    return matchesSearch && matchesStatus && matchesPriority;
+  });
 
   return (
     <section className="section-card">
@@ -232,9 +253,38 @@ export default function WorkOrdersAdmin({
         </div>
       </div>
 
+      <div className="list-toolbar work-order-toolbar">
+        <label className="search-field">
+          <Search size={16} />
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Buscar estacao, ativo, responsavel ou descricao"
+          />
+        </label>
+        <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+          <option value="ALL">Todos os status</option>
+          <option value="ABERTA">Aberta</option>
+          <option value="TRIAGEM">Triagem</option>
+          <option value="PLANEJADA">Planejada</option>
+          <option value="EM_EXECUCAO">Em execucao</option>
+          <option value="AGUARDANDO_MATERIAL">Aguardando material</option>
+          <option value="AGUARDANDO_TERCEIRO">Aguardando terceiro</option>
+          <option value="CONCLUIDA">Concluida</option>
+          <option value="VALIDADA">Validada</option>
+        </select>
+        <select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)}>
+          <option value="ALL">Todas as prioridades</option>
+          <option value="CRITICA">Critica</option>
+          <option value="ALTA">Alta</option>
+          <option value="MEDIA">Media</option>
+          <option value="BAIXA">Baixa</option>
+        </select>
+      </div>
+
       <div className="work-order-layout">
         <div className="ops-list">
-          {sortedOrders.slice(0, 30).map((order) => (
+          {filteredOrders.slice(0, 30).map((order) => (
             <div className="work-order-card" key={order.id}>
               <div className="work-order-main">
                 <div>
@@ -287,7 +337,29 @@ export default function WorkOrdersAdmin({
               </div>
             </div>
           ))}
-          {orders.length === 0 && <div className="empty-state">Nenhuma ordem de servico.</div>}
+          {orders.length === 0 && (
+            <div className="empty-state empty-state-positive">
+              <strong>Nenhuma ordem de servico</strong>
+              <span>A operacao nao possui OS registrada neste momento.</span>
+            </div>
+          )}
+          {orders.length > 0 && filteredOrders.length === 0 && (
+            <div className="empty-state">
+              <Search size={22} />
+              <strong>Nenhuma OS encontrada</strong>
+              <span>Altere a busca ou os filtros para ampliar os resultados.</span>
+              <button
+                className="small-button"
+                onClick={() => {
+                  setSearch("");
+                  setStatusFilter("ALL");
+                  setPriorityFilter("ALL");
+                }}
+              >
+                Limpar filtros
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="compact-form admin-create-form">
