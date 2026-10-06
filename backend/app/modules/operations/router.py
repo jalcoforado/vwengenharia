@@ -11,6 +11,7 @@ from app.modules.operations.schemas import (
     DashboardSla,
     OccurrenceCreate,
     OccurrenceRead,
+    OperationalAlert,
     VisitReviewCreate,
     VisitReviewRead,
     WorkOrderAssign,
@@ -26,6 +27,7 @@ from app.modules.operations.service import (
     dashboard_overview,
     dashboard_sla,
     list_occurrences,
+    operational_alerts,
     list_work_orders,
     review_visit,
     transition_work_order,
@@ -181,3 +183,14 @@ async def get_dashboard_sla(
     session: SessionDep,
 ) -> DashboardSla:
     return DashboardSla(buckets=await dashboard_sla(session, context))
+
+
+@router.get("/alerts", response_model=list[OperationalAlert])
+async def get_operational_alerts(
+    context: ManagementContextDep,
+    session: SessionDep,
+) -> list[OperationalAlert]:
+    return [
+        OperationalAlert.model_validate(item)
+        for item in await operational_alerts(session, context)
+    ]
