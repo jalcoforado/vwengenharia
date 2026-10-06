@@ -31,6 +31,9 @@ from app.models.maintenance import (
     WorkOrderStatusHistory,
 )
 from app.models.materials import (
+    InventoryItem,
+    InventoryMovement,
+    InventoryMovementType,
     MaterialRequest,
     RequestCategory,
     RequestPriority,
@@ -51,6 +54,9 @@ __all__ = [
     "Client",
     "Development",
     "IntegrationCredential",
+    "InventoryItem",
+    "InventoryMovement",
+    "InventoryMovementType",
     "LegacyStationMapping",
     "LegacyTechnicianMapping",
     "LegacyVisitStage",
