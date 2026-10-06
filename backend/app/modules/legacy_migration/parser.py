@@ -43,7 +43,12 @@ def parse_legacy_datetime(value) -> datetime | None:
     if isinstance(value, datetime):
         parsed = value
     elif isinstance(value, date):
-        parsed = datetime(value.year, value.month, value.day)
+        parsed = datetime(
+            value.year,
+            value.month,
+            value.day,
+            tzinfo=LOCAL_TZ,
+        )
     elif isinstance(value, str):
         text = value.strip()
         for fmt in (
@@ -54,7 +59,7 @@ def parse_legacy_datetime(value) -> datetime | None:
             "%d/%m/%Y",
         ):
             try:
-                parsed = datetime.strptime(text, fmt)
+                parsed = datetime.strptime(text, fmt).replace(tzinfo=LOCAL_TZ)
                 break
             except ValueError:
                 continue
