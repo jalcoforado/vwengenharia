@@ -19,7 +19,7 @@ services:
     restart: unless-stopped
 
   minio:
-    image: minio/minio:latest
+    image: quay.io/minio/aistor/minio:latest
     command: server /data --console-address ":9001"
     restart: unless-stopped
     environment:
