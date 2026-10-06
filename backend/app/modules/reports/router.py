@@ -10,6 +10,7 @@ from sqlalchemy import select
 from app.models.field import Visit
 from app.models.identity import Role
 from app.models.maintenance import MaintenancePlan, WorkOrder
+from app.models.materials import InventoryItem, InventoryMovement
 from app.modules.auth.dependencies import AuthContext, SessionDep, require_roles
 
 router = APIRouter(prefix="/reports", tags=["relatorios"])
@@ -170,6 +171,101 @@ async def maintenance_csv(
                 item.is_active and item.next_due_at < now,
                 item.is_active,
                 item.instructions or "",
+            ]
+            for item in rows
+        ],
+    )
+
+
+
+@router.get("/inventory.csv")
+async def inventory_csv(
+    context: ManagementContextDep,
+    session: SessionDep,
+) -> Response:
+    items = list(
+        (
+            await session.execute(
+                select(InventoryItem)
+                .where(InventoryItem.tenant_id == context.tenant.id)
+                .order_by(InventoryItem.name)
+                .limit(10_000)
+            )
+        ).scalars()
+    )
+    return csv_response(
+        "estoque.csv",
+        [
+            "id",
+            "code",
+            "name",
+            "unit",
+            "current_quantity",
+            "minimum_quantity",
+            "is_active",
+            "notes",
+        ],
+        [
+            [
+                item.id,
+                item.code,
+                item.name,
+                item.unit,
+                item.current_quantity,
+                item.minimum_quantity,
+                item.is_active,
+                item.notes or "",
+            ]
+            for item in items
+        ],
+    )
+
+
+@router.get("/inventory-movements.csv")
+async def inventory_movements_csv(
+    context: ManagementContextDep,
+    session: SessionDep,
+) -> Response:
+    rows = list(
+        (
+            await session.execute(
+                select(InventoryMovement)
+                .where(InventoryMovement.tenant_id == context.tenant.id)
+                .order_by(InventoryMovement.occurred_at.desc())
+                .limit(10_000)
+            )
+        ).scalars()
+    )
+    return csv_response(
+        "movimentos-estoque.csv",
+        [
+            "id",
+            "inventory_item_id",
+            "movement_type",
+            "quantity",
+            "balance_after",
+            "unit_cost",
+            "station_id",
+            "work_order_id",
+            "material_request_id",
+            "performed_by_user_id",
+            "occurred_at",
+            "notes",
+        ],
+        [
+            [
+                item.id,
+                item.inventory_item_id,
+                item.movement_type,
+                item.quantity,
+                item.balance_after,
+                item.unit_cost or "",
+                item.station_id or "",
+                item.work_order_id or "",
+                item.material_request_id or "",
+                item.performed_by_user_id,
+                item.occurred_at,
+                item.notes or "",
             ]
             for item in rows
         ],
