@@ -6,6 +6,7 @@ from app.modules.field.router import router as field_router
 from app.modules.integration.router import router as integration_router
 from app.modules.maintenance.router import router as maintenance_router
 from app.modules.operations.router import router as operations_router
+from app.modules.reports.router import router as reports_router
 from app.modules.team.router import router as team_router
 
 api_router = APIRouter()
@@ -15,6 +16,7 @@ api_router.include_router(field_router)
 api_router.include_router(integration_router)
 api_router.include_router(maintenance_router)
 api_router.include_router(operations_router)
+api_router.include_router(reports_router)
 api_router.include_router(team_router)
 
 
