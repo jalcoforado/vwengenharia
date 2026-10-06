@@ -31,6 +31,7 @@ import AuditViewer from "./components/AuditViewer";
 import InboxPanel from "./components/InboxPanel";
 import LegacyMigrationAdmin from "./components/LegacyMigrationAdmin";
 import ChecklistAdmin from "./components/ChecklistAdmin";
+import ClientPortal from "./components/ClientPortal";
 import WorkOrdersAdmin from "./components/WorkOrdersAdmin";
 import StationOverview from "./components/StationOverview";
 import { AccountSettings, IntegrationSettings } from "./components/SettingsPanels";
@@ -599,7 +600,9 @@ export default function App() {
         />
       )}
 
-      {selectedVisit && bootstrap ? (
+      {me?.role === "CLIENTE" ? (
+        <ClientPortal userName={me.user.name} />
+      ) : selectedVisit && bootstrap ? (
         <VisitScreen
           visit={selectedVisit}
           bootstrap={bootstrap}
