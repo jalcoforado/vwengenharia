@@ -145,6 +145,8 @@ class AttachmentRead(ORMModel):
     object_key: str
     content_type: str
     size_bytes: int | None
+    storage_status: str
+    uploaded_at: datetime | None
     caption: str | None
     created_at: datetime
     updated_at: datetime
@@ -175,3 +177,10 @@ class FieldBootstrapResponse(BaseModel):
     answers: list[VisitAnswerRead]
     measurements: list[MeasurementRead]
     attachments: list[AttachmentRead]
+
+
+class AttachmentPresignResponse(BaseModel):
+    attachment: AttachmentRead
+    upload_url: str
+    expires_in: int
+    required_headers: dict[str, str]
