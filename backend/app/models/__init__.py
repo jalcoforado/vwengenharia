@@ -16,6 +16,9 @@ from app.models.field import (
 from app.models.identity import Membership, RefreshToken, Role, Tenant, User
 from app.models.integration import IntegrationCredential
 from app.models.maintenance import (
+    MaintenanceExecution,
+    MaintenancePlan,
+    MaintenanceType,
     Occurrence,
     OccurrenceSeverity,
     OccurrenceStatus,
@@ -41,6 +44,9 @@ __all__ = [
     "Client",
     "Development",
     "IntegrationCredential",
+    "MaintenanceExecution",
+    "MaintenancePlan",
+    "MaintenanceType",
     "Measurement",
     "MeasurementStatus",
     "Membership",
