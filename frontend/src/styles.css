@@ -244,3 +244,13 @@ button:disabled { cursor: wait; opacity: .65; }
 @media (max-width: 600px) {
   .occurrence-controls { grid-template-columns: 1fr; }
 }
+
+
+.evidence-capture { display: grid; gap: 8px; }
+.evidence-button {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  min-height: 54px; border: 1px dashed #8eb09b; border-radius: 14px;
+  background: #f5faf7; color: #24553a; font-weight: 800; cursor: pointer;
+}
+.evidence-button input { display: none; }
+.evidence-capture p { margin: 0; color: #69776e; font-size: 12px; }
