@@ -2,7 +2,7 @@ import enum
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, UniqueConstraint, Uuid
+from sqlalchemy import DateTime, ForeignKey, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
@@ -160,8 +160,6 @@ class WorkOrderStatusHistory(Base):
 
 class VisitReview(Base):
     __tablename__ = "visit_reviews"
-    __table_args__ = (UniqueConstraint("tenant_id", "visit_id", name="uq_visit_review"),)
-
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
     tenant_id: Mapped[UUID] = mapped_column(
         Uuid(as_uuid=True),
