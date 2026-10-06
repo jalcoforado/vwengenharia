@@ -150,14 +150,14 @@ class AttachmentRead(ORMModel):
     updated_at: datetime
 
 
-class BootstrapStation(BaseModel):
+class BootstrapStation(ORMModel):
     id: UUID
     name: str
     code: str | None
     station_type: str | None
 
 
-class BootstrapAsset(BaseModel):
+class BootstrapAsset(ORMModel):
     id: UUID
     station_id: UUID
     asset_type_id: UUID
@@ -172,3 +172,6 @@ class FieldBootstrapResponse(BaseModel):
     assets: list[BootstrapAsset]
     templates: list[ChecklistTemplateRead]
     items: list[ChecklistItemRead]
+    answers: list[VisitAnswerRead]
+    measurements: list[MeasurementRead]
+    attachments: list[AttachmentRead]
