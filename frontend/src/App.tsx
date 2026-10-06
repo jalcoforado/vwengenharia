@@ -17,6 +17,7 @@ import {
 
 import AuditViewer from "./components/AuditViewer";
 import InboxPanel from "./components/InboxPanel";
+import InventoryAdmin from "./components/InventoryAdmin";
 import LegacyMigrationAdmin from "./components/LegacyMigrationAdmin";
 import ChecklistAdmin from "./components/ChecklistAdmin";
 import WorkOrdersAdmin from "./components/WorkOrdersAdmin";
@@ -1465,6 +1466,12 @@ function SupervisorHome({ me }: { me: Me }) {
 
       {managementView === "OPERATIONS" && (
         <>
+      <InventoryAdmin
+        requests={materialRequests}
+        stations={adminStations}
+        onChanged={load}
+      />
+
       <MaterialRequestsAdmin
         requests={materialRequests}
         stations={adminStations}
