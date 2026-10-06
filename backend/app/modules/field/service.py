@@ -17,6 +17,7 @@ from app.models.field import (
     SyncOperation,
     Visit,
     VisitAnswer,
+    VisitPlan,
     VisitStatus,
 )
 from app.models.identity import Membership, Role
@@ -30,6 +31,8 @@ from app.modules.field.schemas import (
     MeasurementCreate,
     VisitAnswerUpsert,
     VisitCreate,
+    VisitPlanCreate,
+    VisitPlanUpdate,
 )
 from app.services.storage import get_storage
 
@@ -163,6 +166,202 @@ async def list_template_items(
         .order_by(ChecklistTemplateItem.position, ChecklistTemplateItem.code)
     )
     return list((await session.execute(stmt)).scalars().all())
+
+
+
+
+async def create_visit_plan(
+    session: AsyncSession,
+    context: AuthContext,
+    payload: VisitPlanCreate,
+) -> VisitPlan:
+    await tenant_get_or_404(session, Station, context.tenant.id, payload.station_id)
+    technician = await get_tenant_membership(
+        session, context.tenant.id, payload.technician_membership_id
+    )
+    if technician.role not in SELF_FIELD_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="membership_is_not_field_role",
+        )
+    if payload.checklist_template_id is not None:
+        await tenant_get_or_404(
+            session,
+            ChecklistTemplate,
+            context.tenant.id,
+            payload.checklist_template_id,
+        )
+
+    plan = VisitPlan(
+        tenant_id=context.tenant.id,
+        station_id=payload.station_id,
+        technician_membership_id=payload.technician_membership_id,
+        checklist_template_id=payload.checklist_template_id,
+        frequency_days=payload.frequency_days,
+        start_at=payload.start_at,
+        end_at=payload.end_at,
+        next_due_at=payload.start_at,
+        notes=payload.notes,
+        is_active=True,
+    )
+    session.add(plan)
+    await session.flush()
+    add_audit(
+        session,
+        context,
+        action="VISIT_PLAN_CREATE",
+        entity_type="visit_plan",
+        entity_id=plan.id,
+    )
+    await session.commit()
+    await session.refresh(plan)
+    return plan
+
+
+async def list_visit_plans(
+    session: AsyncSession,
+    context: AuthContext,
+    *,
+    active_only: bool = True,
+    station_id: UUID | None = None,
+) -> list[VisitPlan]:
+    stmt = select(VisitPlan).where(VisitPlan.tenant_id == context.tenant.id)
+    if active_only:
+        stmt = stmt.where(VisitPlan.is_active.is_(True))
+    if station_id is not None:
+        stmt = stmt.where(VisitPlan.station_id == station_id)
+    stmt = stmt.order_by(VisitPlan.next_due_at, VisitPlan.created_at)
+    return list((await session.execute(stmt)).scalars().all())
+
+
+async def update_visit_plan(
+    session: AsyncSession,
+    context: AuthContext,
+    plan_id: UUID,
+    payload: VisitPlanUpdate,
+) -> VisitPlan:
+    plan = await tenant_get_or_404(session, VisitPlan, context.tenant.id, plan_id)
+    changes = payload.model_dump(exclude_unset=True)
+
+    if "technician_membership_id" in changes:
+        technician = await get_tenant_membership(
+            session, context.tenant.id, changes["technician_membership_id"]
+        )
+        if technician.role not in SELF_FIELD_ROLES:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="membership_is_not_field_role",
+            )
+    if changes.get("checklist_template_id") is not None:
+        await tenant_get_or_404(
+            session,
+            ChecklistTemplate,
+            context.tenant.id,
+            changes["checklist_template_id"],
+        )
+    if "end_at" in changes and changes["end_at"] is not None:
+        if changes["end_at"] < plan.start_at:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="end_at_before_start_at",
+            )
+
+    for field, value in changes.items():
+        setattr(plan, field, value)
+
+    add_audit(
+        session,
+        context,
+        action="VISIT_PLAN_UPDATE",
+        entity_type="visit_plan",
+        entity_id=plan.id,
+        fields=sorted(changes.keys()),
+    )
+    await session.commit()
+    await session.refresh(plan)
+    return plan
+
+
+async def generate_visits_from_plans(
+    session: AsyncSession,
+    context: AuthContext,
+    *,
+    horizon_days: int,
+) -> dict:
+    now = datetime.now(UTC)
+    horizon_until = now + timedelta(days=horizon_days)
+    plans = list(
+        (
+            await session.execute(
+                select(VisitPlan).where(
+                    VisitPlan.tenant_id == context.tenant.id,
+                    VisitPlan.is_active.is_(True),
+                    VisitPlan.next_due_at <= horizon_until,
+                )
+            )
+        ).scalars()
+    )
+
+    generated = 0
+    already_existing = 0
+
+    for plan in plans:
+        due_at = plan.next_due_at
+        while due_at <= horizon_until:
+            if plan.end_at is not None and due_at > plan.end_at:
+                plan.is_active = False
+                break
+
+            existing = (
+                await session.execute(
+                    select(Visit.id).where(
+                        Visit.tenant_id == context.tenant.id,
+                        Visit.visit_plan_id == plan.id,
+                        Visit.scheduled_for == due_at,
+                    )
+                )
+            ).scalar_one_or_none()
+
+            if existing is None:
+                session.add(
+                    Visit(
+                        tenant_id=context.tenant.id,
+                        visit_plan_id=plan.id,
+                        station_id=plan.station_id,
+                        technician_membership_id=plan.technician_membership_id,
+                        checklist_template_id=plan.checklist_template_id,
+                        scheduled_for=due_at,
+                        status=VisitStatus.PROGRAMADA.value,
+                        notes=plan.notes,
+                    )
+                )
+                generated += 1
+            else:
+                already_existing += 1
+
+            due_at = due_at + timedelta(days=plan.frequency_days)
+
+        plan.next_due_at = due_at
+        if plan.end_at is not None and plan.next_due_at > plan.end_at:
+            plan.is_active = False
+
+    if plans:
+        add_audit(
+            session,
+            context,
+            action="VISIT_PLAN_GENERATE",
+            entity_type="visit_plan",
+            entity_id=None,
+            fields=["generated", "horizon_until"],
+        )
+    await session.commit()
+
+    return {
+        "generated": generated,
+        "already_existing": already_existing,
+        "plans_processed": len(plans),
+        "horizon_until": horizon_until,
+    }
 
 
 async def create_visit(
