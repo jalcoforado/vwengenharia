@@ -50,6 +50,7 @@ import { useOfflineSync, type SyncQueueError } from "./lib/useOfflineSync";
 import { cacheValue, outboxCount, queueUpload, readCache, type SyncQueueSummary } from "./offline/db";
 import { runOrQueue, syncOutbox } from "./lib/sync";
 import { SyncControl, SyncHealthCard } from "./components/SyncStatus";
+import Toast from "./components/Toast";
 
 type Visit = {
   id: string;
@@ -581,9 +582,17 @@ export default function App() {
       </header>
 
       {message && (
-        <div className="message" onClick={() => setMessage(null)}>
-          {message}
-        </div>
+        <Toast
+          message={message}
+          tone={
+            /nao foi possivel|falha|erro/i.test(message)
+              ? "warning"
+              : /sucesso|confirmada|sincronizado|salva/i.test(message)
+                ? "success"
+                : "info"
+          }
+          onClose={() => setMessage(null)}
+        />
       )}
 
       {selectedVisit && bootstrap ? (
