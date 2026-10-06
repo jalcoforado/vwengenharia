@@ -2,10 +2,9 @@ from fastapi import FastAPI, HTTPException
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.db.session import get_session_factory
-
 from app.api.v1.router import api_router
 from app.core.config import settings
+from app.db.session import get_session_factory
 
 app = FastAPI(title=settings.app_name, version="0.2.0")
 app.include_router(api_router, prefix=settings.api_v1_prefix)
