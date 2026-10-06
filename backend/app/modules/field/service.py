@@ -298,13 +298,17 @@ async def transition_visit(
     now = datetime.now(UTC)
 
     if operation == "VISIT_START":
-        if visit.status != VisitStatus.PROGRAMADA.value:
+        if visit.status not in {
+            VisitStatus.PROGRAMADA.value,
+            VisitStatus.DEVOLVIDA.value,
+        }:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="visit_not_programmed",
+                detail="visit_not_startable",
             )
         visit.status = VisitStatus.EM_EXECUCAO.value
         visit.started_at = now
+        visit.finished_at = None
     elif operation == "VISIT_FINISH":
         if visit.status != VisitStatus.EM_EXECUCAO.value:
             raise HTTPException(
