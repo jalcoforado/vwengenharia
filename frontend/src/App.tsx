@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  AlertTriangle,
   ArrowLeft,
   CheckCircle2,
+  ClipboardCheck,
   Cloud,
   CloudOff,
   LogOut,
   RefreshCw,
   Route,
   Save,
+  ShieldCheck,
   Wrench,
 } from "lucide-react";
 
@@ -91,6 +94,37 @@ type Me = {
   role: string;
 };
 
+type DashboardOverview = {
+  active_stations: number;
+  unavailable_assets: number;
+  visits_waiting_review: number;
+  open_occurrences: number;
+  open_work_orders: number;
+  overdue_work_orders: number;
+  critical_work_orders: number;
+};
+
+type WorkOrder = {
+  id: string;
+  station_id: string;
+  priority: string;
+  status: string;
+  description: string;
+  sla_due_at: string;
+  assigned_membership_id: string | null;
+};
+
+type Occurrence = {
+  id: string;
+  station_id: string;
+  occurrence_type: string;
+  severity: string;
+  status: string;
+  description: string;
+  detected_at: string;
+};
+
+const MANAGEMENT_ROLES = new Set(["SUPERADMIN", "ADMIN", "GESTOR", "SUPERVISOR"]);
 const CACHE_KEY = "field-bootstrap";
 
 function statusLabel(status: string) {
@@ -359,13 +393,14 @@ export default function App() {
   }
 
   const selectedVisit = bootstrap?.visits.find((item) => item.id === selectedVisitId) ?? null;
+  const isManagement = Boolean(me && MANAGEMENT_ROLES.has(me.role));
 
   return (
     <div className="app-shell">
       <header className="topbar">
         <div>
           <span className="brand-kicker">VW Engenharia</span>
-          <strong>{selectedVisit ? "Visita tecnica" : "Operacao de campo"}</strong>
+          <strong>{selectedVisit ? "Visita tecnica" : isManagement ? "Cockpit operacional" : "Operacao de campo"}</strong>
         </div>
         <div className="top-actions">
           <span className={online ? "connection online" : "connection offline"}>
@@ -395,6 +430,8 @@ export default function App() {
           onMeasurement={saveMeasurement}
           busy={busy}
         />
+      ) : isManagement && me ? (
+        <SupervisorHome me={me} />
       ) : (
         <Home
           me={me}
@@ -823,5 +860,211 @@ function TextChecklistField({
         </button>
       </div>
     </label>
+  );
+}
+
+
+function SupervisorHome({ me }: { me: Me }) {
+  const [overview, setOverview] = useState<DashboardOverview | null>(null);
+  const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
+  const [occurrences, setOccurrences] = useState<Occurrence[]>([]);
+  const [reviews, setReviews] = useState<Visit[]>([]);
+  const [stations, setStations] = useState<Station[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  async function load() {
+    setBusy(true);
+    try {
+      const [summary, orders, occurrenceList, visitList, stationList] = await Promise.all([
+        api<DashboardOverview>("/api/v1/dashboard/overview"),
+        api<WorkOrder[]>("/api/v1/work-orders?limit=100"),
+        api<Occurrence[]>("/api/v1/occurrences?limit=100"),
+        api<Visit[]>("/api/v1/visits?limit=200"),
+        api<Station[]>("/api/v1/stations?limit=500"),
+      ]);
+      setOverview(summary);
+      setWorkOrders(orders);
+      setOccurrences(occurrenceList);
+      setReviews(visitList.filter((visit) => visit.status === "AGUARDANDO_REVISAO"));
+      setStations(stationList);
+    } catch {
+      setNotice("Nao foi possivel atualizar o cockpit.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function reviewVisit(visitId: string, decision: "APROVAR" | "DEVOLVER") {
+    setBusy(true);
+    try {
+      await api(`/api/v1/visits/${visitId}/review`, {
+        method: "POST",
+        body: JSON.stringify({
+          decision,
+          notes: decision === "APROVAR" ? "Revisao operacional aprovada." : "Devolvida para ajuste.",
+        }),
+      });
+      setNotice(decision === "APROVAR" ? "Visita aprovada." : "Visita devolvida ao tecnico.");
+      await load();
+    } catch {
+      setNotice("Nao foi possivel registrar a revisao.");
+      setBusy(false);
+    }
+  }
+
+  const stationMap = new Map(stations.map((station) => [station.id, station]));
+  const now = Date.now();
+  const sortedOrders = [...workOrders].sort(
+    (a, b) => new Date(a.sla_due_at).getTime() - new Date(b.sla_due_at).getTime(),
+  );
+
+  return (
+    <main className="content">
+      <section className="welcome">
+        <div>
+          <span className="eyebrow">Gestao operacional</span>
+          <h1>Ola, {me.user.name.split(" ")[0]}</h1>
+          <p>{me.tenant.name} · visao consolidada da operacao</p>
+        </div>
+        <button className="secondary-button" onClick={() => void load()} disabled={busy}>
+          <RefreshCw size={17} className={busy ? "spin" : ""} />
+          Atualizar
+        </button>
+      </section>
+
+      {notice && <div className="message" onClick={() => setNotice(null)}>{notice}</div>}
+
+      <section className="metric-grid management-metrics">
+        <div className="metric-card">
+          <Route />
+          <strong>{overview?.active_stations ?? "—"}</strong>
+          <span>Estacoes ativas</span>
+        </div>
+        <div className="metric-card">
+          <Wrench />
+          <strong>{overview?.open_work_orders ?? "—"}</strong>
+          <span>OS abertas</span>
+        </div>
+        <div className="metric-card danger-metric">
+          <AlertTriangle />
+          <strong>{overview?.overdue_work_orders ?? "—"}</strong>
+          <span>OS fora do SLA</span>
+        </div>
+        <div className="metric-card">
+          <ClipboardCheck />
+          <strong>{overview?.visits_waiting_review ?? "—"}</strong>
+          <span>Aguardando revisao</span>
+        </div>
+        <div className="metric-card">
+          <ShieldCheck />
+          <strong>{overview?.critical_work_orders ?? "—"}</strong>
+          <span>OS criticas</span>
+        </div>
+        <div className="metric-card">
+          <AlertTriangle />
+          <strong>{overview?.open_occurrences ?? "—"}</strong>
+          <span>Ocorrencias abertas</span>
+        </div>
+      </section>
+
+      <div className="management-grid">
+        <section className="section-card">
+          <div className="section-heading">
+            <div>
+              <span className="eyebrow">Prioridade</span>
+              <h2>Ordens de servico</h2>
+            </div>
+          </div>
+          <div className="ops-list">
+            {sortedOrders.slice(0, 12).map((order) => {
+              const overdue =
+                !["VALIDADA", "CANCELADA"].includes(order.status) &&
+                new Date(order.sla_due_at).getTime() < now;
+              return (
+                <div className="ops-row" key={order.id}>
+                  <div>
+                    <strong>{stationMap.get(order.station_id)?.name ?? "Estacao"}</strong>
+                    <span>{order.description}</span>
+                  </div>
+                  <div className="ops-meta">
+                    <span className={`priority priority-${order.priority.toLowerCase()}`}>
+                      {order.priority}
+                    </span>
+                    <span className={overdue ? "sla overdue" : "sla"}>
+                      {overdue ? "SLA vencido" : order.status.replaceAll("_", " ")}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+            {sortedOrders.length === 0 && <div className="empty-state">Nenhuma OS aberta.</div>}
+          </div>
+        </section>
+
+        <section className="section-card">
+          <span className="eyebrow">Qualidade</span>
+          <h2>Visitas para revisar</h2>
+          <div className="ops-list">
+            {reviews.slice(0, 10).map((visit) => (
+              <div className="review-row" key={visit.id}>
+                <div>
+                  <strong>{stationMap.get(visit.station_id)?.name ?? "Estacao"}</strong>
+                  <span>
+                    {new Intl.DateTimeFormat("pt-BR", {
+                      dateStyle: "short",
+                      timeStyle: "short",
+                    }).format(new Date(visit.finished_at ?? visit.scheduled_for))}
+                  </span>
+                </div>
+                <div className="review-actions">
+                  <button
+                    className="small-button"
+                    disabled={busy}
+                    onClick={() => void reviewVisit(visit.id, "APROVAR")}
+                  >
+                    Aprovar
+                  </button>
+                  <button
+                    className="small-button warning-button"
+                    disabled={busy}
+                    onClick={() => void reviewVisit(visit.id, "DEVOLVER")}
+                  >
+                    Devolver
+                  </button>
+                </div>
+              </div>
+            ))}
+            {reviews.length === 0 && <div className="empty-state">Fila de revisao em dia.</div>}
+          </div>
+        </section>
+      </div>
+
+      <section className="section-card">
+        <span className="eyebrow">Ocorrencias</span>
+        <h2>Atencao operacional recente</h2>
+        <div className="ops-list">
+          {occurrences
+            .filter((item) => !["RESOLVIDA", "CANCELADA"].includes(item.status))
+            .slice(0, 10)
+            .map((item) => (
+              <div className="ops-row" key={item.id}>
+                <div>
+                  <strong>{stationMap.get(item.station_id)?.name ?? "Estacao"} · {item.occurrence_type}</strong>
+                  <span>{item.description}</span>
+                </div>
+                <span className={`priority priority-${item.severity.toLowerCase()}`}>
+                  {item.severity}
+                </span>
+              </div>
+            ))}
+        </div>
+      </section>
+    </main>
   );
 }
