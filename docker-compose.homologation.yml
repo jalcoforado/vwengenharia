@@ -1,0 +1,33 @@
+services:
+  minio:
+    ports:
+      - "${HOMOLOGATION_MINIO_PORT:-19000}:9000"
+      - "${HOMOLOGATION_MINIO_CONSOLE_PORT:-19001}:9001"
+
+  backend:
+    environment:
+      APP_ENV: homologation
+      REFRESH_COOKIE_SECURE: "false"
+
+  frontend:
+    ports:
+      - "${HOMOLOGATION_APP_PORT:-18080}:80"
+
+  seed:
+    build:
+      context: ./backend
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      APP_ENV: homologation
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-vw}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-vwengenharia}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      HOMOLOGATION_PASSWORD: ${HOMOLOGATION_PASSWORD:?HOMOLOGATION_PASSWORD is required}
+      HOMOLOGATION_TENANT_NAME: ${HOMOLOGATION_TENANT_NAME:-VW Engenharia - Homologacao}
+      HOMOLOGATION_TENANT_SLUG: ${HOMOLOGATION_TENANT_SLUG:-vw-homologacao}
+      HOMOLOGATION_ADMIN_EMAIL: ${HOMOLOGATION_ADMIN_EMAIL:-gestor.homologacao@example.com}
+      HOMOLOGATION_TECH_EMAIL: ${HOMOLOGATION_TECH_EMAIL:-tecnico.homologacao@example.com}
+      HOMOLOGATION_MAINTENANCE_EMAIL: ${HOMOLOGATION_MAINTENANCE_EMAIL:-manutencao.homologacao@example.com}
+    command: ["python", "scripts/seed_homologation.py"]
+    restart: "no"
