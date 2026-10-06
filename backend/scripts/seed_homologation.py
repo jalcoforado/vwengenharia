@@ -437,9 +437,7 @@ async def main() -> None:
                 ).scalars()
             )
             for item in checklist_items:
-                if item.code == "GRADE_LIMPA":
-                    value = True
-                elif item.code == "CLORACAO":
+                if item.code in {"GRADE_LIMPA", "CLORACAO"}:
                     value = True
                 else:
                     value = "Operacao normal; aerador requer manutencao programada."
@@ -564,7 +562,7 @@ async def main() -> None:
                     requested_by_user_id=tech_user.id,
                     category="MATERIAL",
                     item_name="Mangueira 1 polegada",
-                    quantity=Decimal("2"),
+                    quantity=Decimal(2),
                     unit="m",
                     priority="MEDIA",
                     status="APROVADA",
