@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.field import Visit, VisitStatus
 from app.models.identity import Membership, Role
+from app.models.materials import InventoryItem
 from app.models.maintenance import (
     MaintenancePlan,
     Occurrence,
@@ -684,6 +685,33 @@ async def operational_alerts(
                 "entity_type": "visit",
                 "entity_id": visit.id,
                 "due_at": visit.finished_at,
+            }
+        )
+
+    low_stock = list(
+        (
+            await session.execute(
+                select(InventoryItem).where(
+                    InventoryItem.tenant_id == context.tenant.id,
+                    InventoryItem.is_active.is_(True),
+                    InventoryItem.current_quantity <= InventoryItem.minimum_quantity,
+                )
+            )
+        ).scalars()
+    )
+    for item in low_stock:
+        alerts.append(
+            {
+                "kind": "INVENTORY_LOW_STOCK",
+                "severity": "ALTA" if item.current_quantity <= 0 else "MEDIA",
+                "title": "Estoque zerado" if item.current_quantity <= 0 else "Estoque baixo",
+                "message": (
+                    f"{item.name}: {item.current_quantity} {item.unit}; "
+                    f"minimo {item.minimum_quantity} {item.unit}."
+                ),
+                "entity_type": "inventory_item",
+                "entity_id": item.id,
+                "due_at": None,
             }
         )
 
