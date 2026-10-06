@@ -45,8 +45,11 @@ import OperationalAdmin, {
   type DevelopmentRecord,
 } from "./components/OperationalAdmin";
 import { api, clearSession, downloadApi, hasSession, login, openApiDocument } from "./lib/api";
+import { formatBytes, optimizeEvidenceImage } from "./lib/media";
+import { useOfflineSync } from "./lib/useOfflineSync";
 import { cacheValue, outboxCount, queueUpload, readCache } from "./offline/db";
 import { runOrQueue, syncOutbox } from "./lib/sync";
+import { SyncControl, SyncHealthCard } from "./components/SyncStatus";
 
 type Visit = {
   id: string;
@@ -246,11 +249,13 @@ export default function App() {
   const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null);
   const [online, setOnline] = useState(navigator.onLine);
   const [pending, setPending] = useState(0);
+  const { summary: syncSummary, errors: syncErrors, syncing, refresh: refreshSync, syncNow } = useOfflineSync();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   async function refreshPending() {
     setPending(await outboxCount());
+    await refreshSync();
   }
 
   async function loadFieldData() {
