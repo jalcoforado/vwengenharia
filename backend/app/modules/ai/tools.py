@@ -6,7 +6,12 @@ from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.field import Measurement, Visit
-from app.models.maintenance import Occurrence, OccurrenceStatus, WorkOrder, WorkOrderStatus
+from app.models.maintenance import (
+    Occurrence,
+    OccurrenceStatus,
+    WorkOrder,
+    WorkOrderStatus,
+)
 from app.models.operations import Asset, Station
 from app.modules.auth.dependencies import AuthContext
 from app.modules.core_registers.service import tenant_get_or_404
