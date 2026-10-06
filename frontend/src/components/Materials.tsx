@@ -10,6 +10,7 @@ export type MaterialRequest = {
   visit_id: string | null;
   work_order_id: string | null;
   asset_id: string | null;
+  inventory_item_id: string | null;
   requested_by_user_id: string;
   category: string;
   item_name: string;
