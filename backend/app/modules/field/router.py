@@ -26,9 +26,9 @@ from app.modules.field.schemas import (
 )
 from app.modules.field.service import (
     add_measurement,
-    complete_attachment_upload,
     add_template_item,
     build_field_bootstrap,
+    complete_attachment_upload,
     create_template,
     create_visit,
     list_template_items,
