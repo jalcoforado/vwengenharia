@@ -15,6 +15,7 @@ import {
   Wrench,
 } from "lucide-react";
 
+import AuditViewer from "./components/AuditViewer";
 import ChecklistAdmin from "./components/ChecklistAdmin";
 import WorkOrdersAdmin from "./components/WorkOrdersAdmin";
 import StationOverview from "./components/StationOverview";
@@ -1425,6 +1426,10 @@ function SupervisorHome({ me }: { me: Me }) {
         team={team}
         onChanged={load}
       />
+
+      {["SUPERADMIN", "ADMIN", "GESTOR"].includes(me.role) && (
+        <AuditViewer team={team} />
+      )}
 
       <MaintenanceAdmin
         plans={maintenancePlans}
