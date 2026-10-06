@@ -616,3 +616,42 @@ button:disabled { cursor: wait; opacity: .65; }
   .audit-row { flex-direction: column; }
   .audit-meta { text-align: left; }
 }
+
+
+.management-nav {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 6px 0 14px;
+  margin-bottom: 14px;
+  position: sticky;
+  top: 72px;
+  z-index: 20;
+  background: rgba(247, 250, 248, 0.95);
+  backdrop-filter: blur(10px);
+}
+.management-nav-item {
+  border: 1px solid #dce6df;
+  background: #ffffff;
+  color: #5d6d63;
+  border-radius: 11px;
+  padding: 9px 13px;
+  font-size: 12px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+.management-nav-item.active {
+  background: #173c2a;
+  border-color: #173c2a;
+  color: #ffffff;
+}
+
+@media (max-width: 700px) {
+  .management-nav {
+    top: 62px;
+    margin-left: -4px;
+    margin-right: -4px;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+}
