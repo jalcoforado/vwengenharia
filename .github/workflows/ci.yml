@@ -63,3 +63,31 @@ jobs:
         run: docker build -t vwengenharia-backend:ci ./backend
       - name: Build frontend image
         run: docker build -t vwengenharia-frontend:ci ./frontend
+
+
+  homologation-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate homologation compose
+        run: docker compose --env-file .env.homologation.example -f docker-compose.app.yml -f docker-compose.homologation.yml config > /dev/null
+      - name: Start homologation stack
+        run: |
+          docker compose --env-file .env.homologation.example -f docker-compose.app.yml -f docker-compose.homologation.yml up -d --build postgres redis s3mock migrate backend frontend
+      - name: Seed homologation data
+        run: |
+          docker compose --env-file .env.homologation.example -f docker-compose.app.yml -f docker-compose.homologation.yml run --rm seed
+          docker compose --env-file .env.homologation.example -f docker-compose.app.yml -f docker-compose.homologation.yml run --rm seed
+      - name: Smoke test homologation stack
+        env:
+          BASE_URL: http://127.0.0.1:18080
+          HOMOLOGATION_PASSWORD: Homologacao-VW-2026!
+          HOMOLOGATION_ADMIN_EMAIL: gestor.homologacao@example.com
+          HOMOLOGATION_TECH_EMAIL: tecnico.homologacao@example.com
+        run: sh scripts/smoke_homologation.sh
+      - name: Show compose logs on failure
+        if: failure()
+        run: docker compose --env-file .env.homologation.example -f docker-compose.app.yml -f docker-compose.homologation.yml logs --no-color
+      - name: Stop homologation stack
+        if: always()
+        run: docker compose --env-file .env.homologation.example -f docker-compose.app.yml -f docker-compose.homologation.yml down -v
