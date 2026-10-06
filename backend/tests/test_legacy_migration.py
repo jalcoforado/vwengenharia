@@ -39,13 +39,13 @@ def legacy_workbook_bytes(
     )
     sheet.append(
         [
-            datetime(2026, 8, 17, 10, 6),
+            "2026-08-17 10:06:00",
             "127.0.0.1",
             technician,
             station,
             technician,
-            datetime(2026, 8, 17, 10, 5),
-            datetime(2026, 8, 17, 10, 4),
+            "2026-08-17 10:05:00",
+            "2026-08-17 10:04:00",
             "Aguardando Revisão",
             "Registro histórico de teste.",
         ]
