@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.field import Visit, VisitStatus
 from app.models.identity import Membership, Role
 from app.models.maintenance import (
+    MaintenancePlan,
     Occurrence,
     OccurrenceStatus,
     ReviewDecision,
@@ -580,3 +581,117 @@ async def dashboard_sla(
             }
         )
     return buckets
+
+
+async def operational_alerts(
+    session: AsyncSession,
+    context: AuthContext,
+) -> list[dict]:
+    now = datetime.now(UTC)
+    alerts: list[dict] = []
+
+    overdue_visits = list(
+        (
+            await session.execute(
+                select(Visit).where(
+                    Visit.tenant_id == context.tenant.id,
+                    Visit.status == VisitStatus.PROGRAMADA.value,
+                    Visit.scheduled_for < now,
+                )
+            )
+        ).scalars()
+    )
+    for visit in overdue_visits:
+        alerts.append(
+            {
+                "kind": "VISIT_OVERDUE",
+                "severity": "ALTA",
+                "title": "Visita atrasada",
+                "message": "Visita programada ainda nao foi iniciada.",
+                "entity_type": "visit",
+                "entity_id": visit.id,
+                "due_at": visit.scheduled_for,
+            }
+        )
+
+    overdue_orders = list(
+        (
+            await session.execute(
+                select(WorkOrder).where(
+                    WorkOrder.tenant_id == context.tenant.id,
+                    WorkOrder.sla_due_at < now,
+                    WorkOrder.status.notin_(
+                        [WorkOrderStatus.VALIDADA.value, WorkOrderStatus.CANCELADA.value]
+                    ),
+                )
+            )
+        ).scalars()
+    )
+    for order in overdue_orders:
+        alerts.append(
+            {
+                "kind": "WORK_ORDER_SLA",
+                "severity": "CRITICA" if order.priority == WorkOrderPriority.CRITICA.value else "ALTA",
+                "title": "OS fora do SLA",
+                "message": order.description,
+                "entity_type": "work_order",
+                "entity_id": order.id,
+                "due_at": order.sla_due_at,
+            }
+        )
+
+    overdue_maintenance = list(
+        (
+            await session.execute(
+                select(MaintenancePlan).where(
+                    MaintenancePlan.tenant_id == context.tenant.id,
+                    MaintenancePlan.is_active.is_(True),
+                    MaintenancePlan.next_due_at < now,
+                )
+            )
+        ).scalars()
+    )
+    for plan in overdue_maintenance:
+        alerts.append(
+            {
+                "kind": "MAINTENANCE_OVERDUE",
+                "severity": "ALTA",
+                "title": "Manutencao preventiva vencida",
+                "message": plan.instructions or "Plano preventivo vencido.",
+                "entity_type": "maintenance_plan",
+                "entity_id": plan.id,
+                "due_at": plan.next_due_at,
+            }
+        )
+
+    waiting_reviews = list(
+        (
+            await session.execute(
+                select(Visit).where(
+                    Visit.tenant_id == context.tenant.id,
+                    Visit.status == VisitStatus.AGUARDANDO_REVISAO.value,
+                )
+            )
+        ).scalars()
+    )
+    for visit in waiting_reviews:
+        alerts.append(
+            {
+                "kind": "VISIT_REVIEW",
+                "severity": "MEDIA",
+                "title": "Visita aguardando revisao",
+                "message": "Dados de campo aguardam validacao da supervisao.",
+                "entity_type": "visit",
+                "entity_id": visit.id,
+                "due_at": visit.finished_at,
+            }
+        )
+
+    severity_rank = {"CRITICA": 0, "ALTA": 1, "MEDIA": 2, "BAIXA": 3}
+    alerts.sort(
+        key=lambda item: (
+            severity_rank.get(item["severity"], 9),
+            item["due_at"] or now,
+        )
+    )
+    return alerts[:200]
