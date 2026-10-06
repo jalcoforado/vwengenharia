@@ -13,6 +13,17 @@ from app.models.field import (
     VisitStatus,
 )
 from app.models.identity import Membership, RefreshToken, Role, Tenant, User
+from app.models.maintenance import (
+    Occurrence,
+    OccurrenceSeverity,
+    OccurrenceStatus,
+    ReviewDecision,
+    VisitReview,
+    WorkOrder,
+    WorkOrderPriority,
+    WorkOrderStatus,
+    WorkOrderStatusHistory,
+)
 from app.models.operations import Asset, AssetStatus, AssetType, Client, Development, Station
 
 __all__ = [
@@ -29,14 +40,23 @@ __all__ = [
     "Development",
     "Measurement",
     "MeasurementStatus",
+    "Occurrence",
+    "OccurrenceSeverity",
+    "OccurrenceStatus",
     "Membership",
     "RefreshToken",
+    "ReviewDecision",
     "Role",
     "Station",
     "SyncOperation",
     "Tenant",
     "User",
     "Visit",
+    "VisitReview",
     "VisitAnswer",
     "VisitStatus",
+    "WorkOrder",
+    "WorkOrderPriority",
+    "WorkOrderStatus",
+    "WorkOrderStatusHistory",
 ]
