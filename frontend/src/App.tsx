@@ -374,8 +374,8 @@ export default function App() {
     }
   }
 
-  function logout() {
-    clearSession();
+  async function logout() {
+    await clearSession();
     setAuthenticated(false);
     setMe(null);
     setSelectedVisitId(null);
@@ -408,7 +408,7 @@ export default function App() {
             {online ? "Online" : "Offline"}
           </span>
           {pending > 0 && <span className="sync-pill">{pending} pendente(s)</span>}
-          <button className="icon-button" onClick={logout} title="Sair">
+          <button className="icon-button" onClick={() => void logout()} title="Sair">
             <LogOut size={18} />
           </button>
         </div>
