@@ -141,7 +141,6 @@ def upgrade() -> None:
         ),
         sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["visit_id"], ["visits.id"], ondelete="CASCADE"),
-        sa.UniqueConstraint("tenant_id", "visit_id", name="uq_visit_review"),
     )
     op.create_index("ix_visit_reviews_tenant_id", "visit_reviews", ["tenant_id"])
     op.create_index("ix_visit_reviews_visit_id", "visit_reviews", ["visit_id"])
