@@ -350,8 +350,8 @@ async def generate_visits_from_plans(
             session,
             context,
             action="VISIT_PLAN_GENERATE",
-            entity_type="visit_plan",
-            entity_id=None,
+            entity_type="visit_plan_generation",
+            entity_id=context.tenant.id,
             fields=["generated", "horizon_until"],
         )
     await session.commit()
