@@ -254,3 +254,42 @@ button:disabled { cursor: wait; opacity: .65; }
 }
 .evidence-button input { display: none; }
 .evidence-capture p { margin: 0; color: #69776e; font-size: 12px; }
+
+
+.status-revisada { background: #dff3e7; color: #1b6439; }
+
+.compact-form {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #edf1ee;
+  display: grid;
+  gap: 12px;
+}
+.compact-form h3 { margin: 0; font-size: 15px; }
+.compact-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.compact-form label {
+  display: grid;
+  gap: 6px;
+  color: #5b6a61;
+  font-size: 12px;
+  font-weight: 750;
+}
+.compact-form input,
+.compact-form select {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid #d8e2db;
+  border-radius: 10px;
+  background: white;
+  padding: 8px 10px;
+  color: #17231c;
+  outline: none;
+}
+
+@media (max-width: 650px) {
+  .compact-form-grid { grid-template-columns: 1fr; }
+}
