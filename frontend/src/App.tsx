@@ -23,7 +23,7 @@ import OperationalAdmin, {
   type ClientRecord,
   type DevelopmentRecord,
 } from "./components/OperationalAdmin";
-import { api, clearSession, hasSession, login } from "./lib/api";
+import { api, clearSession, downloadApi, hasSession, login } from "./lib/api";
 import { cacheValue, outboxCount, queueUpload, readCache } from "./offline/db";
 import { runOrQueue, syncOutbox } from "./lib/sync";
 
@@ -169,6 +169,16 @@ type MaintenanceSummary = {
   overdue_plans: number;
   due_next_7_days: number;
   executions_last_30_days: number;
+};
+
+type OperationalAlert = {
+  kind: string;
+  severity: string;
+  title: string;
+  message: string;
+  entity_type: string;
+  entity_id: string;
+  due_at: string | null;
 };
 
 type Occurrence = {
@@ -993,6 +1003,7 @@ function SupervisorHome({ me }: { me: Me }) {
   const [templates, setTemplates] = useState<ChecklistTemplateSummary[]>([]);
   const [maintenancePlans, setMaintenancePlans] = useState<MaintenancePlan[]>([]);
   const [maintenanceSummary, setMaintenanceSummary] = useState<MaintenanceSummary | null>(null);
+  const [alerts, setAlerts] = useState<OperationalAlert[]>([]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -1014,6 +1025,7 @@ function SupervisorHome({ me }: { me: Me }) {
         templateList,
         maintenancePlanList,
         maintenanceOverview,
+        alertList,
       ] = await Promise.all([
         api<DashboardOverview>("/api/v1/dashboard/overview"),
         api<WorkOrder[]>("/api/v1/work-orders?limit=100"),
@@ -1029,6 +1041,7 @@ function SupervisorHome({ me }: { me: Me }) {
         api<ChecklistTemplateSummary[]>("/api/v1/checklist-templates"),
         api<MaintenancePlan[]>("/api/v1/maintenance/plans?active_only=false"),
         api<MaintenanceSummary>("/api/v1/maintenance/summary"),
+        api<OperationalAlert[]>("/api/v1/alerts"),
       ]);
       setOverview(summary);
       setWorkOrders(orders);
@@ -1052,6 +1065,7 @@ function SupervisorHome({ me }: { me: Me }) {
       setTemplates(templateList);
       setMaintenancePlans(maintenancePlanList);
       setMaintenanceSummary(maintenanceOverview);
+      setAlerts(alertList);
     } catch {
       setNotice("Nao foi possivel atualizar o cockpit.");
     } finally {
@@ -1128,6 +1142,27 @@ function SupervisorHome({ me }: { me: Me }) {
 
       {notice && <div className="message" onClick={() => setNotice(null)}>{notice}</div>}
 
+      <section className="quick-actions">
+        <button
+          className="secondary-button"
+          onClick={() => void downloadApi("/api/v1/reports/visits.csv", "visitas.csv")}
+        >
+          Exportar visitas
+        </button>
+        <button
+          className="secondary-button"
+          onClick={() => void downloadApi("/api/v1/reports/work-orders.csv", "ordens-servico.csv")}
+        >
+          Exportar OS
+        </button>
+        <button
+          className="secondary-button"
+          onClick={() => void downloadApi("/api/v1/reports/maintenance.csv", "manutencao-preventiva.csv")}
+        >
+          Exportar manutencao
+        </button>
+      </section>
+
       <section className="metric-grid management-metrics">
         <div className="metric-card">
           <Route />
@@ -1158,6 +1193,40 @@ function SupervisorHome({ me }: { me: Me }) {
           <AlertTriangle />
           <strong>{overview?.open_occurrences ?? "—"}</strong>
           <span>Ocorrencias abertas</span>
+        </div>
+      </section>
+
+      <section className="section-card alert-center">
+        <div className="section-heading">
+          <div>
+            <span className="eyebrow">Atencao</span>
+            <h2>Alertas operacionais</h2>
+          </div>
+          <span className="status">{alerts.length}</span>
+        </div>
+        <div className="ops-list">
+          {alerts.slice(0, 12).map((alert) => (
+            <div className="ops-row" key={alert.kind + "-" + alert.entity_id}>
+              <div>
+                <strong>{alert.title}</strong>
+                <span>{alert.message}</span>
+              </div>
+              <div className="ops-meta">
+                <span className={"priority priority-" + alert.severity.toLowerCase()}>
+                  {alert.severity}
+                </span>
+                {alert.due_at && (
+                  <span className="sla">
+                    {new Intl.DateTimeFormat("pt-BR", {
+                      dateStyle: "short",
+                      timeStyle: "short",
+                    }).format(new Date(alert.due_at))}
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
+          {alerts.length === 0 && <div className="empty-state">Nenhum alerta operacional.</div>}
         </div>
       </section>
 
