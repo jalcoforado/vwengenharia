@@ -59,6 +59,7 @@ type Props = {
   assetTypes: AssetTypeRecord[];
   assets: AssetRecord[];
   onChanged: () => Promise<void>;
+  onOpenStation?: (stationId: string) => void;
 };
 
 export default function OperationalAdmin({
@@ -68,6 +69,7 @@ export default function OperationalAdmin({
   assetTypes,
   assets,
   onChanged,
+  onOpenStation,
 }: Props) {
   const [tab, setTab] = useState<"CLIENTES" | "EMPREENDIMENTOS" | "ESTACOES" | "ATIVOS">("CLIENTES");
 
@@ -110,7 +112,12 @@ export default function OperationalAdmin({
         <DevelopmentAdmin clients={clients} developments={developments} onChanged={onChanged} />
       )}
       {tab === "ESTACOES" && (
-        <StationAdmin developments={developments} stations={stations} onChanged={onChanged} />
+        <StationAdmin
+          developments={developments}
+          stations={stations}
+          onChanged={onChanged}
+          onOpenStation={onOpenStation}
+        />
       )}
       {tab === "ATIVOS" && (
         <AssetAdmin stations={stations} assetTypes={assetTypes} assets={assets} onChanged={onChanged} />
@@ -273,7 +280,17 @@ function DevelopmentAdmin({ clients, developments, onChanged }: { clients: Clien
   );
 }
 
-function StationAdmin({ developments, stations, onChanged }: { developments: DevelopmentRecord[]; stations: AdminStation[]; onChanged: () => Promise<void> }) {
+function StationAdmin({
+  developments,
+  stations,
+  onChanged,
+  onOpenStation,
+}: {
+  developments: DevelopmentRecord[];
+  stations: AdminStation[];
+  onChanged: () => Promise<void>;
+  onOpenStation?: (stationId: string) => void;
+}) {
   const [developmentId, setDevelopmentId] = useState("");
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
@@ -322,6 +339,11 @@ function StationAdmin({ developments, stations, onChanged }: { developments: Dev
               <span className={station.is_active ? "status status-revisada" : "status"}>
                 {station.is_active ? (station.visit_frequency_days ? station.visit_frequency_days + "d" : "Ativa") : "Inativa"}
               </span>
+              {onOpenStation && (
+                <button className="text-button" onClick={() => onOpenStation(station.id)}>
+                  Ver estacao
+                </button>
+              )}
               <button className="text-button" disabled={busy} onClick={() => void toggle(station)}>
                 {station.is_active ? "Inativar" : "Reativar"}
               </button>
