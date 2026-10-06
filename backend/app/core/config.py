@@ -1,3 +1,6 @@
+from functools import lru_cache
+
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -8,7 +11,25 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://vw:vw@localhost:5432/vwengenharia"
     redis_url: str = "redis://localhost:6379/0"
 
+    jwt_secret: str = "development-only-change-me-use-32-bytes-minimum"
+    jwt_algorithm: str = "HS256"
+    access_token_minutes: int = 15
+    refresh_token_days: int = 30
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
+    @model_validator(mode="after")
+    def validate_production_secrets(self) -> "Settings":
+        if self.app_env.lower() in {"production", "prod"} and self.jwt_secret == (
+            "development-only-change-me-use-32-bytes-minimum"
+        ):
+            raise ValueError("JWT_SECRET must be configured in production")
+        return self
 
-settings = Settings()
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()
+
+
+settings = get_settings()
