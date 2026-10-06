@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.field import Visit, VisitStatus
 from app.models.identity import Role
 from app.models.maintenance import MaintenancePlan, WorkOrder, WorkOrderStatus
-from app.models.materials import MaterialRequest, RequestStatus
+from app.models.materials import InventoryItem, MaterialRequest, RequestStatus
 from app.modules.auth.dependencies import AuthContext
 
 FIELD_ROLES = {Role.TECNICO.value, Role.MANUTENCAO.value}
@@ -245,6 +245,34 @@ async def build_inbox(
                     "entity_id": plan.id,
                     "due_at": plan.next_due_at,
                     "status": "VENCIDA",
+                }
+            )
+
+        low_stock = list(
+            (
+                await session.execute(
+                    select(InventoryItem).where(
+                        InventoryItem.tenant_id == context.tenant.id,
+                        InventoryItem.is_active.is_(True),
+                        InventoryItem.current_quantity <= InventoryItem.minimum_quantity,
+                    )
+                )
+            ).scalars()
+        )
+        for item in low_stock:
+            items.append(
+                {
+                    "kind": "INVENTORY_LOW_STOCK",
+                    "priority": "ALTA" if item.current_quantity <= 0 else "MEDIA",
+                    "title": "Estoque zerado" if item.current_quantity <= 0 else "Estoque baixo",
+                    "message": (
+                        f"{item.name}: {item.current_quantity} {item.unit}; "
+                        f"minimo {item.minimum_quantity} {item.unit}."
+                    ),
+                    "entity_type": "inventory_item",
+                    "entity_id": item.id,
+                    "due_at": None,
+                    "status": "ZERADO" if item.current_quantity <= 0 else "BAIXO",
                 }
             )
 
