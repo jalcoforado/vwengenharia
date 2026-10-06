@@ -268,11 +268,13 @@ export default function App() {
     setMessage(null);
     try {
       if (navigator.onLine && authenticated) {
-        const [who, data] = await Promise.all([
-          api<Me>("/api/v1/auth/me"),
-          api<Bootstrap>("/api/v1/field/bootstrap"),
-        ]);
+        const who = await api<Me>("/api/v1/auth/me");
         setMe(who);
+        if (who.role === "CLIENTE") {
+          setBootstrap(null);
+          return;
+        }
+        const data = await api<Bootstrap>("/api/v1/field/bootstrap");
         setBootstrap(data);
         await cacheValue(CACHE_KEY, data);
       } else {
