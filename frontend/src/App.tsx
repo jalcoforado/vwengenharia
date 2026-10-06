@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 import ChecklistAdmin from "./components/ChecklistAdmin";
+import WorkOrdersAdmin from "./components/WorkOrdersAdmin";
 import {
   MaterialRequestsAdmin,
   type MaterialRequest,
@@ -120,12 +121,19 @@ type DashboardOverview = {
 
 type WorkOrder = {
   id: string;
+  occurrence_id: string | null;
   station_id: string;
+  asset_id: string | null;
   priority: string;
   status: string;
   description: string;
   sla_due_at: string;
   assigned_membership_id: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  validated_at: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 type TeamMember = {
@@ -189,6 +197,7 @@ type OperationalAlert = {
 type Occurrence = {
   id: string;
   station_id: string;
+  asset_id?: string | null;
   occurrence_type: string;
   severity: string;
   status: string;
@@ -1395,6 +1404,15 @@ function SupervisorHome({ me }: { me: Me }) {
       <MaterialRequestsAdmin
         requests={materialRequests}
         stations={adminStations}
+        onChanged={load}
+      />
+
+      <WorkOrdersAdmin
+        orders={workOrders}
+        occurrences={occurrences}
+        stations={adminStations}
+        assets={assets}
+        team={team}
         onChanged={load}
       />
 
