@@ -1,4 +1,3 @@
-from typing import TypeVar
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -11,10 +10,8 @@ from app.models.base import Base
 from app.models.operations import Asset, AssetType, Client, Development, Station
 from app.modules.auth.dependencies import AuthContext
 
-ModelT = TypeVar("ModelT", bound=Base)
 
-
-async def tenant_get_or_404(
+async def tenant_get_or_404[ModelT: Base](
     session: AsyncSession,
     model: type[ModelT],
     tenant_id: UUID,
@@ -51,7 +48,7 @@ def add_audit(
     )
 
 
-async def list_tenant_objects(
+async def list_tenant_objects[ModelT: Base](
     session: AsyncSession,
     model: type[ModelT],
     tenant_id: UUID,
@@ -139,7 +136,7 @@ async def create_asset(session: AsyncSession, context: AuthContext, payload) -> 
     return asset
 
 
-async def update_object(
+async def update_object[ModelT: Base](
     session: AsyncSession,
     context: AuthContext,
     obj: ModelT,
