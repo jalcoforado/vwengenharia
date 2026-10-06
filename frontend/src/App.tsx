@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   ArrowLeft,
+  Camera,
   CheckCircle2,
   ClipboardCheck,
   Cloud,
@@ -15,7 +16,7 @@ import {
 } from "lucide-react";
 
 import { api, clearSession, hasSession, login } from "./lib/api";
-import { cacheValue, outboxCount, readCache } from "./offline/db";
+import { cacheValue, outboxCount, queueUpload, readCache } from "./offline/db";
 import { runOrQueue, syncOutbox } from "./lib/sync";
 
 type Visit = {
@@ -374,8 +375,49 @@ export default function App() {
     }
   }
 
-  function logout() {
-    clearSession();
+  async function saveEvidence(visitId: string, file: File) {
+    const allowed = new Set([
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "video/mp4",
+      "video/quicktime",
+      "application/pdf",
+    ]);
+    if (!allowed.has(file.type)) {
+      setMessage("Formato de arquivo nao suportado.");
+      return;
+    }
+    if (file.size > 50_000_000) {
+      setMessage("A evidencia deve ter no maximo 50 MB.");
+      return;
+    }
+
+    const operationId = uuid();
+    await queueUpload({
+      id: operationId,
+      visitId,
+      filename: file.name || `evidencia-${operationId}`,
+      contentType: file.type,
+      sizeBytes: file.size,
+      blob: file,
+      createdAt: new Date().toISOString(),
+    });
+    setMessage("Evidencia salva no aparelho.");
+    await refreshPending();
+
+    if (navigator.onLine) {
+      const synced = await syncOutbox();
+      if (synced > 0) {
+        setMessage("Evidencia enviada e confirmada.");
+        await loadFieldData();
+      }
+      await refreshPending();
+    }
+  }
+
+  async function logout() {
+    await clearSession();
     setAuthenticated(false);
     setMe(null);
     setSelectedVisitId(null);
@@ -408,7 +450,7 @@ export default function App() {
             {online ? "Online" : "Offline"}
           </span>
           {pending > 0 && <span className="sync-pill">{pending} pendente(s)</span>}
-          <button className="icon-button" onClick={logout} title="Sair">
+          <button className="icon-button" onClick={() => void logout()} title="Sair">
             <LogOut size={18} />
           </button>
         </div>
@@ -428,6 +470,7 @@ export default function App() {
           onCommand={commandVisit}
           onAnswer={saveAnswer}
           onMeasurement={saveMeasurement}
+          onEvidence={saveEvidence}
           busy={busy}
         />
       ) : isManagement && me ? (
@@ -615,6 +658,7 @@ function VisitScreen({
   onCommand,
   onAnswer,
   onMeasurement,
+  onEvidence,
   busy,
 }: {
   visit: Visit;
@@ -623,6 +667,7 @@ function VisitScreen({
   onCommand: (visit: Visit, action: "start" | "finish") => Promise<void>;
   onAnswer: (visitId: string, itemId: string, value: unknown) => Promise<void>;
   onMeasurement: (visitId: string, type: string, value: string, unit: string) => Promise<void>;
+  onEvidence: (visitId: string, file: File) => Promise<void>;
   busy: boolean;
 }) {
   const station = bootstrap.stations.find((item) => item.id === visit.station_id);
@@ -685,6 +730,12 @@ function VisitScreen({
                 onSave={(value) => onMeasurement(visit.id, "CLORO", value, "mg/L")}
               />
             </div>
+          </section>
+
+          <section className="section-card">
+            <span className="eyebrow">Evidencias</span>
+            <h2>Fotos e arquivos</h2>
+            <EvidenceCapture onFile={(file) => onEvidence(visit.id, file)} />
           </section>
 
           <section className="section-card">
@@ -1163,6 +1214,48 @@ function OccurrenceForm({ visit }: { visit: Visit }) {
         {busy ? "Salvando..." : "Registrar ocorrencia"}
       </button>
       {feedback && <span className="inline-feedback">{feedback}</span>}
+    </div>
+  );
+}
+
+
+function EvidenceCapture({ onFile }: { onFile: (file: File) => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  const [lastName, setLastName] = useState<string | null>(null);
+
+  async function selected(file: File | undefined) {
+    if (!file) return;
+    setBusy(true);
+    try {
+      await onFile(file);
+      setLastName(file.name || "Evidencia capturada");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="evidence-capture">
+      <label className="evidence-button">
+        <Camera size={20} />
+        <span>{busy ? "Salvando..." : "Adicionar foto ou arquivo"}</span>
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,application/pdf"
+          capture="environment"
+          disabled={busy}
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            void selected(file);
+            event.target.value = "";
+          }}
+        />
+      </label>
+      <p>
+        {lastName
+          ? `${lastName} salvo. O envio sera retomado automaticamente se estiver offline.`
+          : "Fotos, videos curtos ou PDF de ate 50 MB."}
+      </p>
     </div>
   );
 }

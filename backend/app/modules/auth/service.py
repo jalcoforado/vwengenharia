@@ -92,6 +92,21 @@ async def issue_tokens(
     )
 
 
+async def revoke_refresh_token(session: AsyncSession, *, raw_token: str) -> None:
+    token_hash = hash_refresh_token(raw_token)
+    record = (
+        await session.execute(
+            select(RefreshToken)
+            .where(RefreshToken.token_hash == token_hash)
+            .with_for_update()
+        )
+    ).scalar_one_or_none()
+    if record is None or record.revoked_at is not None:
+        return
+    record.revoked_at = datetime.now(UTC)
+    await session.commit()
+
+
 async def rotate_refresh_token(session: AsyncSession, *, raw_token: str) -> TokenResponse:
     token_hash = hash_refresh_token(raw_token)
     stmt = select(RefreshToken).where(RefreshToken.token_hash == token_hash).with_for_update()

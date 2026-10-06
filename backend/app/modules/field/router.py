@@ -8,6 +8,7 @@ from app.models.field import ChecklistTemplate, ChecklistTemplateItem, Visit
 from app.models.identity import Role
 from app.modules.auth.dependencies import AuthContext, SessionDep, require_roles
 from app.modules.field.schemas import (
+    AttachmentPresignResponse,
     AttachmentRead,
     AttachmentRegisterCreate,
     ChecklistItemCreate,
@@ -27,11 +28,13 @@ from app.modules.field.service import (
     add_measurement,
     add_template_item,
     build_field_bootstrap,
+    complete_attachment_upload,
     create_template,
     create_visit,
     list_template_items,
     list_templates,
     list_visits,
+    presign_attachment_upload,
     register_attachment,
     transition_visit,
     upsert_answer,
@@ -216,6 +219,33 @@ async def post_attachment(
     session: SessionDep,
 ) -> AttachmentRead:
     return await register_attachment(session, context, visit_id, payload)
+
+
+@router.post(
+    "/visits/{visit_id}/attachments/presign",
+    response_model=AttachmentPresignResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def presign_attachment(
+    visit_id: UUID,
+    payload: AttachmentRegisterCreate,
+    context: FieldContextDep,
+    session: SessionDep,
+) -> AttachmentPresignResponse:
+    data = await presign_attachment_upload(session, context, visit_id, payload)
+    return AttachmentPresignResponse.model_validate(data)
+
+
+@router.post(
+    "/attachments/{attachment_id}/complete",
+    response_model=AttachmentRead,
+)
+async def complete_attachment(
+    attachment_id: UUID,
+    context: FieldContextDep,
+    session: SessionDep,
+) -> AttachmentRead:
+    return await complete_attachment_upload(session, context, attachment_id)
 
 
 @router.get("/field/bootstrap", response_model=FieldBootstrapResponse)
