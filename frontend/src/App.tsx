@@ -115,6 +115,35 @@ type WorkOrder = {
   assigned_membership_id: string | null;
 };
 
+type TeamMember = {
+  membership_id: string;
+  user_id: string;
+  email: string;
+  name: string;
+  role: string;
+  is_active: boolean;
+};
+
+type VisitPlan = {
+  id: string;
+  station_id: string;
+  technician_membership_id: string;
+  checklist_template_id: string | null;
+  frequency_days: number;
+  start_at: string;
+  end_at: string | null;
+  next_due_at: string;
+  is_active: boolean;
+  notes: string | null;
+};
+
+type ChecklistTemplateSummary = {
+  id: string;
+  name: string;
+  version: number;
+  is_active: boolean;
+};
+
 type Occurrence = {
   id: string;
   station_id: string;
@@ -927,24 +956,42 @@ function SupervisorHome({ me }: { me: Me }) {
   const [occurrences, setOccurrences] = useState<Occurrence[]>([]);
   const [reviews, setReviews] = useState<Visit[]>([]);
   const [stations, setStations] = useState<Station[]>([]);
+  const [team, setTeam] = useState<TeamMember[]>([]);
+  const [visitPlans, setVisitPlans] = useState<VisitPlan[]>([]);
+  const [templates, setTemplates] = useState<ChecklistTemplateSummary[]>([]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
   async function load() {
     setBusy(true);
     try {
-      const [summary, orders, occurrenceList, visitList, stationList] = await Promise.all([
+      const [
+        summary,
+        orders,
+        occurrenceList,
+        visitList,
+        stationList,
+        teamList,
+        planList,
+        templateList,
+      ] = await Promise.all([
         api<DashboardOverview>("/api/v1/dashboard/overview"),
         api<WorkOrder[]>("/api/v1/work-orders?limit=100"),
         api<Occurrence[]>("/api/v1/occurrences?limit=100"),
         api<Visit[]>("/api/v1/visits?limit=200"),
         api<Station[]>("/api/v1/stations?limit=500"),
+        api<TeamMember[]>("/api/v1/team?active_only=true"),
+        api<VisitPlan[]>("/api/v1/visit-plans?active_only=false"),
+        api<ChecklistTemplateSummary[]>("/api/v1/checklist-templates"),
       ]);
       setOverview(summary);
       setWorkOrders(orders);
       setOccurrences(occurrenceList);
       setReviews(visitList.filter((visit) => visit.status === "AGUARDANDO_REVISAO"));
       setStations(stationList);
+      setTeam(teamList);
+      setVisitPlans(planList);
+      setTemplates(templateList);
     } catch {
       setNotice("Nao foi possivel atualizar o cockpit.");
     } finally {
@@ -975,7 +1022,31 @@ function SupervisorHome({ me }: { me: Me }) {
     }
   }
 
+  async function generateAgenda() {
+    setBusy(true);
+    try {
+      const result = await api<{
+        generated: number;
+        already_existing: number;
+        plans_processed: number;
+      }>("/api/v1/visit-plans/generate", {
+        method: "POST",
+        body: JSON.stringify({ horizon_days: 30 }),
+      });
+      setNotice(
+        result.generated > 0
+          ? `${result.generated} visita(s) adicionada(s) aos proximos 30 dias.`
+          : "Agenda ja estava atualizada para os proximos 30 dias.",
+      );
+      await load();
+    } catch {
+      setNotice("Nao foi possivel gerar a agenda.");
+      setBusy(false);
+    }
+  }
+
   const stationMap = new Map(stations.map((station) => [station.id, station]));
+  const teamMap = new Map(team.map((member) => [member.membership_id, member]));
   const now = Date.now();
   const sortedOrders = [...workOrders].sort(
     (a, b) => new Date(a.sla_due_at).getTime() - new Date(b.sla_due_at).getTime(),
@@ -1099,6 +1170,70 @@ function SupervisorHome({ me }: { me: Me }) {
             ))}
             {reviews.length === 0 && <div className="empty-state">Fila de revisao em dia.</div>}
           </div>
+        </section>
+      </div>
+
+      <div className="management-grid">
+        <section className="section-card">
+          <div className="section-heading">
+            <div>
+              <span className="eyebrow">Planejamento</span>
+              <h2>Planos de visita</h2>
+            </div>
+            <button
+              className="small-button"
+              disabled={busy}
+              onClick={() => void generateAgenda()}
+            >
+              <RefreshCw size={15} />
+              Gerar 30 dias
+            </button>
+          </div>
+          <div className="ops-list">
+            {visitPlans.slice(0, 12).map((plan) => (
+              <div className="ops-row" key={plan.id}>
+                <div>
+                  <strong>{stationMap.get(plan.station_id)?.name ?? "Estacao"}</strong>
+                  <span>
+                    A cada {plan.frequency_days} dia(s) · {teamMap.get(plan.technician_membership_id)?.name ?? "Tecnico"}
+                  </span>
+                </div>
+                <span className={plan.is_active ? "status status-revisada" : "status"}>
+                  {plan.is_active ? "Ativo" : "Pausado"}
+                </span>
+              </div>
+            ))}
+            {visitPlans.length === 0 && (
+              <div className="empty-state">Nenhum plano recorrente cadastrado.</div>
+            )}
+          </div>
+          <VisitPlanForm
+            stations={stations}
+            team={team}
+            templates={templates}
+            onCreated={load}
+          />
+        </section>
+
+        <section className="section-card">
+          <span className="eyebrow">Equipe</span>
+          <h2>Tecnicos e manutencao</h2>
+          <div className="ops-list">
+            {team
+              .filter((member) => ["TECNICO", "MANUTENCAO"].includes(member.role))
+              .map((member) => (
+                <div className="ops-row" key={member.membership_id}>
+                  <div>
+                    <strong>{member.name}</strong>
+                    <span>{member.email}</span>
+                  </div>
+                  <span className="status">{member.role}</span>
+                </div>
+              ))}
+          </div>
+          {["ADMIN", "SUPERADMIN"].includes(me.role) && (
+            <TeamMemberForm onCreated={load} />
+          )}
         </section>
       </div>
 
@@ -1256,6 +1391,199 @@ function EvidenceCapture({ onFile }: { onFile: (file: File) => Promise<void> }) 
           ? `${lastName} salvo. O envio sera retomado automaticamente se estiver offline.`
           : "Fotos, videos curtos ou PDF de ate 50 MB."}
       </p>
+    </div>
+  );
+}
+
+
+function VisitPlanForm({
+  stations,
+  team,
+  templates,
+  onCreated,
+}: {
+  stations: Station[];
+  team: TeamMember[];
+  templates: ChecklistTemplateSummary[];
+  onCreated: () => Promise<void>;
+}) {
+  const fieldTeam = team.filter((member) =>
+    ["TECNICO", "MANUTENCAO"].includes(member.role),
+  );
+  const [stationId, setStationId] = useState("");
+  const [technicianId, setTechnicianId] = useState("");
+  const [templateId, setTemplateId] = useState("");
+  const [frequencyDays, setFrequencyDays] = useState("7");
+  const [startAt, setStartAt] = useState("");
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    if (!stationId || !technicianId || !startAt) {
+      setFeedback("Selecione estacao, tecnico e inicio.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await api("/api/v1/visit-plans", {
+        method: "POST",
+        body: JSON.stringify({
+          station_id: stationId,
+          technician_membership_id: technicianId,
+          checklist_template_id: templateId || null,
+          frequency_days: Number(frequencyDays),
+          start_at: new Date(startAt).toISOString(),
+        }),
+      });
+      setFeedback("Plano criado.");
+      setStationId("");
+      setTechnicianId("");
+      setTemplateId("");
+      setStartAt("");
+      await onCreated();
+    } catch {
+      setFeedback("Nao foi possivel criar o plano.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="compact-form">
+      <h3>Novo plano</h3>
+      <div className="compact-form-grid">
+        <label>
+          Estacao
+          <select value={stationId} onChange={(event) => setStationId(event.target.value)}>
+            <option value="">Selecione</option>
+            {stations.map((station) => (
+              <option key={station.id} value={station.id}>{station.name}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Tecnico
+          <select value={technicianId} onChange={(event) => setTechnicianId(event.target.value)}>
+            <option value="">Selecione</option>
+            {fieldTeam.map((member) => (
+              <option key={member.membership_id} value={member.membership_id}>
+                {member.name} · {member.role}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Checklist
+          <select value={templateId} onChange={(event) => setTemplateId(event.target.value)}>
+            <option value="">Sem checklist</option>
+            {templates.map((template) => (
+              <option key={template.id} value={template.id}>
+                {template.name} v{template.version}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Frequencia
+          <select value={frequencyDays} onChange={(event) => setFrequencyDays(event.target.value)}>
+            <option value="1">Diaria</option>
+            <option value="7">Semanal</option>
+            <option value="14">Quinzenal</option>
+            <option value="30">Mensal</option>
+          </select>
+        </label>
+        <label>
+          Primeira visita
+          <input
+            type="datetime-local"
+            value={startAt}
+            onChange={(event) => setStartAt(event.target.value)}
+          />
+        </label>
+      </div>
+      <button className="small-button" disabled={busy} onClick={() => void submit()}>
+        {busy ? "Criando..." : "Criar plano"}
+      </button>
+      {feedback && <span className="inline-feedback">{feedback}</span>}
+    </div>
+  );
+}
+
+
+function TeamMemberForm({ onCreated }: { onCreated: () => Promise<void> }) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState("TECNICO");
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    if (!name.trim() || !email.trim() || password.length < 12) {
+      setFeedback("Informe nome, email e senha inicial com pelo menos 12 caracteres.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await api("/api/v1/team", {
+        method: "POST",
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim(),
+          password,
+          role,
+        }),
+      });
+      setFeedback("Membro adicionado.");
+      setName("");
+      setEmail("");
+      setPassword("");
+      await onCreated();
+    } catch {
+      setFeedback("Nao foi possivel adicionar o membro.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="compact-form">
+      <h3>Adicionar membro</h3>
+      <div className="compact-form-grid">
+        <label>
+          Nome
+          <input value={name} onChange={(event) => setName(event.target.value)} />
+        </label>
+        <label>
+          Email
+          <input
+            type="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+          />
+        </label>
+        <label>
+          Perfil
+          <select value={role} onChange={(event) => setRole(event.target.value)}>
+            <option value="TECNICO">Tecnico</option>
+            <option value="MANUTENCAO">Manutencao</option>
+            <option value="SUPERVISOR">Supervisor</option>
+            <option value="GESTOR">Gestor</option>
+          </select>
+        </label>
+        <label>
+          Senha inicial
+          <input
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+          />
+        </label>
+      </div>
+      <button className="small-button" disabled={busy} onClick={() => void submit()}>
+        {busy ? "Adicionando..." : "Adicionar membro"}
+      </button>
+      {feedback && <span className="inline-feedback">{feedback}</span>}
     </div>
   );
 }
