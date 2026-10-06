@@ -23,7 +23,7 @@ docker compose \
   --env-file .env.homologation \
   -f docker-compose.app.yml \
   -f docker-compose.homologation.yml \
-  up -d --build postgres redis minio minio-init migrate backend frontend
+  up -d --build postgres redis s3mock migrate backend frontend
 ```
 
 ## 3. Carregar dados demonstrativos
@@ -46,12 +46,13 @@ Por padrao:
 http://localhost:18080
 ```
 
-MinIO:
+Storage S3 de homologacao:
 
 ```text
-API:     http://localhost:19000
-Console: http://localhost:19001
+S3Mock: http://localhost:19000
 ```
+
+O S3Mock e somente para desenvolvimento/homologacao; nao deve ser usado em producao.
 
 ## 5. Usuarios de demonstracao
 
@@ -172,14 +173,14 @@ Depois suba e rode o seed novamente.
 Homologacao:
 - pode usar senha conhecida de teste;
 - cookie pode operar sem HTTPS local;
-- MinIO pode ficar exposto em portas locais;
+- S3Mock pode ficar exposto apenas localmente;
 - usa dados ficticios.
 
 Producao:
 - segredos fortes;
 - HTTPS obrigatorio;
 - `REFRESH_COOKIE_SECURE=true`;
-- MinIO/object storage protegido;
+- object storage S3 compativel real e protegido;
 - sem seed demonstrativo;
 - dados reais importados de forma reconciliada.
 
