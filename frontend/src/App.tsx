@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   ArrowLeft,
+  Bot,
   Camera,
   CheckCircle2,
   ClipboardCheck,
@@ -11,6 +12,7 @@ import {
   RefreshCw,
   Route,
   Save,
+  Send,
   ShieldCheck,
   Wrench,
 } from "lucide-react";
@@ -113,6 +115,14 @@ type WorkOrder = {
   description: string;
   sla_due_at: string;
   assigned_membership_id: string | null;
+};
+
+type SoniaAnswer = {
+  run_id: string;
+  answer: string;
+  tool_trace: Array<{ tool: string; arguments: Record<string, unknown>; result_count: number | null }>;
+  provider: string;
+  model: string;
 };
 
 type Occurrence = {
@@ -997,6 +1007,8 @@ function SupervisorHome({ me }: { me: Me }) {
 
       {notice && <div className="message" onClick={() => setNotice(null)}>{notice}</div>}
 
+      <SoniaPanel />
+
       <section className="metric-grid management-metrics">
         <div className="metric-card">
           <Route />
@@ -1257,5 +1269,78 @@ function EvidenceCapture({ onFile }: { onFile: (file: File) => Promise<void> }) 
           : "Fotos, videos curtos ou PDF de ate 50 MB."}
       </p>
     </div>
+  );
+}
+
+
+function SoniaPanel() {
+  const [question, setQuestion] = useState("");
+  const [answer, setAnswer] = useState<SoniaAnswer | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function ask() {
+    const text = question.trim();
+    if (text.length < 3) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await api<SoniaAnswer>("/api/v1/ai/ask", {
+        method: "POST",
+        body: JSON.stringify({ question: text }),
+      });
+      setAnswer(result);
+    } catch (err) {
+      const detail =
+        typeof err === "object" && err !== null && "detail" in err
+          ? String((err as { detail: unknown }).detail)
+          : "";
+      setError(
+        detail === "ai_provider_disabled"
+          ? "SonIA pronta, mas o provedor de IA ainda nao foi habilitado neste ambiente."
+          : "Nao foi possivel consultar a SonIA agora.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="sonia-card">
+      <div className="sonia-heading">
+        <div className="sonia-icon"><Bot size={22} /></div>
+        <div>
+          <span className="eyebrow">made iAnalisys</span>
+          <h2>SonIA Operacional</h2>
+          <p>Pergunte sobre riscos, SLA, ocorrencias, ativos e estacoes.</p>
+        </div>
+      </div>
+      <div className="sonia-input">
+        <input
+          value={question}
+          onChange={(event) => setQuestion(event.target.value)}
+          placeholder="Ex.: Quais sao os riscos mais criticos da operacao agora?"
+          onKeyDown={(event) => {
+            if (event.key === "Enter") void ask();
+          }}
+        />
+        <button className="primary-button" disabled={busy || question.trim().length < 3} onClick={() => void ask()}>
+          <Send size={17} />
+          {busy ? "Analisando..." : "Perguntar"}
+        </button>
+      </div>
+      {error && <div className="sonia-error">{error}</div>}
+      {answer && (
+        <div className="sonia-answer">
+          <strong>SonIA</strong>
+          <p>{answer.answer}</p>
+          {answer.tool_trace.length > 0 && (
+            <span>
+              Consultas usadas: {answer.tool_trace.map((item) => item.tool).join(", ")}
+            </span>
+          )}
+        </div>
+      )}
+    </section>
   );
 }
