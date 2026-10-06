@@ -15,12 +15,6 @@ from app.models.field import (
 )
 from app.models.identity import Membership, RefreshToken, Role, Tenant, User
 from app.models.integration import IntegrationCredential
-from app.models.materials import (
-    MaterialRequest,
-    RequestCategory,
-    RequestPriority,
-    RequestStatus,
-)
 from app.models.maintenance import (
     MaintenanceExecution,
     MaintenancePlan,
@@ -34,6 +28,12 @@ from app.models.maintenance import (
     WorkOrderPriority,
     WorkOrderStatus,
     WorkOrderStatusHistory,
+)
+from app.models.materials import (
+    MaterialRequest,
+    RequestCategory,
+    RequestPriority,
+    RequestStatus,
 )
 from app.models.operations import Asset, AssetStatus, AssetType, Client, Development, Station
 
@@ -50,10 +50,10 @@ __all__ = [
     "Client",
     "Development",
     "IntegrationCredential",
-    "MaterialRequest",
     "MaintenanceExecution",
     "MaintenancePlan",
     "MaintenanceType",
+    "MaterialRequest",
     "Measurement",
     "MeasurementStatus",
     "Membership",
