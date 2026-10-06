@@ -27,6 +27,17 @@ services:
     volumes:
       - minio_data:/data
 
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 minioadmin change-me; do sleep 2; done;
+      mc mb --ignore-existing local/vwengenharia;
+      exit 0;
+      "
+
 volumes:
   postgres_data:
   minio_data:
