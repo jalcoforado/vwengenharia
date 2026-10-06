@@ -15,6 +15,7 @@ from app.models.field import (
 )
 from app.models.identity import Membership, RefreshToken, Role, Tenant, User
 from app.models.integration import IntegrationCredential
+from app.models.legacy import LegacyStationMapping, LegacyTechnicianMapping, LegacyVisitStage
 from app.models.maintenance import (
     MaintenanceExecution,
     MaintenancePlan,
@@ -50,6 +51,9 @@ __all__ = [
     "Client",
     "Development",
     "IntegrationCredential",
+    "LegacyStationMapping",
+    "LegacyTechnicianMapping",
+    "LegacyVisitStage",
     "MaintenanceExecution",
     "MaintenancePlan",
     "MaintenanceType",
