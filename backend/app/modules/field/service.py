@@ -259,12 +259,15 @@ async def update_visit_plan(
             context.tenant.id,
             changes["checklist_template_id"],
         )
-    if "end_at" in changes and changes["end_at"] is not None:
-        if changes["end_at"] < plan.start_at:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="end_at_before_start_at",
-            )
+    if (
+        "end_at" in changes
+        and changes["end_at"] is not None
+        and changes["end_at"] < plan.start_at
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="end_at_before_start_at",
+        )
 
     for field, value in changes.items():
         setattr(plan, field, value)
