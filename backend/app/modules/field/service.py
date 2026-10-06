@@ -578,6 +578,42 @@ async def build_field_bootstrap(
     assets = []
     templates = []
     items = []
+    answers = []
+    measurements = []
+    attachments = []
+
+    visit_ids = {visit.id for visit in visits}
+    if visit_ids:
+        answers = list(
+            (
+                await session.execute(
+                    select(VisitAnswer).where(
+                        VisitAnswer.tenant_id == context.tenant.id,
+                        VisitAnswer.visit_id.in_(visit_ids),
+                    )
+                )
+            ).scalars()
+        )
+        measurements = list(
+            (
+                await session.execute(
+                    select(Measurement).where(
+                        Measurement.tenant_id == context.tenant.id,
+                        Measurement.visit_id.in_(visit_ids),
+                    )
+                )
+            ).scalars()
+        )
+        attachments = list(
+            (
+                await session.execute(
+                    select(Attachment).where(
+                        Attachment.tenant_id == context.tenant.id,
+                        Attachment.visit_id.in_(visit_ids),
+                    )
+                )
+            ).scalars()
+        )
 
     if station_ids:
         stations = list(
@@ -635,4 +671,7 @@ async def build_field_bootstrap(
         "assets": assets,
         "templates": templates,
         "items": items,
+        "answers": answers,
+        "measurements": measurements,
+        "attachments": attachments,
     }
