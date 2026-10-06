@@ -1,4 +1,5 @@
 from datetime import datetime
+from enum import StrEnum
 from typing import Any
 from uuid import UUID
 
@@ -20,6 +21,20 @@ class IntegrationKeyRead(BaseModel):
 
 class IntegrationKeyCreated(IntegrationKeyRead):
     secret: str
+
+
+class IntegrationResource(StrEnum):
+    CLIENTS = "clients"
+    DEVELOPMENTS = "developments"
+    STATIONS = "stations"
+    ASSETS = "assets"
+    VISIT_PLANS = "visit-plans"
+    VISITS = "visits"
+    MEASUREMENTS = "measurements"
+    OCCURRENCES = "occurrences"
+    WORK_ORDERS = "work-orders"
+    WORK_ORDER_HISTORY = "work-order-history"
+    REVIEWS = "reviews"
 
 
 class IntegrationEnvelope(BaseModel):
