@@ -6,6 +6,30 @@ Subir uma instancia completa da V1 com dados demonstrativos para navegacao e val
 
 Este ambiente e exclusivamente de homologacao/desenvolvimento.
 
+## Windows - caminho mais simples
+
+No PowerShell, na raiz do repositorio:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\start-homologation.ps1
+```
+
+O launcher:
+- verifica o Docker Desktop;
+- cria `.env.homologation` se necessario;
+- sobe toda a pilha;
+- executa migrations;
+- carrega os dados demonstrativos;
+- valida login/dashboard/estacao;
+- mostra os usuarios;
+- abre `http://localhost:18080` no navegador.
+
+Para encerrar sem apagar os dados:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\stop-homologation.ps1
+```
+
 ## 1. Preparar variaveis
 
 Na raiz:
