@@ -27,6 +27,15 @@ export type CacheRecord = {
   savedAt: string;
 };
 
+export type SyncQueueSummary = {
+  commands: number;
+  uploads: number;
+  failedCommands: number;
+  failedUploads: number;
+  failed: number;
+  total: number;
+};
+
 class VWOfflineDB extends Dexie {
   outbox!: Table<OutboxItem, string>;
   pendingUploads!: Table<PendingUpload, string>;
@@ -67,4 +76,51 @@ export async function outboxCount() {
     db.pendingUploads.count(),
   ]);
   return commands + uploads;
+}
+
+
+export async function syncQueueSummary(): Promise<SyncQueueSummary> {
+  const [commands, uploads] = await Promise.all([
+    db.outbox.toArray(),
+    db.pendingUploads.toArray(),
+  ]);
+  const failedCommands = commands.filter((item) => Boolean(item.lastError)).length;
+  const failedUploads = uploads.filter((item) => Boolean(item.lastError)).length;
+  return {
+    commands: commands.length,
+    uploads: uploads.length,
+    failedCommands,
+    failedUploads,
+    failed: failedCommands + failedUploads,
+    total: commands.length + uploads.length,
+  };
+}
+
+export async function syncQueueErrors(limit = 8) {
+  const [commands, uploads] = await Promise.all([
+    db.outbox.orderBy("createdAt").reverse().toArray(),
+    db.pendingUploads.orderBy("createdAt").reverse().toArray(),
+  ]);
+  return [
+    ...commands
+      .filter((item) => item.lastError)
+      .map((item) => ({
+        id: item.id,
+        kind: "command" as const,
+        label: item.path,
+        error: item.lastError ?? "Falha pendente",
+        createdAt: item.createdAt,
+      })),
+    ...uploads
+      .filter((item) => item.lastError)
+      .map((item) => ({
+        id: item.id,
+        kind: "upload" as const,
+        label: item.filename,
+        error: item.lastError ?? "Upload pendente",
+        createdAt: item.createdAt,
+      })),
+  ]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, limit);
 }
