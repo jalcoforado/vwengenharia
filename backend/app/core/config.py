@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     s3_presign_seconds: int = 900
 
     llm_provider: str = "disabled"
+    anthropic_api_key: str = ""
+    anthropic_model: str = "claude-sonnet-4-5-20250929"
+    ai_max_tool_steps: int = 6
+    ai_max_tokens: int = 1200
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
