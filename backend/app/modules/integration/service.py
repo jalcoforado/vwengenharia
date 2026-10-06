@@ -300,6 +300,16 @@ async def export_resource(
     offset: int,
 ) -> dict:
     now = datetime.now(UTC)
+    if updated_since is not None and updated_since.tzinfo is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="updated_since_must_include_timezone",
+        )
+    if snapshot_at is not None and snapshot_at.tzinfo is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="snapshot_at_must_include_timezone",
+        )
     if snapshot_at is not None and snapshot_at > now:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
