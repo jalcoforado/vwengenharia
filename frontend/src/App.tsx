@@ -566,7 +566,15 @@ export default function App() {
       <header className="topbar">
         <div>
           <span className="brand-kicker">VW Engenharia</span>
-          <strong>{selectedVisit ? "Visita tecnica" : isManagement ? "Cockpit operacional" : "Operacao de campo"}</strong>
+          <strong>
+            {me?.role === "CLIENTE"
+              ? "Portal do cliente"
+              : selectedVisit
+                ? "Visita tecnica"
+                : isManagement
+                  ? "Cockpit operacional"
+                  : "Operacao de campo"}
+          </strong>
         </div>
         <div className="top-actions">
           <span className={online ? "connection online" : "connection offline"}>
