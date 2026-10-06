@@ -340,3 +340,22 @@ button:disabled { cursor: wait; opacity: .65; }
   .admin-heading { flex-direction: column; }
   .admin-summary { justify-content: flex-start; }
 }
+
+
+.full-field {
+  display: grid;
+  gap: 6px;
+  color: #5b6a61;
+  font-size: 12px;
+  font-weight: 750;
+}
+.full-field textarea {
+  width: 100%;
+  border: 1px solid #d8e2db;
+  border-radius: 10px;
+  background: white;
+  padding: 9px 10px;
+  color: #17231c;
+  outline: none;
+  resize: vertical;
+}
