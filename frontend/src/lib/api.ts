@@ -93,3 +93,33 @@ export async function login(email: string, password: string) {
   saveAccessToken(body.access_token);
   return body;
 }
+
+
+export async function downloadApi(
+  path: string,
+  filename: string,
+  retry = true,
+): Promise<void> {
+  const headers = new Headers();
+  if (accessToken) headers.set("Authorization", "Bearer " + accessToken);
+
+  const response = await fetch(API_BASE + path, {
+    method: "GET",
+    headers,
+    credentials: "include",
+  });
+  if (response.status === 401 && retry && (await refreshSession())) {
+    return downloadApi(path, filename, false);
+  }
+  if (!response.ok) throw await decodeError(response);
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
