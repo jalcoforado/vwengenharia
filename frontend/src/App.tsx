@@ -18,6 +18,7 @@ import {
   RefreshCw,
   Route,
   Save,
+  Search,
   ShieldCheck,
   Sparkles,
   Shield,
@@ -728,6 +729,23 @@ function Home({
     [bootstrap],
   );
   const stations = new Map((bootstrap?.stations ?? []).map((station) => [station.id, station]));
+  const [visitSearch, setVisitSearch] = useState("");
+  const [visitStatus, setVisitStatus] = useState("ALL");
+  const filteredVisits = visits.filter((visit) => {
+    const station = stations.get(visit.station_id);
+    const haystack = [
+      station?.name,
+      station?.code,
+      station?.station_type,
+      statusLabel(visit.status),
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+    const matchesSearch = !visitSearch.trim() || haystack.includes(visitSearch.trim().toLowerCase());
+    const matchesStatus = visitStatus === "ALL" || visit.status === visitStatus;
+    return matchesSearch && matchesStatus;
+  });
 
   return (
     <main className="content">
@@ -782,9 +800,50 @@ function Home({
           </div>
         </div>
 
+        <div className="list-toolbar">
+          <label className="search-field">
+            <Search size={16} />
+            <input
+              value={visitSearch}
+              onChange={(event) => setVisitSearch(event.target.value)}
+              placeholder="Buscar estacao, codigo ou status"
+            />
+          </label>
+          <select value={visitStatus} onChange={(event) => setVisitStatus(event.target.value)}>
+            <option value="ALL">Todos os status</option>
+            <option value="PROGRAMADA">Programadas</option>
+            <option value="EM_EXECUCAO">Em execucao</option>
+            <option value="AGUARDANDO_REVISAO">Concluidas</option>
+            <option value="DEVOLVIDA">Devolvidas</option>
+            <option value="REVISADA">Revisadas</option>
+          </select>
+        </div>
+
         <div className="visit-list">
-          {visits.length === 0 && <div className="empty-state">Nenhuma visita no periodo sincronizado.</div>}
-          {visits.map((visit) => {
+          {visits.length === 0 && (
+            <div className="empty-state empty-state-positive">
+              <CheckCircle2 size={22} />
+              <strong>Nenhuma visita atribuida</strong>
+              <span>Sua agenda sincronizada esta livre neste momento.</span>
+            </div>
+          )}
+          {visits.length > 0 && filteredVisits.length === 0 && (
+            <div className="empty-state">
+              <Search size={22} />
+              <strong>Nenhum resultado encontrado</strong>
+              <span>Altere a busca ou o filtro de status para ver outras visitas.</span>
+              <button
+                className="small-button"
+                onClick={() => {
+                  setVisitSearch("");
+                  setVisitStatus("ALL");
+                }}
+              >
+                Limpar filtros
+              </button>
+            </div>
+          )}
+          {filteredVisits.map((visit) => {
             const station = stations.get(visit.station_id);
             return (
               <button
