@@ -1,8 +1,10 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_session
-from app.modules.auth.dependencies import AuthContext, get_auth_context
+from app.modules.auth.dependencies import AuthContextDep
 from app.modules.auth.schemas import (
     LoginRequest,
     MeResponse,
@@ -14,12 +16,11 @@ from app.modules.auth.schemas import (
 from app.modules.auth.service import authenticate, issue_tokens, rotate_refresh_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(
-    payload: LoginRequest, session: AsyncSession = Depends(get_session)
-) -> TokenResponse:
+async def login(payload: LoginRequest, session: SessionDep) -> TokenResponse:
     selection = await authenticate(
         session,
         email=str(payload.email),
@@ -35,14 +36,12 @@ async def login(
 
 
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh(
-    payload: RefreshRequest, session: AsyncSession = Depends(get_session)
-) -> TokenResponse:
+async def refresh(payload: RefreshRequest, session: SessionDep) -> TokenResponse:
     return await rotate_refresh_token(session, raw_token=payload.refresh_token)
 
 
 @router.get("/me", response_model=MeResponse)
-async def me(context: AuthContext = Depends(get_auth_context)) -> MeResponse:
+async def me(context: AuthContextDep) -> MeResponse:
     return MeResponse(
         user=MeUser(id=context.user.id, email=context.user.email, name=context.user.name),
         tenant=MeTenant(
