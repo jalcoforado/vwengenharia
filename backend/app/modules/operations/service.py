@@ -9,7 +9,6 @@ from app.models.field import Visit, VisitStatus
 from app.models.identity import Membership, Role
 from app.models.maintenance import (
     Occurrence,
-    OccurrenceSeverity,
     OccurrenceStatus,
     ReviewDecision,
     VisitReview,
