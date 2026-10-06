@@ -40,5 +40,9 @@ class IntegrationResource(StrEnum):
 class IntegrationEnvelope(BaseModel):
     schema_version: str = "1"
     tenant_id: UUID
+    resource: IntegrationResource
     generated_at: datetime
+    offset: int
+    limit: int
+    next_offset: int | None
     items: list[dict[str, Any]]
