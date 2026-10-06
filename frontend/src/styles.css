@@ -254,3 +254,36 @@ button:disabled { cursor: wait; opacity: .65; }
 }
 .evidence-button input { display: none; }
 .evidence-capture p { margin: 0; color: #69776e; font-size: 12px; }
+
+
+.sonia-card {
+  background: linear-gradient(135deg, #102c20, #204a35);
+  color: white; border-radius: 22px; padding: 22px; margin-bottom: 20px;
+  box-shadow: 0 14px 40px rgba(15, 45, 31, .16);
+}
+.sonia-heading { display: flex; gap: 13px; align-items: flex-start; margin-bottom: 16px; }
+.sonia-icon {
+  width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center;
+  background: rgba(255,255,255,.1); flex: 0 0 auto;
+}
+.sonia-heading h2 { margin: 2px 0 3px; }
+.sonia-heading p { margin: 0; color: #c9ddd1; font-size: 13px; }
+.sonia-card .eyebrow { color: #91c8a7; }
+.sonia-input { display: grid; grid-template-columns: 1fr auto; gap: 9px; }
+.sonia-input input {
+  min-height: 48px; border: 1px solid rgba(255,255,255,.18); border-radius: 12px;
+  padding: 10px 13px; background: rgba(255,255,255,.08); color: white; outline: none;
+}
+.sonia-input input::placeholder { color: #acc2b5; }
+.sonia-input .primary-button { background: #e7f4eb; color: #173c2a; }
+.sonia-answer {
+  margin-top: 14px; padding: 15px; border-radius: 14px;
+  background: rgba(255,255,255,.08); display: grid; gap: 7px;
+}
+.sonia-answer p { margin: 0; white-space: pre-wrap; line-height: 1.5; }
+.sonia-answer span, .sonia-error { font-size: 11px; color: #bdd2c5; }
+.sonia-error { margin-top: 10px; color: #ffd7cf; }
+
+@media (max-width: 680px) {
+  .sonia-input { grid-template-columns: 1fr; }
+}
