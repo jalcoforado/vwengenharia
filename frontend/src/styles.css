@@ -728,3 +728,52 @@ button:disabled { cursor: wait; opacity: .65; }
   .migration-map-grid { grid-template-columns: 1fr; }
   .mapping-row { grid-template-columns: 1fr; }
 }
+
+
+.settings-form { margin-top: 12px; }
+.secret-once {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 16px;
+  padding: 14px;
+  border: 1px solid #d8e5dc;
+  border-radius: 14px;
+  background: #f5faf7;
+}
+.secret-once code {
+  display: block;
+  overflow-wrap: anywhere;
+  border-radius: 9px;
+  background: #173c2a;
+  color: #ffffff;
+  padding: 10px;
+  font-size: 12px;
+}
+.integration-create {
+  display: flex;
+  gap: 9px;
+  align-items: end;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.integration-create label {
+  display: grid;
+  gap: 5px;
+  min-width: 240px;
+  color: #607067;
+  font-size: 11px;
+  font-weight: 800;
+}
+.integration-create input {
+  min-height: 40px;
+  border: 1px solid #d8e2db;
+  border-radius: 9px;
+  background: white;
+  padding: 8px 10px;
+}
+.integration-key-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
