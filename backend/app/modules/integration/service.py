@@ -327,14 +327,20 @@ async def export_resource(
 
     stmt = (
         stmt.order_by(watermark_column, model.id)
-        .limit(limit)
+        .limit(limit + 1)
         .offset(offset)
     )
-    rows = list((await session.execute(stmt)).scalars().all())
+    fetched = list((await session.execute(stmt)).scalars().all())
+    has_more = len(fetched) > limit
+    rows = fetched[:limit]
 
     return {
         "schema_version": "1",
         "tenant_id": context.tenant_id,
+        "resource": resource,
         "generated_at": generated_at,
+        "offset": offset,
+        "limit": limit,
+        "next_offset": offset + limit if has_more else None,
         "items": [_serialize(resource, row) for row in rows],
     }
