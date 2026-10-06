@@ -127,3 +127,28 @@ export async function downloadApi(
   anchor.remove();
   URL.revokeObjectURL(url);
 }
+
+
+export async function openApiDocument(path: string, retry = true): Promise<void> {
+  const headers = new Headers();
+  if (accessToken) headers.set("Authorization", "Bearer " + accessToken);
+
+  const response = await fetch(API_BASE + path, {
+    method: "GET",
+    headers,
+    credentials: "include",
+  });
+  if (response.status === 401 && retry && (await refreshSession())) {
+    return openApiDocument(path, false);
+  }
+  if (!response.ok) throw await decodeError(response);
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const opened = window.open(url, "_blank", "noopener,noreferrer");
+  if (!opened) {
+    URL.revokeObjectURL(url);
+    throw { status: 0, detail: "popup_blocked" } satisfies ApiError;
+  }
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
