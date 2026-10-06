@@ -1,13 +1,38 @@
 services:
-  minio:
+  s3mock:
+    image: adobe/s3mock:5.2.2
+    restart: unless-stopped
+    environment:
+      COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS: ${S3_BUCKET:-vwengenharia}
+      COM_ADOBE_TESTING_S3MOCK_STORE_ROOT: /s3mockroot
+      COM_ADOBE_TESTING_S3MOCK_STORE_RETAIN_FILES_ON_EXIT: "true"
     ports:
-      - "${HOMOLOGATION_MINIO_PORT:-19000}:9000"
-      - "${HOMOLOGATION_MINIO_CONSOLE_PORT:-19001}:9001"
+      - "${HOMOLOGATION_S3_PORT:-19000}:9090"
+    volumes:
+      - s3mock_data:/s3mockroot
+
+  migrate:
+    environment:
+      APP_ENV: homologation
+      S3_ENDPOINT: http://s3mock:9090
+      S3_PUBLIC_ENDPOINT: http://127.0.0.1:${HOMOLOGATION_S3_PORT:-19000}
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   backend:
     environment:
       APP_ENV: homologation
       REFRESH_COOKIE_SECURE: "false"
+      S3_ENDPOINT: http://s3mock:9090
+      S3_PUBLIC_ENDPOINT: http://127.0.0.1:${HOMOLOGATION_S3_PORT:-19000}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+      s3mock:
+        condition: service_started
 
   seed:
     build:
@@ -15,10 +40,18 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+      s3mock:
+        condition: service_started
     environment:
       APP_ENV: homologation
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-vw}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-vwengenharia}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      S3_ENDPOINT: http://s3mock:9090
+      S3_PUBLIC_ENDPOINT: http://127.0.0.1:${HOMOLOGATION_S3_PORT:-19000}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET: ${S3_BUCKET:-vwengenharia}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-dummy}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-dummy}
       HOMOLOGATION_PASSWORD: ${HOMOLOGATION_PASSWORD:?HOMOLOGATION_PASSWORD is required}
       HOMOLOGATION_TENANT_NAME: ${HOMOLOGATION_TENANT_NAME:-VW Engenharia - Homologacao}
       HOMOLOGATION_TENANT_SLUG: ${HOMOLOGATION_TENANT_SLUG:-vw-homologacao}
@@ -27,3 +60,6 @@ services:
       HOMOLOGATION_MAINTENANCE_EMAIL: ${HOMOLOGATION_MAINTENANCE_EMAIL:-manutencao.homologacao@example.com}
     command: ["python", "scripts/seed_homologation.py"]
     restart: "no"
+
+volumes:
+  s3mock_data:
