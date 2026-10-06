@@ -1,0 +1,367 @@
+import { useState } from "react";
+
+import { api } from "../lib/api";
+import type { AdminStation, AssetRecord } from "./OperationalAdmin";
+
+export type WorkOrderRecord = {
+  id: string;
+  occurrence_id: string | null;
+  station_id: string;
+  asset_id: string | null;
+  assigned_membership_id: string | null;
+  priority: string;
+  status: string;
+  description: string;
+  sla_due_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  validated_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type OccurrenceRecord = {
+  id: string;
+  station_id: string;
+  asset_id?: string | null;
+  occurrence_type: string;
+  severity: string;
+  status: string;
+  description: string;
+  detected_at: string;
+};
+
+type TeamMember = {
+  membership_id: string;
+  name: string;
+  role: string;
+  is_active: boolean;
+};
+
+const TRANSITIONS: Record<string, Array<{ value: string; label: string }>> = {
+  ABERTA: [
+    { value: "TRIAGEM", label: "Enviar para triagem" },
+    { value: "PLANEJADA", label: "Planejar" },
+    { value: "CANCELADA", label: "Cancelar" },
+  ],
+  TRIAGEM: [
+    { value: "PLANEJADA", label: "Planejar" },
+    { value: "CANCELADA", label: "Cancelar" },
+  ],
+  PLANEJADA: [
+    { value: "EM_EXECUCAO", label: "Iniciar execucao" },
+    { value: "AGUARDANDO_MATERIAL", label: "Aguardar material" },
+    { value: "AGUARDANDO_TERCEIRO", label: "Aguardar terceiro" },
+    { value: "CANCELADA", label: "Cancelar" },
+  ],
+  EM_EXECUCAO: [
+    { value: "AGUARDANDO_MATERIAL", label: "Aguardar material" },
+    { value: "AGUARDANDO_TERCEIRO", label: "Aguardar terceiro" },
+    { value: "CONCLUIDA", label: "Concluir" },
+    { value: "CANCELADA", label: "Cancelar" },
+  ],
+  AGUARDANDO_MATERIAL: [
+    { value: "EM_EXECUCAO", label: "Retomar execucao" },
+    { value: "CONCLUIDA", label: "Concluir" },
+    { value: "CANCELADA", label: "Cancelar" },
+  ],
+  AGUARDANDO_TERCEIRO: [
+    { value: "EM_EXECUCAO", label: "Retomar execucao" },
+    { value: "CONCLUIDA", label: "Concluir" },
+    { value: "CANCELADA", label: "Cancelar" },
+  ],
+  CONCLUIDA: [
+    { value: "VALIDADA", label: "Validar" },
+    { value: "EM_EXECUCAO", label: "Reabrir" },
+  ],
+  VALIDADA: [],
+  CANCELADA: [],
+};
+
+export default function WorkOrdersAdmin({
+  orders,
+  occurrences,
+  stations,
+  assets,
+  team,
+  onChanged,
+}: {
+  orders: WorkOrderRecord[];
+  occurrences: OccurrenceRecord[];
+  stations: AdminStation[];
+  assets: AssetRecord[];
+  team: TeamMember[];
+  onChanged: () => Promise<void>;
+}) {
+  const [occurrenceId, setOccurrenceId] = useState("");
+  const [stationId, setStationId] = useState("");
+  const [assetId, setAssetId] = useState("");
+  const [assignedId, setAssignedId] = useState("");
+  const [priority, setPriority] = useState("MEDIA");
+  const [description, setDescription] = useState("");
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const stationMap = new Map(stations.map((item) => [item.id, item]));
+  const assetMap = new Map(assets.map((item) => [item.id, item]));
+  const memberMap = new Map(team.map((item) => [item.membership_id, item]));
+  const assignableTeam = team.filter(
+    (item) =>
+      item.is_active &&
+      ["TECNICO", "MANUTENCAO", "SUPERVISOR"].includes(item.role),
+  );
+  const openOccurrences = occurrences.filter(
+    (item) => !["RESOLVIDA", "CANCELADA"].includes(item.status),
+  );
+
+  function selectOccurrence(value: string) {
+    setOccurrenceId(value);
+    const occurrence = occurrences.find((item) => item.id === value);
+    if (occurrence) {
+      setStationId(occurrence.station_id);
+      setAssetId(occurrence.asset_id ?? "");
+      setDescription(occurrence.description);
+      setPriority(
+        occurrence.severity === "CRITICA"
+          ? "CRITICA"
+          : occurrence.severity === "ALTA"
+            ? "ALTA"
+            : occurrence.severity === "BAIXA"
+              ? "BAIXA"
+              : "MEDIA",
+      );
+    }
+  }
+
+  async function createOrder() {
+    if (!stationId || description.trim().length < 3) {
+      setFeedback("Selecione a estacao e descreva o servico.");
+      return;
+    }
+    setBusyId("new");
+    try {
+      await api("/api/v1/work-orders", {
+        method: "POST",
+        body: JSON.stringify({
+          occurrence_id: occurrenceId || null,
+          station_id: stationId,
+          asset_id: assetId || null,
+          assigned_membership_id: assignedId || null,
+          priority,
+          description: description.trim(),
+        }),
+      });
+      setOccurrenceId("");
+      setStationId("");
+      setAssetId("");
+      setAssignedId("");
+      setPriority("MEDIA");
+      setDescription("");
+      setFeedback("Ordem de servico criada.");
+      await onChanged();
+    } catch {
+      setFeedback("Nao foi possivel criar a ordem de servico.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function assign(order: WorkOrderRecord, membershipId: string) {
+    setBusyId(order.id);
+    try {
+      await api("/api/v1/work-orders/" + order.id + "/assign", {
+        method: "POST",
+        body: JSON.stringify({
+          assigned_membership_id: membershipId || null,
+        }),
+      });
+      setFeedback("Responsavel atualizado.");
+      await onChanged();
+    } catch {
+      setFeedback("Nao foi possivel atribuir a OS.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function transition(order: WorkOrderRecord, target: string) {
+    if (!target) return;
+    setBusyId(order.id);
+    try {
+      await api("/api/v1/work-orders/" + order.id + "/transition", {
+        method: "POST",
+        body: JSON.stringify({
+          status: target,
+          note: "Atualizacao pelo cockpit operacional.",
+        }),
+      });
+      setFeedback("Status da OS atualizado.");
+      await onChanged();
+    } catch {
+      setFeedback("Nao foi possivel alterar o status da OS.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  const sortedOrders = [...orders].sort(
+    (a, b) => new Date(a.sla_due_at).getTime() - new Date(b.sla_due_at).getTime(),
+  );
+
+  return (
+    <section className="section-card">
+      <div className="section-heading">
+        <div>
+          <span className="eyebrow">Execucao</span>
+          <h2>Ordens de servico</h2>
+          <p className="section-copy">
+            Abra, atribua, execute e valide a OS sem sair do cockpit.
+          </p>
+        </div>
+        <div className="admin-summary">
+          <span>
+            <strong>
+              {orders.filter((item) => !["VALIDADA", "CANCELADA"].includes(item.status)).length}
+            </strong>{" "}
+            abertas
+          </span>
+          <span>
+            <strong>{orders.filter((item) => item.status === "CONCLUIDA").length}</strong>{" "}
+            para validar
+          </span>
+        </div>
+      </div>
+
+      <div className="work-order-layout">
+        <div className="ops-list">
+          {sortedOrders.slice(0, 30).map((order) => (
+            <div className="work-order-card" key={order.id}>
+              <div className="work-order-main">
+                <div>
+                  <strong>{stationMap.get(order.station_id)?.name ?? "Estacao"}</strong>
+                  <span>{order.description}</span>
+                  <span>
+                    {(order.asset_id ? assetMap.get(order.asset_id)?.name + " · " : "") +
+                      (memberMap.get(order.assigned_membership_id ?? "")?.name ?? "Sem responsavel")}
+                  </span>
+                </div>
+                <div className="ops-meta">
+                  <span className={"priority priority-" + order.priority.toLowerCase()}>
+                    {order.priority}
+                  </span>
+                  <span className="status">{order.status.replaceAll("_", " ")}</span>
+                </div>
+              </div>
+
+              <div className="work-order-controls">
+                <label>
+                  Responsavel
+                  <select
+                    value={order.assigned_membership_id ?? ""}
+                    disabled={busyId === order.id}
+                    onChange={(event) => void assign(order, event.target.value)}
+                  >
+                    <option value="">Sem responsavel</option>
+                    {assignableTeam.map((member) => (
+                      <option key={member.membership_id} value={member.membership_id}>
+                        {member.name + " · " + member.role}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Proxima etapa
+                  <select
+                    value=""
+                    disabled={busyId === order.id || !(TRANSITIONS[order.status]?.length)}
+                    onChange={(event) => void transition(order, event.target.value)}
+                  >
+                    <option value="">
+                      {TRANSITIONS[order.status]?.length ? "Selecione" : "Fluxo encerrado"}
+                    </option>
+                    {(TRANSITIONS[order.status] ?? []).map((item) => (
+                      <option key={item.value} value={item.value}>{item.label}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </div>
+          ))}
+          {orders.length === 0 && <div className="empty-state">Nenhuma ordem de servico.</div>}
+        </div>
+
+        <div className="compact-form admin-create-form">
+          <h3>Nova ordem de servico</h3>
+          <label>
+            Ocorrencia
+            <select value={occurrenceId} onChange={(event) => selectOccurrence(event.target.value)}>
+              <option value="">OS avulsa</option>
+              {openOccurrences.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {(stationMap.get(item.station_id)?.name ?? "Estacao") + " · " + item.description}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="compact-form-grid">
+            <label>
+              Estacao
+              <select
+                value={stationId}
+                disabled={Boolean(occurrenceId)}
+                onChange={(event) => {
+                  setStationId(event.target.value);
+                  setAssetId("");
+                }}
+              >
+                <option value="">Selecione</option>
+                {stations.filter((item) => item.is_active).map((item) => (
+                  <option key={item.id} value={item.id}>{item.name}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Ativo
+              <select value={assetId} onChange={(event) => setAssetId(event.target.value)}>
+                <option value="">Sem ativo especifico</option>
+                {assets
+                  .filter((item) => item.is_active && item.station_id === stationId)
+                  .map((item) => (
+                    <option key={item.id} value={item.id}>{item.name}</option>
+                  ))}
+              </select>
+            </label>
+            <label>
+              Prioridade
+              <select value={priority} onChange={(event) => setPriority(event.target.value)}>
+                <option value="BAIXA">Baixa</option>
+                <option value="MEDIA">Media</option>
+                <option value="ALTA">Alta</option>
+                <option value="CRITICA">Critica</option>
+              </select>
+            </label>
+            <label>
+              Responsavel
+              <select value={assignedId} onChange={(event) => setAssignedId(event.target.value)}>
+                <option value="">Definir depois</option>
+                {assignableTeam.map((member) => (
+                  <option key={member.membership_id} value={member.membership_id}>
+                    {member.name + " · " + member.role}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <label className="full-field">
+            Descricao
+            <textarea rows={4} value={description} onChange={(event) => setDescription(event.target.value)} />
+          </label>
+          <button className="small-button" disabled={busyId === "new"} onClick={() => void createOrder()}>
+            {busyId === "new" ? "Criando..." : "Criar OS"}
+          </button>
+          {feedback && <span className="inline-feedback">{feedback}</span>}
+        </div>
+      </div>
+    </section>
+  );
+}
