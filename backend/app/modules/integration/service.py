@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.field import Measurement, Visit, VisitPlan
 from app.models.integration import IntegrationCredential
+from app.models.materials import InventoryItem, InventoryMovement
 from app.models.maintenance import (
     Occurrence,
     VisitReview,
@@ -265,6 +266,34 @@ def _serialize(resource: IntegrationResource, row) -> dict:
             "notes": row.notes,
             "reviewed_at": row.reviewed_at,
         }
+    elif resource == IntegrationResource.INVENTORY_ITEMS:
+        payload.update(
+            {
+                "code": row.code,
+                "name": row.name,
+                "unit": row.unit,
+                "current_quantity": row.current_quantity,
+                "minimum_quantity": row.minimum_quantity,
+                "notes": row.notes,
+                "is_active": row.is_active,
+            }
+        )
+    elif resource == IntegrationResource.INVENTORY_MOVEMENTS:
+        payload.update(
+            {
+                "inventory_item_id": row.inventory_item_id,
+                "performed_by_user_id": row.performed_by_user_id,
+                "movement_type": row.movement_type,
+                "quantity": row.quantity,
+                "balance_after": row.balance_after,
+                "unit_cost": row.unit_cost,
+                "station_id": row.station_id,
+                "work_order_id": row.work_order_id,
+                "material_request_id": row.material_request_id,
+                "occurred_at": row.occurred_at,
+                "notes": row.notes,
+            }
+        )
     else:
         raise ValueError(f"unsupported integration resource: {resource}")
 
@@ -286,6 +315,11 @@ _RESOURCE_CONFIG = {
         WorkOrderStatusHistory.changed_at,
     ),
     IntegrationResource.REVIEWS: (VisitReview, VisitReview.reviewed_at),
+    IntegrationResource.INVENTORY_ITEMS: (InventoryItem, InventoryItem.updated_at),
+    IntegrationResource.INVENTORY_MOVEMENTS: (
+        InventoryMovement,
+        InventoryMovement.updated_at,
+    ),
 }
 
 
