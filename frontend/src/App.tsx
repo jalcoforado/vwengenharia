@@ -771,11 +771,18 @@ function VisitScreen({
   const items = bootstrap.items
     .filter((item) => item.template_id === visit.checklist_template_id)
     .sort((a, b) => a.position - b.position);
+  const visitAnswers = bootstrap.answers.filter((answer) => answer.visit_id === visit.id);
   const answerMap = new Map(
-    bootstrap.answers
-      .filter((answer) => answer.visit_id === visit.id)
-      .map((answer) => [answer.item_id, answer.value_json]),
+    visitAnswers.map((answer) => [answer.item_id, answer.value_json]),
   );
+  const requiredItems = items.filter((item) => item.required);
+  const answeredItemIds = new Set(visitAnswers.map((answer) => answer.item_id));
+  const requiredAnswered = requiredItems.filter((item) => answeredItemIds.has(item.id)).length;
+  const checklistAnswered = items.filter((item) => answeredItemIds.has(item.id)).length;
+  const checklistProgress = items.length
+    ? Math.round((checklistAnswered / items.length) * 100)
+    : 100;
+  const canFinish = requiredAnswered === requiredItems.length;
 
   return (
     <main className="content visit-screen">
@@ -800,6 +807,23 @@ function VisitScreen({
         </span>
       </section>
 
+      {visit.status === "EM_EXECUCAO" && (
+        <section className="visit-progress-card" aria-label="Progresso da visita">
+          <div className="visit-progress-heading">
+            <div>
+              <span className="eyebrow">Progresso</span>
+              <strong>{checklistProgress}% do checklist</strong>
+            </div>
+            <span className={canFinish ? "progress-ready" : "progress-pending"}>
+              {canFinish ? "Obrigatorios preenchidos" : `${requiredAnswered}/${requiredItems.length} obrigatorios`}
+            </span>
+          </div>
+          <div className="progress-track" aria-hidden="true">
+            <span style={{ width: checklistProgress + "%" }} />
+          </div>
+        </section>
+      )}
+
       {visit.status === "PROGRAMADA" && (
         <button
           className="primary-button action-wide"
@@ -822,9 +846,11 @@ function VisitScreen({
 
       {visit.status === "EM_EXECUCAO" && (
         <>
-          <section className="section-card">
-            <span className="eyebrow">Qualidade</span>
-            <h2>Medicoes</h2>
+          <section className="section-card visit-step-card">
+            <div className="visit-step-heading">
+              <span className="visit-step-number">1</span>
+              <div><span className="eyebrow">Qualidade</span><h2>Medicoes</h2></div>
+            </div>
             <div className="measurement-grid">
               <MeasurementInput
                 label="pH"
@@ -839,15 +865,19 @@ function VisitScreen({
             </div>
           </section>
 
-          <section className="section-card">
-            <span className="eyebrow">Evidencias</span>
-            <h2>Fotos e arquivos</h2>
+          <section className="section-card visit-step-card">
+            <div className="visit-step-heading">
+              <span className="visit-step-number">2</span>
+              <div><span className="eyebrow">Evidencias</span><h2>Fotos e arquivos</h2></div>
+            </div>
             <EvidenceCapture onFile={(file) => onEvidence(visit.id, file)} />
           </section>
 
-          <section className="section-card">
-            <span className="eyebrow">Checklist</span>
-            <h2>Inspecao da estacao</h2>
+          <section className="section-card visit-step-card">
+            <div className="visit-step-heading">
+              <span className="visit-step-number">3</span>
+              <div><span className="eyebrow">Checklist</span><h2>Inspecao da estacao</h2></div>
+            </div>
             <div className="checklist">
               {items.map((item) => (
                 <ChecklistField
@@ -863,26 +893,36 @@ function VisitScreen({
             </div>
           </section>
 
-          <section className="section-card">
-            <span className="eyebrow">Ocorrencia</span>
-            <h2>Encontrou algum problema?</h2>
+          <section className="section-card visit-step-card">
+            <div className="visit-step-heading">
+              <span className="visit-step-number">4</span>
+              <div><span className="eyebrow">Ocorrencia</span><h2>Encontrou algum problema?</h2></div>
+            </div>
             <OccurrenceForm visit={visit} />
           </section>
 
-          <section className="section-card">
-            <span className="eyebrow">Materiais e servicos</span>
-            <h2>Precisa solicitar algo?</h2>
+          <section className="section-card visit-step-card">
+            <div className="visit-step-heading">
+              <span className="visit-step-number">5</span>
+              <div><span className="eyebrow">Materiais e servicos</span><h2>Precisa solicitar algo?</h2></div>
+            </div>
             <VisitMaterialRequestForm visit={visit} />
           </section>
 
-          <button
-            className="primary-button action-wide"
-            disabled={busy}
-            onClick={() => void onCommand(visit, "finish")}
-          >
-            <CheckCircle2 size={18} />
-            Finalizar visita
-          </button>
+          <div className="visit-finish-bar">
+            <div className="visit-finish-status">
+              <strong>{canFinish ? "Pronto para finalizar" : "Complete os itens obrigatorios"}</strong>
+              <span>{checklistAnswered} de {items.length} item(ns) respondido(s)</span>
+            </div>
+            <button
+              className="primary-button"
+              disabled={busy || !canFinish}
+              onClick={() => void onCommand(visit, "finish")}
+            >
+              <CheckCircle2 size={18} />
+              Finalizar visita
+            </button>
+          </div>
         </>
       )}
 
