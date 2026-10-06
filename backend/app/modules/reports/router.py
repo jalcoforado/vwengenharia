@@ -1,6 +1,6 @@
 import csv
-from html import escape
 from datetime import UTC, datetime
+from html import escape
 from io import StringIO
 from typing import Annotated
 from uuid import UUID
