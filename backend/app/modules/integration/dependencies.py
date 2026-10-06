@@ -6,7 +6,6 @@ from uuid import UUID
 
 from fastapi import Header, HTTPException, status
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.identity import Tenant
 from app.models.integration import IntegrationCredential
