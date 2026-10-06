@@ -6,12 +6,17 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Cloud,
+  LayoutDashboard,
+  Activity,
+  Database,
+  Settings2,
   CloudOff,
   LogOut,
   RefreshCw,
   Route,
   Save,
   ShieldCheck,
+  Shield,
   Wrench,
 } from "lucide-react";
 
@@ -1189,12 +1194,12 @@ function SupervisorHome({ me }: { me: Me }) {
 
       <nav className="management-nav" aria-label="Areas do ERP">
         {[
-          ["OVERVIEW", "Visao geral"],
-          ["OPERATIONS", "Operacao"],
-          ["REGISTERS", "Cadastros"],
-          ["CONFIG", "Configuracao"],
-          ["GOVERNANCE", "Governanca"],
-        ].map(([value, label]) => (
+          { value: "OVERVIEW", label: "Visao geral", Icon: LayoutDashboard },
+          { value: "OPERATIONS", label: "Operacao", Icon: Activity },
+          { value: "REGISTERS", label: "Cadastros", Icon: Database },
+          { value: "CONFIG", label: "Configuracao", Icon: Settings2 },
+          { value: "GOVERNANCE", label: "Governanca", Icon: Shield },
+        ].map(({ value, label, Icon }) => (
           <button
             key={value}
             className={managementView === value ? "management-nav-item active" : "management-nav-item"}
@@ -1203,7 +1208,8 @@ function SupervisorHome({ me }: { me: Me }) {
               if (value !== "REGISTERS") setSelectedStationId(null);
             }}
           >
-            {label}
+            <Icon size={16} strokeWidth={2} />
+            <span>{label}</span>
           </button>
         ))}
       </nav>
