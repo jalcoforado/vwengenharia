@@ -2,6 +2,7 @@ import re
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.field import Visit, VisitStatus
@@ -355,7 +356,7 @@ async def materialize_legacy_visits(
             stage.error_code = None
             stage.error_message = None
             imported += 1
-        except Exception as exc:
+        except (SQLAlchemyError, TypeError, ValueError) as exc:
             stage.status = "ERROR"
             stage.error_code = "MATERIALIZATION_ERROR"
             stage.error_message = str(exc)[:1000]
