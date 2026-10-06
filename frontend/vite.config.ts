@@ -13,9 +13,17 @@ export default defineConfig({
         description: "Gestao operacional de campo",
         display: "standalone",
         start_url: "/",
-        theme_color: "#111827",
-        background_color: "#ffffff"
+        theme_color: "#173c2a",
+        background_color: "#f3f6f4"
       }
     })
-  ]
+  ],
+  server: {
+    proxy: {
+      "/api": {
+        target: "http://localhost:8000",
+        changeOrigin: true
+      }
+    }
+  }
 });
