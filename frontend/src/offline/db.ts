@@ -9,6 +9,18 @@ export type OutboxItem = {
   lastError?: string;
 };
 
+export type PendingUpload = {
+  id: string;
+  visitId: string;
+  filename: string;
+  contentType: string;
+  sizeBytes: number;
+  caption?: string;
+  blob: Blob;
+  createdAt: string;
+  lastError?: string;
+};
+
 export type CacheRecord = {
   key: string;
   value: unknown;
@@ -17,12 +29,18 @@ export type CacheRecord = {
 
 class VWOfflineDB extends Dexie {
   outbox!: Table<OutboxItem, string>;
+  pendingUploads!: Table<PendingUpload, string>;
   cache!: Table<CacheRecord, string>;
 
   constructor() {
     super("vwengenharia");
     this.version(1).stores({
       outbox: "id, createdAt",
+      cache: "key, savedAt",
+    });
+    this.version(2).stores({
+      outbox: "id, createdAt",
+      pendingUploads: "id, visitId, createdAt",
       cache: "key, savedAt",
     });
   }
@@ -39,10 +57,14 @@ export async function readCache<T>(key: string): Promise<T | null> {
   return (record?.value as T | undefined) ?? null;
 }
 
-export async function enqueue(item: OutboxItem) {
-  await db.outbox.put(item);
+export async function queueUpload(item: PendingUpload) {
+  await db.pendingUploads.put(item);
 }
 
 export async function outboxCount() {
-  return db.outbox.count();
+  const [commands, uploads] = await Promise.all([
+    db.outbox.count(),
+    db.pendingUploads.count(),
+  ]);
+  return commands + uploads;
 }
