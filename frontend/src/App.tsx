@@ -151,6 +151,25 @@ type ChecklistTemplateSummary = {
   is_active: boolean;
 };
 
+type MaintenancePlan = {
+  id: string;
+  asset_id: string;
+  assigned_membership_id: string | null;
+  maintenance_type: string;
+  frequency_days: number;
+  next_due_at: string;
+  last_completed_at: string | null;
+  instructions: string | null;
+  is_active: boolean;
+};
+
+type MaintenanceSummary = {
+  active_plans: number;
+  overdue_plans: number;
+  due_next_7_days: number;
+  executions_last_30_days: number;
+};
+
 type Occurrence = {
   id: string;
   station_id: string;
@@ -971,6 +990,8 @@ function SupervisorHome({ me }: { me: Me }) {
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [visitPlans, setVisitPlans] = useState<VisitPlan[]>([]);
   const [templates, setTemplates] = useState<ChecklistTemplateSummary[]>([]);
+  const [maintenancePlans, setMaintenancePlans] = useState<MaintenancePlan[]>([]);
+  const [maintenanceSummary, setMaintenanceSummary] = useState<MaintenanceSummary | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -990,6 +1011,8 @@ function SupervisorHome({ me }: { me: Me }) {
         teamList,
         planList,
         templateList,
+        maintenancePlanList,
+        maintenanceOverview,
       ] = await Promise.all([
         api<DashboardOverview>("/api/v1/dashboard/overview"),
         api<WorkOrder[]>("/api/v1/work-orders?limit=100"),
@@ -1003,6 +1026,8 @@ function SupervisorHome({ me }: { me: Me }) {
         api<TeamMember[]>("/api/v1/team?active_only=true"),
         api<VisitPlan[]>("/api/v1/visit-plans?active_only=false"),
         api<ChecklistTemplateSummary[]>("/api/v1/checklist-templates"),
+        api<MaintenancePlan[]>("/api/v1/maintenance/plans?active_only=false"),
+        api<MaintenanceSummary>("/api/v1/maintenance/summary"),
       ]);
       setOverview(summary);
       setWorkOrders(orders);
@@ -1024,6 +1049,8 @@ function SupervisorHome({ me }: { me: Me }) {
       setTeam(teamList);
       setVisitPlans(planList);
       setTemplates(templateList);
+      setMaintenancePlans(maintenancePlanList);
+      setMaintenanceSummary(maintenanceOverview);
     } catch {
       setNotice("Nao foi possivel atualizar o cockpit.");
     } finally {
@@ -1275,6 +1302,15 @@ function SupervisorHome({ me }: { me: Me }) {
         stations={adminStations}
         assetTypes={assetTypes}
         assets={assets}
+        onChanged={load}
+      />
+
+      <MaintenanceAdmin
+        plans={maintenancePlans}
+        summary={maintenanceSummary}
+        assets={assets}
+        stations={adminStations}
+        team={team}
         onChanged={load}
       />
 
@@ -1626,5 +1662,167 @@ function TeamMemberForm({ onCreated }: { onCreated: () => Promise<void> }) {
       </button>
       {feedback && <span className="inline-feedback">{feedback}</span>}
     </div>
+  );
+}
+
+
+function MaintenanceAdmin({
+  plans,
+  summary,
+  assets,
+  stations,
+  team,
+  onChanged,
+}: {
+  plans: MaintenancePlan[];
+  summary: MaintenanceSummary | null;
+  assets: AssetRecord[];
+  stations: AdminStation[];
+  team: TeamMember[];
+  onChanged: () => Promise<void>;
+}) {
+  const [assetId, setAssetId] = useState("");
+  const [memberId, setMemberId] = useState("");
+  const [frequencyDays, setFrequencyDays] = useState("30");
+  const [nextDueAt, setNextDueAt] = useState("");
+  const [instructions, setInstructions] = useState("");
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const assetMap = new Map(assets.map((item) => [item.id, item]));
+  const stationMap = new Map(stations.map((item) => [item.id, item]));
+  const memberMap = new Map(team.map((item) => [item.membership_id, item]));
+  const fieldTeam = team.filter((item) => ["TECNICO", "MANUTENCAO"].includes(item.role));
+  const now = Date.now();
+
+  async function createPlan() {
+    if (!assetId || !nextDueAt) {
+      setFeedback("Selecione o ativo e informe a primeira manutencao.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await api("/api/v1/maintenance/plans", {
+        method: "POST",
+        body: JSON.stringify({
+          asset_id: assetId,
+          assigned_membership_id: memberId || null,
+          maintenance_type: "PREVENTIVA",
+          frequency_days: Number(frequencyDays),
+          next_due_at: new Date(nextDueAt).toISOString(),
+          instructions: instructions.trim() || null,
+        }),
+      });
+      setAssetId("");
+      setMemberId("");
+      setNextDueAt("");
+      setInstructions("");
+      setFeedback("Plano preventivo criado.");
+      await onChanged();
+    } catch {
+      setFeedback("Nao foi possivel criar o plano de manutencao.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="section-card">
+      <div className="section-heading">
+        <div>
+          <span className="eyebrow">Manutencao</span>
+          <h2>Preventivas e vencimentos</h2>
+        </div>
+        <div className="admin-summary">
+          <span><strong>{summary?.active_plans ?? 0}</strong> planos</span>
+          <span><strong>{summary?.overdue_plans ?? 0}</strong> vencidos</span>
+          <span><strong>{summary?.due_next_7_days ?? 0}</strong> proximos 7 dias</span>
+        </div>
+      </div>
+
+      <div className="admin-panel">
+        <div className="admin-list">
+          {[...plans]
+            .sort((a, b) => new Date(a.next_due_at).getTime() - new Date(b.next_due_at).getTime())
+            .map((plan) => {
+              const asset = assetMap.get(plan.asset_id);
+              const station = asset ? stationMap.get(asset.station_id) : undefined;
+              const overdue = plan.is_active && new Date(plan.next_due_at).getTime() < now;
+              return (
+                <div className="admin-row" key={plan.id}>
+                  <div>
+                    <strong>{asset?.name ?? "Ativo"}</strong>
+                    <span>
+                      {(station?.name ?? "Estacao") + " · a cada " + plan.frequency_days + " dias · " +
+                        (memberMap.get(plan.assigned_membership_id ?? "")?.name ?? "Sem responsavel")}
+                    </span>
+                  </div>
+                  <span className={overdue ? "sla overdue" : "sla"}>
+                    {overdue
+                      ? "Vencida"
+                      : new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(new Date(plan.next_due_at))}
+                  </span>
+                </div>
+              );
+            })}
+          {plans.length === 0 && <div className="empty-state">Nenhum plano preventivo cadastrado.</div>}
+        </div>
+
+        <div className="compact-form admin-create-form">
+          <h3>Nova preventiva</h3>
+          <div className="compact-form-grid">
+            <label>
+              Ativo
+              <select value={assetId} onChange={(event) => setAssetId(event.target.value)}>
+                <option value="">Selecione</option>
+                {assets.filter((item) => item.is_active).map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {(stationMap.get(item.station_id)?.name ?? "Estacao") + " · " + item.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Responsavel
+              <select value={memberId} onChange={(event) => setMemberId(event.target.value)}>
+                <option value="">Sem responsavel fixo</option>
+                {fieldTeam.map((item) => (
+                  <option key={item.membership_id} value={item.membership_id}>{item.name}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Periodicidade
+              <select value={frequencyDays} onChange={(event) => setFrequencyDays(event.target.value)}>
+                <option value="7">7 dias</option>
+                <option value="15">15 dias</option>
+                <option value="30">30 dias</option>
+                <option value="60">60 dias</option>
+                <option value="90">90 dias</option>
+                <option value="180">180 dias</option>
+                <option value="365">Anual</option>
+              </select>
+            </label>
+            <label>
+              Proxima manutencao
+              <input type="datetime-local" value={nextDueAt} onChange={(event) => setNextDueAt(event.target.value)} />
+            </label>
+          </div>
+          <label className="full-field">
+            Instrucoes
+            <textarea
+              rows={3}
+              value={instructions}
+              onChange={(event) => setInstructions(event.target.value)}
+              placeholder="Ex.: limpar, lubrificar, conferir rolamentos e registrar evidencia."
+            />
+          </label>
+          <button className="small-button" disabled={busy} onClick={() => void createPlan()}>
+            {busy ? "Salvando..." : "Criar preventiva"}
+          </button>
+          {feedback && <span className="inline-feedback">{feedback}</span>}
+        </div>
+      </div>
+    </section>
   );
 }
