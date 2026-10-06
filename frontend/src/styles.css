@@ -1170,3 +1170,154 @@ button:not(:disabled):active { transform: translateY(1px); }
   .management-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .topbar strong { font-size: 13px; }
 }
+
+
+/* Executive command center */
+.command-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: center;
+  margin-bottom: 14px;
+  padding: 22px;
+  border: 1px solid #d9e5dc;
+  border-radius: 22px;
+  background:
+    linear-gradient(135deg, rgba(232, 243, 236, .96), rgba(255,255,255,.98) 56%),
+    var(--vw-surface);
+  box-shadow: var(--vw-shadow-sm);
+}
+.command-hero-healthy {
+  border-color: #cfe4d6;
+  background: linear-gradient(135deg, #edf8f1, #ffffff 62%);
+}
+.command-hero-main {
+  display: flex;
+  gap: 15px;
+  align-items: flex-start;
+  min-width: 0;
+}
+.command-hero-icon {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: var(--vw-primary);
+  color: white;
+  box-shadow: 0 7px 18px rgba(21, 63, 43, .18);
+}
+.command-hero h2 {
+  margin: 3px 0 7px;
+  font-size: clamp(22px, 3vw, 30px);
+  line-height: 1.08;
+  letter-spacing: -.035em;
+}
+.command-hero p {
+  margin: 0;
+  color: var(--vw-text-secondary);
+  max-width: 700px;
+  line-height: 1.55;
+}
+.command-hero-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  flex: 0 0 auto;
+}
+
+.attention-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.attention-item {
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 13px;
+  border: 1px solid var(--vw-border);
+  border-radius: 14px;
+  background: rgba(255,255,255,.94);
+  color: #4f5f56;
+  text-align: left;
+  box-shadow: var(--vw-shadow-sm);
+}
+.attention-item:hover {
+  border-color: var(--vw-border-strong);
+  background: white;
+}
+.attention-item strong {
+  color: var(--vw-text);
+  font-size: 17px;
+  margin-right: 3px;
+  font-variant-numeric: tabular-nums;
+}
+.attention-danger {
+  border-color: #efccc5;
+  background: #fff9f8;
+  color: var(--vw-danger-text);
+}
+.attention-warning {
+  border-color: #eddcaf;
+  background: #fffaf0;
+  color: var(--vw-warning-text);
+}
+.attention-info {
+  border-color: #ccd9ec;
+  background: #f8fbff;
+  color: var(--vw-info-text);
+}
+
+.quick-actions {
+  padding: 2px 0;
+}
+.quick-actions .secondary-button {
+  min-height: 38px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.alert-center {
+  overflow: hidden;
+}
+.alert-center .ops-row {
+  margin: 0 -8px;
+  padding-left: 8px;
+  padding-right: 8px;
+  border-radius: 10px;
+}
+
+@media (max-width: 900px) {
+  .command-hero {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .command-hero-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 700px) {
+  .attention-strip {
+    grid-template-columns: 1fr;
+  }
+  .command-hero {
+    padding: 18px;
+    border-radius: 18px;
+  }
+  .command-hero-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .command-hero-actions .primary-button,
+  .command-hero-actions .secondary-button {
+    width: 100%;
+  }
+}
