@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 import AuditViewer from "./components/AuditViewer";
+import InboxPanel from "./components/InboxPanel";
 import ChecklistAdmin from "./components/ChecklistAdmin";
 import WorkOrdersAdmin from "./components/WorkOrdersAdmin";
 import StationOverview from "./components/StationOverview";
@@ -1168,6 +1169,8 @@ function SupervisorHome({ me }: { me: Me }) {
       </section>
 
       {notice && <div className="message" onClick={() => setNotice(null)}>{notice}</div>}
+
+      <InboxPanel />
 
       <section className="quick-actions">
         <button
