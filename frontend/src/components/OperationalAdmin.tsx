@@ -128,6 +128,22 @@ function ClientAdmin({ clients, onChanged }: { clients: ClientRecord[]; onChange
   const [feedback, setFeedback] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  async function toggle(client: ClientRecord) {
+    setBusy(true);
+    try {
+      await api("/api/v1/clients/" + client.id, {
+        method: "PATCH",
+        body: JSON.stringify({ is_active: !client.is_active }),
+      });
+      setFeedback(client.is_active ? "Cliente inativado." : "Cliente reativado.");
+      await onChanged();
+    } catch {
+      setFeedback("Nao foi possivel alterar o cliente.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function create() {
     if (name.trim().length < 2) return setFeedback("Informe o nome do cliente.");
     setBusy(true);
@@ -158,7 +174,12 @@ function ClientAdmin({ clients, onChanged }: { clients: ClientRecord[]; onChange
         {clients.map((client) => (
           <div className="admin-row" key={client.id}>
             <div><strong>{client.name}</strong><span>{client.document || client.contact_name || "Sem documento informado"}</span></div>
-            <span className={client.is_active ? "status status-revisada" : "status"}>{client.is_active ? "Ativo" : "Inativo"}</span>
+            <div className="admin-actions">
+              <span className={client.is_active ? "status status-revisada" : "status"}>{client.is_active ? "Ativo" : "Inativo"}</span>
+              <button className="text-button" disabled={busy} onClick={() => void toggle(client)}>
+                {client.is_active ? "Inativar" : "Reativar"}
+              </button>
+            </div>
           </div>
         ))}
         {clients.length === 0 && <div className="empty-state">Nenhum cliente cadastrado.</div>}
@@ -190,6 +211,22 @@ function DevelopmentAdmin({ clients, developments, onChanged }: { clients: Clien
   const [busy, setBusy] = useState(false);
   const clientMap = new Map(clients.map((item) => [item.id, item]));
 
+  async function toggle(item: DevelopmentRecord) {
+    setBusy(true);
+    try {
+      await api("/api/v1/developments/" + item.id, {
+        method: "PATCH",
+        body: JSON.stringify({ is_active: !item.is_active }),
+      });
+      setFeedback(item.is_active ? "Empreendimento inativado." : "Empreendimento reativado.");
+      await onChanged();
+    } catch {
+      setFeedback("Nao foi possivel alterar o empreendimento.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function create() {
     if (!clientId || name.trim().length < 2) return setFeedback("Selecione o cliente e informe o empreendimento.");
     setBusy(true);
@@ -210,7 +247,12 @@ function DevelopmentAdmin({ clients, developments, onChanged }: { clients: Clien
         {developments.map((item) => (
           <div className="admin-row" key={item.id}>
             <div><strong>{item.name}</strong><span>{clientMap.get(item.client_id)?.name ?? "Cliente"} · {[item.city, item.state].filter(Boolean).join("/")}</span></div>
-            <span className={item.is_active ? "status status-revisada" : "status"}>{item.is_active ? "Ativo" : "Inativo"}</span>
+            <div className="admin-actions">
+              <span className={item.is_active ? "status status-revisada" : "status"}>{item.is_active ? "Ativo" : "Inativo"}</span>
+              <button className="text-button" disabled={busy} onClick={() => void toggle(item)}>
+                {item.is_active ? "Inativar" : "Reativar"}
+              </button>
+            </div>
           </div>
         ))}
       </div>
@@ -241,6 +283,22 @@ function StationAdmin({ developments, stations, onChanged }: { developments: Dev
   const [busy, setBusy] = useState(false);
   const developmentMap = new Map(developments.map((item) => [item.id, item]));
 
+  async function toggle(station: AdminStation) {
+    setBusy(true);
+    try {
+      await api("/api/v1/stations/" + station.id, {
+        method: "PATCH",
+        body: JSON.stringify({ is_active: !station.is_active }),
+      });
+      setFeedback(station.is_active ? "Estacao inativada." : "Estacao reativada.");
+      await onChanged();
+    } catch {
+      setFeedback("Nao foi possivel alterar a estacao.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function create() {
     if (!developmentId || name.trim().length < 2) return setFeedback("Selecione o empreendimento e informe a estacao.");
     setBusy(true);
@@ -260,7 +318,14 @@ function StationAdmin({ developments, stations, onChanged }: { developments: Dev
         {stations.map((station) => (
           <div className="admin-row" key={station.id}>
             <div><strong>{station.name}</strong><span>{developmentMap.get(station.development_id)?.name ?? "Empreendimento"} · {station.code || station.station_type || "Estacao"}</span></div>
-            <span className="status">{station.visit_frequency_days ? station.visit_frequency_days + "d" : station.station_type ?? "—"}</span>
+            <div className="admin-actions">
+              <span className={station.is_active ? "status status-revisada" : "status"}>
+                {station.is_active ? (station.visit_frequency_days ? station.visit_frequency_days + "d" : "Ativa") : "Inativa"}
+              </span>
+              <button className="text-button" disabled={busy} onClick={() => void toggle(station)}>
+                {station.is_active ? "Inativar" : "Reativar"}
+              </button>
+            </div>
           </div>
         ))}
       </div>
@@ -295,6 +360,38 @@ function AssetAdmin({ stations, assetTypes, assets, onChanged }: { stations: Adm
   const stationMap = new Map(stations.map((item) => [item.id, item]));
   const typeMap = new Map(assetTypes.map((item) => [item.id, item]));
 
+  async function updateAsset(asset: AssetRecord, patch: Record<string, unknown>) {
+    setBusy(true);
+    try {
+      await api("/api/v1/assets/" + asset.id, {
+        method: "PATCH",
+        body: JSON.stringify(patch),
+      });
+      setFeedback("Ativo atualizado.");
+      await onChanged();
+    } catch {
+      setFeedback("Nao foi possivel atualizar o ativo.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function toggleAssetType(item: AssetTypeRecord) {
+    setBusy(true);
+    try {
+      await api("/api/v1/asset-types/" + item.id, {
+        method: "PATCH",
+        body: JSON.stringify({ is_active: !item.is_active }),
+      });
+      setFeedback("Tipo de ativo atualizado.");
+      await onChanged();
+    } catch {
+      setFeedback("Nao foi possivel atualizar o tipo.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function createAssetType() {
     if (assetTypeName.trim().length < 2) return setFeedback("Informe o nome do tipo de ativo.");
     setBusy(true);
@@ -325,7 +422,25 @@ function AssetAdmin({ stations, assetTypes, assets, onChanged }: { stations: Adm
         {assets.map((asset) => (
           <div className="admin-row" key={asset.id}>
             <div><strong>{asset.name}</strong><span>{stationMap.get(asset.station_id)?.name ?? "Estacao"} · {typeMap.get(asset.asset_type_id)?.name ?? "Tipo"} · {asset.manufacturer || asset.model || "Sem fabricante"}</span></div>
-            <span className={"status " + (asset.status === "OPERANDO" ? "status-revisada" : "")}>{asset.status.replaceAll("_", " ")}</span>
+            <div className="admin-actions asset-actions">
+              <select
+                value={asset.status}
+                disabled={busy}
+                onChange={(event) => void updateAsset(asset, { status: event.target.value })}
+              >
+                <option value="OPERANDO">Operando</option>
+                <option value="DESLIGADO">Desligado</option>
+                <option value="EM_MANUTENCAO">Em manutencao</option>
+                <option value="AGUARDANDO_MANUTENCAO">Aguardando manutencao</option>
+                <option value="AGUARDANDO_INSTALACAO">Aguardando instalacao</option>
+                <option value="NECESSITA_VERIFICACAO">Necessita verificacao</option>
+                <option value="NAO_POSSUI">Nao possui</option>
+                <option value="NAO_APLICAVEL">Nao aplicavel</option>
+              </select>
+              <button className="text-button" disabled={busy} onClick={() => void updateAsset(asset, { is_active: !asset.is_active })}>
+                {asset.is_active ? "Inativar" : "Reativar"}
+              </button>
+            </div>
           </div>
         ))}
       </div>
@@ -335,6 +450,16 @@ function AssetAdmin({ stations, assetTypes, assets, onChanged }: { stations: Adm
           <div className="compact-form-grid">
             <label>Nome<input value={assetTypeName} onChange={(e) => setAssetTypeName(e.target.value)} /></label>
             <label>Codigo<input value={assetTypeCode} onChange={(e) => setAssetTypeCode(e.target.value)} /></label>
+          </div>
+          <div className="type-list">
+            {assetTypes.map((item) => (
+              <div className="type-chip" key={item.id}>
+                <span>{item.name}</span>
+                <button className="text-button" disabled={busy} onClick={() => void toggleAssetType(item)}>
+                  {item.is_active ? "Inativar" : "Reativar"}
+                </button>
+              </div>
+            ))}
           </div>
           <button className="small-button" disabled={busy} onClick={() => void createAssetType()}>{busy ? "Salvando..." : "Cadastrar tipo"}</button>
         </div>
