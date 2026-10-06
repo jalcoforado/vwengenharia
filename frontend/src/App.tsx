@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
+  ArrowRight,
   ArrowLeft,
   Camera,
   CheckCircle2,
   ClipboardCheck,
+  Clock3,
   Cloud,
   LayoutDashboard,
   Activity,
@@ -16,6 +18,7 @@ import {
   Route,
   Save,
   ShieldCheck,
+  Sparkles,
   Shield,
   Wrench,
 } from "lucide-react";
@@ -1175,6 +1178,11 @@ function SupervisorHome({ me }: { me: Me }) {
   const sortedOrders = [...workOrders].sort(
     (a, b) => new Date(a.sla_due_at).getTime() - new Date(b.sla_due_at).getTime(),
   );
+  const overdueOrders = overview?.overdue_work_orders ?? 0;
+  const criticalOrders = overview?.critical_work_orders ?? 0;
+  const waitingReview = overview?.visits_waiting_review ?? 0;
+  const attentionCount = overdueOrders + criticalOrders + waitingReview;
+  const operationHealthy = attentionCount === 0 && alerts.length === 0;
 
   return (
     <main className="content">
@@ -1216,6 +1224,51 @@ function SupervisorHome({ me }: { me: Me }) {
 
       {managementView === "OVERVIEW" && (
         <>
+      <section className={operationHealthy ? "command-hero command-hero-healthy" : "command-hero"}>
+        <div className="command-hero-main">
+          <div className="command-hero-icon">
+            {operationHealthy ? <ShieldCheck size={22} /> : <Sparkles size={22} />}
+          </div>
+          <div>
+            <span className="eyebrow">Resumo executivo</span>
+            <h2>{operationHealthy ? "Operacao sob controle" : attentionCount + " ponto(s) pedem atencao"}</h2>
+            <p>
+              {operationHealthy
+                ? "Sem excecoes criticas agora. Continue acompanhando a agenda e a manutencao preventiva."
+                : "Priorize SLA vencido, OS critica e visitas aguardando revisao antes das tarefas de rotina."}
+            </p>
+          </div>
+        </div>
+        <div className="command-hero-actions">
+          <button className="primary-button" onClick={() => setManagementView("OPERATIONS")}>
+            Abrir operacao
+            <ArrowRight size={16} />
+          </button>
+          <button className="secondary-button" onClick={() => void load()} disabled={busy}>
+            <RefreshCw size={16} className={busy ? "spin" : ""} />
+            Atualizar agora
+          </button>
+        </div>
+      </section>
+
+      <section className="attention-strip" aria-label="Resumo de pendencias">
+        <button className={overdueOrders > 0 ? "attention-item attention-danger" : "attention-item"} onClick={() => setManagementView("OPERATIONS")}>
+          <AlertTriangle size={17} />
+          <span><strong>{overdueOrders}</strong> SLA vencido(s)</span>
+          <ArrowRight size={15} />
+        </button>
+        <button className={criticalOrders > 0 ? "attention-item attention-warning" : "attention-item"} onClick={() => setManagementView("OPERATIONS")}>
+          <ShieldCheck size={17} />
+          <span><strong>{criticalOrders}</strong> OS critica(s)</span>
+          <ArrowRight size={15} />
+        </button>
+        <button className={waitingReview > 0 ? "attention-item attention-info" : "attention-item"} onClick={() => setManagementView("OVERVIEW")}>
+          <Clock3 size={17} />
+          <span><strong>{waitingReview}</strong> para revisar</span>
+          <ArrowRight size={15} />
+        </button>
+      </section>
+
       <InboxPanel />
 
       <section className="quick-actions">
