@@ -1,5 +1,6 @@
 import re
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal, InvalidOperation
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
@@ -18,7 +19,7 @@ from app.models.field import (
     VisitStatus,
 )
 from app.models.identity import Membership, Role
-from app.models.operations import Asset, AssetType, Station
+from app.models.operations import Asset, AssetStatus, AssetType, Station
 from app.modules.auth.dependencies import AuthContext
 from app.modules.core_registers.service import add_audit, tenant_get_or_404
 from app.modules.field.schemas import (
@@ -375,6 +376,108 @@ async def validate_required_answers(
         )
 
 
+def _validated_answer_value(item: ChecklistTemplateItem, value):
+    if value is None:
+        if item.required:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="required_answer_cannot_be_empty",
+            )
+        return value
+
+    if item.answer_type == "BOOLEAN":
+        if not isinstance(value, bool):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="answer_must_be_boolean",
+            )
+        return value
+
+    if item.answer_type == "NUMBER":
+        if isinstance(value, bool):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="answer_must_be_number",
+            )
+        try:
+            numeric = Decimal(str(value))
+        except (InvalidOperation, ValueError):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="answer_must_be_number",
+            ) from None
+        return float(numeric)
+
+    if item.answer_type in {"SELECT", "ASSET_STATUS"}:
+        if not isinstance(value, str) or not value:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="answer_must_be_option",
+            )
+        allowed = item.options_json
+        if item.answer_type == "ASSET_STATUS" and not allowed:
+            allowed = [state.value for state in AssetStatus]
+        if allowed and value not in allowed:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="answer_option_not_allowed",
+            )
+        return value
+
+    if item.answer_type == "TEXT":
+        if not isinstance(value, str):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="answer_must_be_text",
+            )
+        if item.required and not value.strip():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="required_answer_cannot_be_empty",
+            )
+        return value
+
+    raise HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail="unsupported_answer_type",
+    )
+
+
+async def _sync_replay_entity(
+    session: AsyncSession,
+    *,
+    tenant_id: UUID,
+    client_operation_id: UUID | None,
+    operation_type: str,
+    entity_type: str,
+    model,
+):
+    if client_operation_id is None:
+        return None
+    operation = await _find_sync_operation(session, tenant_id, client_operation_id)
+    if operation is None:
+        return None
+    if operation.operation_type != operation_type or operation.entity_type != entity_type:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="client_operation_id_conflict",
+        )
+    entity = (
+        await session.execute(
+            select(model).where(
+                model.id == operation.entity_id,
+                model.tenant_id == tenant_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if entity is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="idempotent_entity_missing",
+        )
+    return entity
+
+
 async def upsert_answer(
     session: AsyncSession,
     context: AuthContext,
@@ -387,17 +490,21 @@ async def upsert_answer(
     if visit.checklist_template_id is None:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="visit_has_no_template")
 
-    if payload.client_operation_id is not None:
-        existing_by_operation = (
-            await session.execute(
-                select(VisitAnswer).where(
-                    VisitAnswer.tenant_id == context.tenant.id,
-                    VisitAnswer.client_operation_id == payload.client_operation_id,
-                )
+    replay = await _sync_replay_entity(
+        session,
+        tenant_id=context.tenant.id,
+        client_operation_id=payload.client_operation_id,
+        operation_type="VISIT_ANSWER_UPSERT",
+        entity_type="visit_answer",
+        model=VisitAnswer,
+    )
+    if replay is not None:
+        if replay.visit_id != visit.id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="client_operation_id_conflict",
             )
-        ).scalar_one_or_none()
-        if existing_by_operation is not None:
-            return existing_by_operation
+        return replay
 
     item = (
         await session.execute(
@@ -410,6 +517,8 @@ async def upsert_answer(
     ).scalar_one_or_none()
     if item is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="checklist_item_not_found")
+
+    normalized_value = _validated_answer_value(item, payload.value)
 
     answer = (
         await session.execute(
@@ -425,16 +534,23 @@ async def upsert_answer(
             tenant_id=context.tenant.id,
             visit_id=visit.id,
             item_id=item.id,
-            value_json=payload.value,
+            value_json=normalized_value,
             client_operation_id=payload.client_operation_id,
         )
         session.add(answer)
     else:
-        answer.value_json = payload.value
-        if payload.client_operation_id is not None:
-            answer.client_operation_id = payload.client_operation_id
+        answer.value_json = normalized_value
 
     await session.flush()
+    if payload.client_operation_id is not None:
+        _record_sync_operation(
+            session,
+            tenant_id=context.tenant.id,
+            client_operation_id=payload.client_operation_id,
+            operation_type="VISIT_ANSWER_UPSERT",
+            entity_type="visit_answer",
+            entity_id=answer.id,
+        )
     add_audit(
         session,
         context,
@@ -457,17 +573,21 @@ async def add_measurement(
     if visit.status != VisitStatus.EM_EXECUCAO.value:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="visit_not_in_progress")
 
-    if payload.client_operation_id is not None:
-        existing = (
-            await session.execute(
-                select(Measurement).where(
-                    Measurement.tenant_id == context.tenant.id,
-                    Measurement.client_operation_id == payload.client_operation_id,
-                )
+    replay = await _sync_replay_entity(
+        session,
+        tenant_id=context.tenant.id,
+        client_operation_id=payload.client_operation_id,
+        operation_type="MEASUREMENT_CREATE",
+        entity_type="measurement",
+        model=Measurement,
+    )
+    if replay is not None:
+        if replay.visit_id != visit.id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="client_operation_id_conflict",
             )
-        ).scalar_one_or_none()
-        if existing is not None:
-            return existing
+        return replay
 
     data = payload.model_dump()
     data["status"] = payload.status.value
@@ -478,6 +598,15 @@ async def add_measurement(
     )
     session.add(measurement)
     await session.flush()
+    if payload.client_operation_id is not None:
+        _record_sync_operation(
+            session,
+            tenant_id=context.tenant.id,
+            client_operation_id=payload.client_operation_id,
+            operation_type="MEASUREMENT_CREATE",
+            entity_type="measurement",
+            entity_id=measurement.id,
+        )
     add_audit(
         session,
         context,
@@ -503,17 +632,21 @@ async def register_attachment(
 ) -> Attachment:
     visit = await get_accessible_visit(session, context, visit_id)
 
-    if payload.client_operation_id is not None:
-        existing = (
-            await session.execute(
-                select(Attachment).where(
-                    Attachment.tenant_id == context.tenant.id,
-                    Attachment.client_operation_id == payload.client_operation_id,
-                )
+    replay = await _sync_replay_entity(
+        session,
+        tenant_id=context.tenant.id,
+        client_operation_id=payload.client_operation_id,
+        operation_type="ATTACHMENT_REGISTER",
+        entity_type="attachment",
+        model=Attachment,
+    )
+    if replay is not None:
+        if replay.visit_id != visit.id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="client_operation_id_conflict",
             )
-        ).scalar_one_or_none()
-        if existing is not None:
-            return existing
+        return replay
 
     if payload.asset_id is not None:
         asset = await tenant_get_or_404(
@@ -542,6 +675,16 @@ async def register_attachment(
         client_operation_id=payload.client_operation_id,
     )
     session.add(attachment)
+    await session.flush()
+    if payload.client_operation_id is not None:
+        _record_sync_operation(
+            session,
+            tenant_id=context.tenant.id,
+            client_operation_id=payload.client_operation_id,
+            operation_type="ATTACHMENT_REGISTER",
+            entity_type="attachment",
+            entity_id=attachment.id,
+        )
     add_audit(
         session,
         context,
