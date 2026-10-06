@@ -53,3 +53,15 @@ class ClientPortalResponse(BaseModel):
     visits: list[ClientPortalVisit]
     occurrences: list[ClientPortalOccurrence]
     work_orders: list[ClientPortalWorkOrder]
+
+
+
+class ClientAccessCreate(BaseModel):
+    membership_id: UUID
+    client_id: UUID
+
+
+class ClientAccessRead(BaseModel):
+    id: UUID
+    membership_id: UUID
+    client_id: UUID
