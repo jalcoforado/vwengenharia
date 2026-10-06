@@ -46,8 +46,8 @@ import OperationalAdmin, {
 } from "./components/OperationalAdmin";
 import { api, clearSession, downloadApi, hasSession, login, openApiDocument } from "./lib/api";
 import { formatBytes, optimizeEvidenceImage } from "./lib/media";
-import { useOfflineSync } from "./lib/useOfflineSync";
-import { cacheValue, outboxCount, queueUpload, readCache } from "./offline/db";
+import { useOfflineSync, type SyncQueueError } from "./lib/useOfflineSync";
+import { cacheValue, outboxCount, queueUpload, readCache, type SyncQueueSummary } from "./offline/db";
 import { runOrQueue, syncOutbox } from "./lib/sync";
 import { SyncControl, SyncHealthCard } from "./components/SyncStatus";
 
