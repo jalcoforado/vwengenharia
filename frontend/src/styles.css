@@ -1988,3 +1988,62 @@ button:not(:disabled):active { transform: translateY(1px); }
     grid-column: auto;
   }
 }
+
+
+/* Client portal */
+.client-portal-grid {
+  display: grid;
+  grid-template-columns: 1.15fr .85fr;
+  gap: 18px;
+  align-items: start;
+}
+.client-row-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.client-access-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  margin-bottom: 16px;
+}
+.client-access-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--vw-text-secondary);
+  font-size: 12px;
+  font-weight: 750;
+}
+.client-access-form select {
+  min-height: 44px;
+  border: 1px solid var(--vw-border-strong);
+  border-radius: 11px;
+  background: white;
+  padding: 8px 10px;
+}
+.client-access-list {
+  margin-top: 14px;
+  max-height: 320px;
+}
+.client-welcome {
+  padding-bottom: 6px;
+}
+.client-metrics {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width: 900px) {
+  .client-portal-grid {
+    grid-template-columns: 1fr;
+  }
+  .client-access-form {
+    grid-template-columns: 1fr;
+  }
+  .client-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
