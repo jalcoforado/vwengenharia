@@ -106,7 +106,9 @@ async def test_recurring_visit_plan_generates_idempotent_agenda() -> None:
         )
         assert created.status_code == 201
         plan_id = created.json()["id"]
-        assert created.json()["next_due_at"] == start_at.isoformat().replace("+00:00", "Z")
+        assert datetime.fromisoformat(
+            created.json()["next_due_at"].replace("Z", "+00:00")
+        ) == start_at
 
         first = await http.post(
             "/api/v1/visit-plans/generate",
