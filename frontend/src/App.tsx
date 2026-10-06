@@ -1029,6 +1029,9 @@ function SupervisorHome({ me }: { me: Me }) {
   const [alerts, setAlerts] = useState<OperationalAlert[]>([]);
   const [materialRequests, setMaterialRequests] = useState<MaterialRequest[]>([]);
   const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
+  const [managementView, setManagementView] = useState<
+    "OVERVIEW" | "OPERATIONS" | "REGISTERS" | "CONFIG" | "GOVERNANCE"
+  >("OVERVIEW");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -1170,6 +1173,29 @@ function SupervisorHome({ me }: { me: Me }) {
 
       {notice && <div className="message" onClick={() => setNotice(null)}>{notice}</div>}
 
+      <nav className="management-nav" aria-label="Areas do ERP">
+        {[
+          ["OVERVIEW", "Visao geral"],
+          ["OPERATIONS", "Operacao"],
+          ["REGISTERS", "Cadastros"],
+          ["CONFIG", "Configuracao"],
+          ["GOVERNANCE", "Governanca"],
+        ].map(([value, label]) => (
+          <button
+            key={value}
+            className={managementView === value ? "management-nav-item active" : "management-nav-item"}
+            onClick={() => {
+              setManagementView(value as typeof managementView);
+              if (value !== "REGISTERS") setSelectedStationId(null);
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+
+      {managementView === "OVERVIEW" && (
+        <>
       <InboxPanel />
 
       <section className="quick-actions">
@@ -1332,6 +1358,11 @@ function SupervisorHome({ me }: { me: Me }) {
         </section>
       </div>
 
+        </>
+      )}
+
+      {managementView === "CONFIG" && (
+        <>
       <div className="management-grid">
         <section className="section-card">
           <div className="section-heading">
@@ -1396,6 +1427,11 @@ function SupervisorHome({ me }: { me: Me }) {
         </section>
       </div>
 
+        </>
+      )}
+
+      {managementView === "REGISTERS" && (
+        <>
       <OperationalAdmin
         clients={clients}
         developments={developments}
@@ -1413,8 +1449,15 @@ function SupervisorHome({ me }: { me: Me }) {
         />
       )}
 
-      <ChecklistAdmin templates={templates} onChanged={load} />
+        </>
+      )}
 
+      {managementView === "CONFIG" && (
+        <ChecklistAdmin templates={templates} onChanged={load} />
+      )}
+
+      {managementView === "OPERATIONS" && (
+        <>
       <MaterialRequestsAdmin
         requests={materialRequests}
         stations={adminStations}
@@ -1430,10 +1473,6 @@ function SupervisorHome({ me }: { me: Me }) {
         onChanged={load}
       />
 
-      {["SUPERADMIN", "ADMIN", "GESTOR"].includes(me.role) && (
-        <AuditViewer team={team} />
-      )}
-
       <MaintenanceAdmin
         plans={maintenancePlans}
         summary={maintenanceSummary}
@@ -1443,6 +1482,38 @@ function SupervisorHome({ me }: { me: Me }) {
         onChanged={load}
       />
 
+        </>
+      )}
+
+      {managementView === "GOVERNANCE" && (
+        <>
+          <section className="quick-actions">
+            <button
+              className="secondary-button"
+              onClick={() => void downloadApi("/api/v1/reports/visits.csv", "visitas.csv")}
+            >
+              Exportar visitas
+            </button>
+            <button
+              className="secondary-button"
+              onClick={() => void downloadApi("/api/v1/reports/work-orders.csv", "ordens-servico.csv")}
+            >
+              Exportar OS
+            </button>
+            <button
+              className="secondary-button"
+              onClick={() => void downloadApi("/api/v1/reports/maintenance.csv", "manutencao-preventiva.csv")}
+            >
+              Exportar manutencao
+            </button>
+          </section>
+          {["SUPERADMIN", "ADMIN", "GESTOR"].includes(me.role) && (
+            <AuditViewer team={team} />
+          )}
+        </>
+      )}
+
+      {managementView === "OVERVIEW" && (
       <section className="section-card">
         <span className="eyebrow">Ocorrencias</span>
         <h2>Atencao operacional recente</h2>
@@ -1463,6 +1534,7 @@ function SupervisorHome({ me }: { me: Me }) {
             ))}
         </div>
       </section>
+      )}
     </main>
   );
 }
