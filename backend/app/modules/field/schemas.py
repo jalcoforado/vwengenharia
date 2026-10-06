@@ -50,6 +50,57 @@ class ChecklistItemRead(ORMModel):
     updated_at: datetime
 
 
+class VisitPlanCreate(BaseModel):
+    station_id: UUID
+    technician_membership_id: UUID
+    checklist_template_id: UUID | None = None
+    frequency_days: int = Field(ge=1, le=365)
+    start_at: datetime
+    end_at: datetime | None = None
+    notes: str | None = Field(default=None, max_length=1000)
+
+    @model_validator(mode="after")
+    def validate_period(self) -> "VisitPlanCreate":
+        if self.end_at is not None and self.end_at < self.start_at:
+            raise ValueError("end_at must be greater than or equal to start_at")
+        return self
+
+
+class VisitPlanRead(ORMModel):
+    id: UUID
+    station_id: UUID
+    technician_membership_id: UUID
+    checklist_template_id: UUID | None
+    frequency_days: int
+    start_at: datetime
+    end_at: datetime | None
+    next_due_at: datetime
+    is_active: bool
+    notes: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class VisitPlanUpdate(BaseModel):
+    technician_membership_id: UUID | None = None
+    checklist_template_id: UUID | None = None
+    frequency_days: int | None = Field(default=None, ge=1, le=365)
+    end_at: datetime | None = None
+    is_active: bool | None = None
+    notes: str | None = Field(default=None, max_length=1000)
+
+
+class VisitGenerationRequest(BaseModel):
+    horizon_days: int = Field(default=30, ge=1, le=180)
+
+
+class VisitGenerationResponse(BaseModel):
+    generated: int
+    already_existing: int
+    plans_processed: int
+    horizon_until: datetime
+
+
 class VisitCreate(BaseModel):
     station_id: UUID
     technician_membership_id: UUID
@@ -61,6 +112,7 @@ class VisitCreate(BaseModel):
 
 class VisitRead(ORMModel):
     id: UUID
+    visit_plan_id: UUID | None
     station_id: UUID
     technician_membership_id: UUID
     checklist_template_id: UUID | None
