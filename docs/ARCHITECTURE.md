@@ -2,26 +2,65 @@
 
 ## Visao
 
+O VW Engenharia e um ERP operacional, nao uma plataforma de IA.
+
 Arquitetura inicial em monolito modular, separando dominios de negocio e evitando microservicos prematuros.
 
 ```text
-PWA React/TypeScript
-        |
-        v
-FastAPI / API v1
-        |
-+-------+----------+----------+
-|                  |          |
-PostgreSQL       Redis       S3/MinIO
-        |
-        +--------------------+
-                 |
-             IA Gateway
-                 |
-      Kimi / OpenAI / Anthropic
+Tecnico / Supervisor / Gestor
+            |
+            v
+     PWA React/TypeScript
+            |
+            v
+        FastAPI / API v1
+            |
+   +--------+---------+---------+
+   |                  |         |
+PostgreSQL          Redis     S3/MinIO
+   |
+   +------------------------------+
+                  |
+          API de integracao
+                  |
+                  v
+              iAnalisys
+        BI / Analytics / IA
 ```
 
-## Dominios
+## Fronteira entre os produtos
+
+### ERP VW Engenharia
+
+Responsavel por:
+
+- dados mestres
+- operacao de campo
+- workflow
+- estados transacionais
+- regras de negocio
+- auditoria
+- evidencias
+- SLA
+- APIs operacionais
+
+### iAnalisys
+
+Responsavel por:
+
+- BI
+- indicadores analiticos avancados
+- IA conversacional
+- agentes
+- RAG
+- tendencias
+- comparacoes
+- previsoes
+- inteligencia gerencial
+
+O ERP nao deve conter LLMGateway, prompts, tools de agentes, embeddings, RAG ou qualquer logica de orquestracao de IA.
+
+## Dominios do ERP
 
 - tenants e usuarios
 - clientes
@@ -36,17 +75,17 @@ PostgreSQL       Redis       S3/MinIO
 - manutencao
 - anexos/evidencias
 - revisoes
-- notificacoes
-- indicadores
-- IA e agentes
+- notificacoes operacionais
 - auditoria
+- integracao/exportacao
 
 ## Regras arquiteturais
 
 - Toda tabela de negocio deve carregar `tenant_id` quando aplicavel.
 - Toda query tenant-scoped deve filtrar por `tenant_id` parametrizado.
-- Fotos/documentos fora do banco relacional.
-- IA nao executa SQL arbitrario.
-- Ferramentas de IA respeitam RBAC e tenant.
-- Acoes mutaveis disparadas pela IA exigem confirmacao/aprovacao quando houver risco operacional.
-- O app de campo deve continuar operando sem internet e sincronizar depois.
+- Fotos/documentos ficam fora do banco relacional.
+- O PWA deve continuar operando sem internet e sincronizar depois.
+- O ERP deve expor contratos de API estaveis para consumo pelo iAnalisys.
+- Integracoes de leitura devem respeitar tenant, RBAC e auditoria.
+- O banco operacional nao deve ser acessado diretamente por LLMs.
+- Analise/IA pertence ao iAnalisys.
