@@ -15,6 +15,12 @@ from app.models.field import (
 )
 from app.models.identity import Membership, RefreshToken, Role, Tenant, User
 from app.models.integration import IntegrationCredential
+from app.models.materials import (
+    MaterialRequest,
+    RequestCategory,
+    RequestPriority,
+    RequestStatus,
+)
 from app.models.maintenance import (
     MaintenanceExecution,
     MaintenancePlan,
@@ -44,6 +50,7 @@ __all__ = [
     "Client",
     "Development",
     "IntegrationCredential",
+    "MaterialRequest",
     "MaintenanceExecution",
     "MaintenancePlan",
     "MaintenanceType",
@@ -54,6 +61,9 @@ __all__ = [
     "OccurrenceSeverity",
     "OccurrenceStatus",
     "RefreshToken",
+    "RequestCategory",
+    "RequestPriority",
+    "RequestStatus",
     "ReviewDecision",
     "Role",
     "Station",
