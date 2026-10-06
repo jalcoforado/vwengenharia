@@ -94,12 +94,6 @@ class VisitPlan(TimestampMixin, Base):
     tenant_id: Mapped[UUID] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    visit_plan_id: Mapped[UUID | None] = mapped_column(
-        Uuid(as_uuid=True),
-        ForeignKey("visit_plans.id", ondelete="SET NULL"),
-        nullable=True,
-        index=True,
-    )
     station_id: Mapped[UUID] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("stations.id", ondelete="RESTRICT"), nullable=False, index=True
     )
@@ -138,6 +132,12 @@ class Visit(TimestampMixin, Base):
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
     tenant_id: Mapped[UUID] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    visit_plan_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("visit_plans.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
     station_id: Mapped[UUID] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("stations.id", ondelete="RESTRICT"), nullable=False, index=True
