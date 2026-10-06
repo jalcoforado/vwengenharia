@@ -46,6 +46,58 @@ class ReviewDecision(str, enum.Enum):
     DEVOLVER = "DEVOLVER"
 
 
+class MaintenanceType(str, enum.Enum):
+    PREVENTIVA = "PREVENTIVA"
+    CORRETIVA = "CORRETIVA"
+    INSPECAO = "INSPECAO"
+
+
+class MaintenancePlan(TimestampMixin, Base):
+    __tablename__ = "maintenance_plans"
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    asset_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("assets.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    assigned_membership_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("memberships.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    maintenance_type: Mapped[str] = mapped_column(String(24), nullable=False)
+    frequency_days: Mapped[int] = mapped_column(nullable=False)
+    next_due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    last_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_active: Mapped[bool] = mapped_column(nullable=False, default=True)
+
+
+class MaintenanceExecution(TimestampMixin, Base):
+    __tablename__ = "maintenance_executions"
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    maintenance_plan_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("maintenance_plans.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    work_order_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("work_orders.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    asset_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("assets.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    performed_by_membership_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("memberships.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    maintenance_type: Mapped[str] = mapped_column(String(24), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
 class Occurrence(TimestampMixin, Base):
     __tablename__ = "occurrences"
 
