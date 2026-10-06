@@ -1,4 +1,3 @@
-from app.models.ai import AiRun
 from app.models.audit import AuditEvent
 from app.models.base import Base
 from app.models.field import (
@@ -28,7 +27,6 @@ from app.models.maintenance import (
 from app.models.operations import Asset, AssetStatus, AssetType, Client, Development, Station
 
 __all__ = [
-    "AiRun",
     "AnswerType",
     "Asset",
     "AssetStatus",
