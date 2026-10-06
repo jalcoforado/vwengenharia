@@ -15,6 +15,7 @@ import {
   Wrench,
 } from "lucide-react";
 
+import ChecklistAdmin from "./components/ChecklistAdmin";
 import OperationalAdmin, {
   type AdminStation,
   type AssetRecord,
@@ -1304,6 +1305,8 @@ function SupervisorHome({ me }: { me: Me }) {
         assets={assets}
         onChanged={load}
       />
+
+      <ChecklistAdmin templates={templates} onChanged={load} />
 
       <MaintenanceAdmin
         plans={maintenancePlans}
