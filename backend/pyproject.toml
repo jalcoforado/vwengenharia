@@ -14,7 +14,8 @@ dependencies = [
   "redis>=5.0",
   "python-multipart>=0.0.12",
   "PyJWT>=2.10",
-  "argon2-cffi>=23.1"
+  "argon2-cffi>=23.1",
+  "boto3>=1.35"
 ]
 
 [project.optional-dependencies]
