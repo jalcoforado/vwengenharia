@@ -17,6 +17,7 @@ import {
 
 import ChecklistAdmin from "./components/ChecklistAdmin";
 import WorkOrdersAdmin from "./components/WorkOrdersAdmin";
+import StationOverview from "./components/StationOverview";
 import {
   MaterialRequestsAdmin,
   type MaterialRequest,
@@ -1025,6 +1026,7 @@ function SupervisorHome({ me }: { me: Me }) {
   const [maintenanceSummary, setMaintenanceSummary] = useState<MaintenanceSummary | null>(null);
   const [alerts, setAlerts] = useState<OperationalAlert[]>([]);
   const [materialRequests, setMaterialRequests] = useState<MaterialRequest[]>([]);
+  const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -1397,7 +1399,15 @@ function SupervisorHome({ me }: { me: Me }) {
         assetTypes={assetTypes}
         assets={assets}
         onChanged={load}
+        onOpenStation={setSelectedStationId}
       />
+
+      {selectedStationId && (
+        <StationOverview
+          stationId={selectedStationId}
+          onClose={() => setSelectedStationId(null)}
+        />
+      )}
 
       <ChecklistAdmin templates={templates} onChanged={load} />
 
