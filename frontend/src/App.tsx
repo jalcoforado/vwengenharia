@@ -889,6 +889,26 @@ function VisitScreen({
         </section>
       )}
 
+      {visit.status === "EM_EXECUCAO" && (
+        <nav className="visit-step-nav" aria-label="Etapas da visita">
+          {[
+            ["visit-measurements", "1", "Medicoes"],
+            ["visit-evidence", "2", "Evidencias"],
+            ["visit-checklist", "3", "Checklist"],
+            ["visit-occurrence", "4", "Ocorrencia"],
+            ["visit-materials", "5", "Materiais"],
+          ].map(([target, number, label]) => (
+            <button
+              key={target}
+              onClick={() => document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            >
+              <span>{number}</span>
+              <strong>{label}</strong>
+            </button>
+          ))}
+        </nav>
+      )}
+
       {visit.status === "PROGRAMADA" && (
         <button
           className="primary-button action-wide"
@@ -911,7 +931,7 @@ function VisitScreen({
 
       {visit.status === "EM_EXECUCAO" && (
         <>
-          <section className="section-card visit-step-card">
+          <section id="visit-measurements" className="section-card visit-step-card">
             <div className="visit-step-heading">
               <span className="visit-step-number">1</span>
               <div><span className="eyebrow">Qualidade</span><h2>Medicoes</h2></div>
@@ -930,7 +950,7 @@ function VisitScreen({
             </div>
           </section>
 
-          <section className="section-card visit-step-card">
+          <section id="visit-evidence" className="section-card visit-step-card">
             <div className="visit-step-heading">
               <span className="visit-step-number">2</span>
               <div><span className="eyebrow">Evidencias</span><h2>Fotos e arquivos</h2></div>
@@ -938,7 +958,7 @@ function VisitScreen({
             <EvidenceCapture onFile={(file) => onEvidence(visit.id, file)} />
           </section>
 
-          <section className="section-card visit-step-card">
+          <section id="visit-checklist" className="section-card visit-step-card">
             <div className="visit-step-heading">
               <span className="visit-step-number">3</span>
               <div><span className="eyebrow">Checklist</span><h2>Inspecao da estacao</h2></div>
@@ -958,7 +978,7 @@ function VisitScreen({
             </div>
           </section>
 
-          <section className="section-card visit-step-card">
+          <section id="visit-occurrence" className="section-card visit-step-card">
             <div className="visit-step-heading">
               <span className="visit-step-number">4</span>
               <div><span className="eyebrow">Ocorrencia</span><h2>Encontrou algum problema?</h2></div>
@@ -966,7 +986,7 @@ function VisitScreen({
             <OccurrenceForm visit={visit} />
           </section>
 
-          <section className="section-card visit-step-card">
+          <section id="visit-materials" className="section-card visit-step-card">
             <div className="visit-step-heading">
               <span className="visit-step-number">5</span>
               <div><span className="eyebrow">Materiais e servicos</span><h2>Precisa solicitar algo?</h2></div>
