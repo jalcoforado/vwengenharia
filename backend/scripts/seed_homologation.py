@@ -419,8 +419,8 @@ async def main() -> None:
                 technician_membership_id=tech_membership.id,
                 checklist_template_id=template.id,
                 scheduled_for=now - timedelta(days=7),
-                started_at=now - timedelta(days=7, hours=-1),
-                finished_at=now - timedelta(days=7, hours=-2),
+                started_at=now - timedelta(days=7, hours=2),
+                finished_at=now - timedelta(days=7, hours=1),
                 status="REVISADA",
                 notes="Visita historica demonstrativa homologada.",
             )
