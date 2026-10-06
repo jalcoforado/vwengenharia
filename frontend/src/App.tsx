@@ -605,6 +605,15 @@ export default function App() {
           bootstrap={bootstrap}
           busy={busy}
           pending={pending}
+          online={online}
+          syncing={syncing}
+          syncSummary={syncSummary}
+          syncErrors={syncErrors}
+          onSync={async () => {
+            const result = await syncNow();
+            setPending(result.summary.total);
+            if (result.synced > 0) await loadFieldData();
+          }}
           onRefresh={async () => {
             if (online) await syncOutbox();
             await loadFieldData();
@@ -679,6 +688,11 @@ function Home({
   bootstrap,
   busy,
   pending,
+  online,
+  syncing,
+  syncSummary,
+  syncErrors,
+  onSync,
   onRefresh,
   onOpenVisit,
 }: {
@@ -686,6 +700,11 @@ function Home({
   bootstrap: Bootstrap | null;
   busy: boolean;
   pending: number;
+  online: boolean;
+  syncing: boolean;
+  syncSummary: SyncQueueSummary;
+  syncErrors: SyncQueueError[];
+  onSync: () => Promise<void>;
   onRefresh: () => Promise<void>;
   onOpenVisit: (id: string) => void;
 }) {
