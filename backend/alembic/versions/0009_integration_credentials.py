@@ -37,7 +37,6 @@ def upgrade() -> None:
         sa.UniqueConstraint(
             "tenant_id", "name", name="uq_integration_credential_name"
         ),
-        sa.UniqueConstraint("key_hash"),
     )
     op.create_index(
         "ix_integration_credentials_tenant_id",
