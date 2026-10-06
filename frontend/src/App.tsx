@@ -564,7 +564,16 @@ export default function App() {
             {online ? <Cloud size={16} /> : <CloudOff size={16} />}
             {online ? "Online" : "Offline"}
           </span>
-          {pending > 0 && <span className="sync-pill">{pending} pendente(s)</span>}
+          <SyncControl
+            online={online}
+            summary={syncSummary}
+            syncing={syncing}
+            onSync={async () => {
+              const result = await syncNow();
+              setPending(result.summary.total);
+              if (result.synced > 0) await loadFieldData();
+            }}
+          />
           <button className="icon-button" onClick={() => void logout()} title="Sair">
             <LogOut size={18} />
           </button>
