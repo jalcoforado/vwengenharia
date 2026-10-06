@@ -22,6 +22,11 @@ from app.modules.field.schemas import (
     VisitAnswerUpsert,
     VisitCommand,
     VisitCreate,
+    VisitGenerationRequest,
+    VisitGenerationResponse,
+    VisitPlanCreate,
+    VisitPlanRead,
+    VisitPlanUpdate,
     VisitRead,
 )
 from app.modules.field.service import (
@@ -31,12 +36,16 @@ from app.modules.field.service import (
     complete_attachment_upload,
     create_template,
     create_visit,
+    create_visit_plan,
+    generate_visits_from_plans,
     list_template_items,
     list_templates,
+    list_visit_plans,
     list_visits,
     presign_attachment_upload,
     register_attachment,
     transition_visit,
+    update_visit_plan,
     upsert_answer,
 )
 
@@ -117,6 +126,60 @@ async def post_template_item(
     session: SessionDep,
 ) -> ChecklistTemplateItem:
     return await add_template_item(session, context, template_id, payload)
+
+
+
+
+@router.get("/visit-plans", response_model=list[VisitPlanRead])
+async def get_visit_plans(
+    context: ManagementContextDep,
+    session: SessionDep,
+    active_only: bool = True,
+    station_id: UUID | None = None,
+) -> list:
+    return await list_visit_plans(
+        session,
+        context,
+        active_only=active_only,
+        station_id=station_id,
+    )
+
+
+@router.post(
+    "/visit-plans",
+    response_model=VisitPlanRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def post_visit_plan(
+    payload: VisitPlanCreate,
+    context: ManagementContextDep,
+    session: SessionDep,
+) -> VisitPlanRead:
+    return await create_visit_plan(session, context, payload)
+
+
+@router.patch("/visit-plans/{plan_id}", response_model=VisitPlanRead)
+async def patch_visit_plan(
+    plan_id: UUID,
+    payload: VisitPlanUpdate,
+    context: ManagementContextDep,
+    session: SessionDep,
+) -> VisitPlanRead:
+    return await update_visit_plan(session, context, plan_id, payload)
+
+
+@router.post("/visit-plans/generate", response_model=VisitGenerationResponse)
+async def post_generate_visit_plans(
+    payload: VisitGenerationRequest,
+    context: ManagementContextDep,
+    session: SessionDep,
+) -> VisitGenerationResponse:
+    data = await generate_visits_from_plans(
+        session,
+        context,
+        horizon_days=payload.horizon_days,
+    )
+    return VisitGenerationResponse.model_validate(data)
 
 
 @router.get("/visits", response_model=list[VisitRead])
