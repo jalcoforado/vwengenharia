@@ -26,16 +26,17 @@ def downgrade() -> None:
         sa.Column("tenant_id", sa.Uuid(), nullable=False),
         sa.Column("user_id", sa.Uuid(), nullable=False),
         sa.Column("question", sa.Text(), nullable=False),
-        sa.Column("provider", sa.String(length=50), nullable=False),
-        sa.Column("model", sa.String(length=120), nullable=False),
-        sa.Column("status", sa.String(length=30), nullable=False),
         sa.Column("answer", sa.Text(), nullable=True),
+        sa.Column("provider", sa.String(length=40), nullable=False),
+        sa.Column("model", sa.String(length=120), nullable=False),
+        sa.Column("status", sa.String(length=24), nullable=False),
         sa.Column("tool_trace", sa.JSON(), nullable=False),
-        sa.Column("error_message", sa.String(length=1000), nullable=True),
+        sa.Column("error_code", sa.String(length=80), nullable=True),
+        sa.Column("completed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
         sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="RESTRICT"),
     )
     op.create_index("ix_ai_runs_tenant_id", "ai_runs", ["tenant_id"])
     op.create_index("ix_ai_runs_user_id", "ai_runs", ["user_id"])
