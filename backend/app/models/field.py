@@ -87,10 +87,52 @@ class ChecklistTemplateItem(TimestampMixin, Base):
     )
 
 
+class VisitPlan(TimestampMixin, Base):
+    __tablename__ = "visit_plans"
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    visit_plan_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("visit_plans.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    station_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("stations.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    technician_membership_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("memberships.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    checklist_template_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("checklist_templates.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
+    frequency_days: Mapped[int] = mapped_column(Integer, nullable=False)
+    start_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    end_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    next_due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    notes: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+
+
 class Visit(TimestampMixin, Base):
     __tablename__ = "visits"
     __table_args__ = (
         UniqueConstraint("tenant_id", "client_operation_id", name="uq_visits_client_operation"),
+        UniqueConstraint(
+            "tenant_id",
+            "visit_plan_id",
+            "scheduled_for",
+            name="uq_visit_plan_schedule",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
