@@ -25,6 +25,7 @@ import {
   Wrench,
 } from "lucide-react";
 
+import AppLoading from "./components/AppLoading";
 import AuditViewer from "./components/AuditViewer";
 import InboxPanel from "./components/InboxPanel";
 import LegacyMigrationAdmin from "./components/LegacyMigrationAdmin";
@@ -538,6 +539,8 @@ export default function App() {
     setMe(null);
     setSelectedVisitId(null);
   }
+
+  if (authenticated && busy && !me) return <AppLoading />;
 
   if (!authenticated) {
     return (
