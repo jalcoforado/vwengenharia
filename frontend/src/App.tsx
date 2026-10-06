@@ -16,6 +16,11 @@ import {
 } from "lucide-react";
 
 import ChecklistAdmin from "./components/ChecklistAdmin";
+import {
+  MaterialRequestsAdmin,
+  type MaterialRequest,
+  VisitMaterialRequestForm,
+} from "./components/Materials";
 import OperationalAdmin, {
   type AdminStation,
   type AssetRecord,
@@ -828,6 +833,12 @@ function VisitScreen({
             <OccurrenceForm visit={visit} />
           </section>
 
+          <section className="section-card">
+            <span className="eyebrow">Materiais e servicos</span>
+            <h2>Precisa solicitar algo?</h2>
+            <VisitMaterialRequestForm visit={visit} />
+          </section>
+
           <button
             className="primary-button action-wide"
             disabled={busy}
@@ -1004,6 +1015,7 @@ function SupervisorHome({ me }: { me: Me }) {
   const [maintenancePlans, setMaintenancePlans] = useState<MaintenancePlan[]>([]);
   const [maintenanceSummary, setMaintenanceSummary] = useState<MaintenanceSummary | null>(null);
   const [alerts, setAlerts] = useState<OperationalAlert[]>([]);
+  const [materialRequests, setMaterialRequests] = useState<MaterialRequest[]>([]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -1026,6 +1038,7 @@ function SupervisorHome({ me }: { me: Me }) {
         maintenancePlanList,
         maintenanceOverview,
         alertList,
+        materialRequestList,
       ] = await Promise.all([
         api<DashboardOverview>("/api/v1/dashboard/overview"),
         api<WorkOrder[]>("/api/v1/work-orders?limit=100"),
@@ -1042,6 +1055,7 @@ function SupervisorHome({ me }: { me: Me }) {
         api<MaintenancePlan[]>("/api/v1/maintenance/plans?active_only=false"),
         api<MaintenanceSummary>("/api/v1/maintenance/summary"),
         api<OperationalAlert[]>("/api/v1/alerts"),
+        api<MaterialRequest[]>("/api/v1/material-requests?limit=500"),
       ]);
       setOverview(summary);
       setWorkOrders(orders);
@@ -1066,6 +1080,7 @@ function SupervisorHome({ me }: { me: Me }) {
       setMaintenancePlans(maintenancePlanList);
       setMaintenanceSummary(maintenanceOverview);
       setAlerts(alertList);
+      setMaterialRequests(materialRequestList);
     } catch {
       setNotice("Nao foi possivel atualizar o cockpit.");
     } finally {
@@ -1376,6 +1391,12 @@ function SupervisorHome({ me }: { me: Me }) {
       />
 
       <ChecklistAdmin templates={templates} onChanged={load} />
+
+      <MaterialRequestsAdmin
+        requests={materialRequests}
+        stations={adminStations}
+        onChanged={load}
+      />
 
       <MaintenanceAdmin
         plans={maintenancePlans}
