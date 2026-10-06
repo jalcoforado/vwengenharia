@@ -6,7 +6,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.field import Visit, VisitStatus
-from app.models.identity import Membership, Role
+from app.models.identity import Membership, Role, User
 from app.models.legacy import (
     LegacyStationMapping,
     LegacyTechnicianMapping,
@@ -204,8 +204,6 @@ async def auto_map_exact(
             )
         ).scalars()
     )
-    from app.models.identity import User
-
     users = {
         user.id: user
         for user in (
