@@ -1,6 +1,6 @@
 import hashlib
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import jwt
@@ -24,7 +24,7 @@ def verify_password(password: str, password_hash: str) -> bool:
 
 
 def create_access_token(*, user_id: UUID, membership_id: UUID, tenant_id: UUID, role: str) -> str:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expires_at = now + timedelta(minutes=settings.access_token_minutes)
     payload = {
         "sub": str(user_id),
@@ -55,4 +55,4 @@ def hash_refresh_token(token: str) -> str:
 
 
 def refresh_expires_at() -> datetime:
-    return datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_days)
+    return datetime.now(UTC) + timedelta(days=settings.refresh_token_days)
