@@ -43,7 +43,7 @@ if ($LASTEXITCODE -ne 0) {
   throw "Falha ao subir a pilha de homologacao."
 }
 
-Write-Host "Carregando dados demonstrativos..." -ForegroundColor Cyan
+Write-Host "Carregando dados demonstrativos e sincronizando credenciais..." -ForegroundColor Cyan
 & docker @Compose run --rm seed
 if ($LASTEXITCODE -ne 0) {
   throw "Falha ao carregar dados demonstrativos."
