@@ -63,6 +63,22 @@ jobs:
         run: docker build -t vwengenharia-backend:ci ./backend
       - name: Build frontend image
         run: docker build -t vwengenharia-frontend:ci ./frontend
+      - name: Validate Windows launcher syntax
+        shell: pwsh
+        run: |
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path "./scripts/start-homologation.ps1"),
+            [ref]$null,
+            [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error $_ }; exit 1 }
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path "./scripts/stop-homologation.ps1"),
+            [ref]$null,
+            [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error $_ }; exit 1 }
 
 
   homologation-smoke:
