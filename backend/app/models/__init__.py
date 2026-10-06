@@ -10,6 +10,7 @@ from app.models.field import (
     SyncOperation,
     Visit,
     VisitAnswer,
+    VisitPlan,
     VisitStatus,
 )
 from app.models.identity import Membership, RefreshToken, Role, Tenant, User
@@ -53,6 +54,7 @@ __all__ = [
     "User",
     "Visit",
     "VisitAnswer",
+    "VisitPlan",
     "VisitReview",
     "VisitStatus",
     "WorkOrder",
