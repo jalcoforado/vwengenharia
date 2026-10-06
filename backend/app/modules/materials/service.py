@@ -4,9 +4,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.field import Visit
 from app.models.identity import Role
-from app.models.maintenance import WorkOrder
 from app.models.materials import MaterialRequest, RequestStatus
 from app.models.operations import Asset, Station
 from app.modules.auth.dependencies import AuthContext
