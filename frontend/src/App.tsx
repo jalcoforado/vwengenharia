@@ -705,6 +705,12 @@ function VisitScreen({
             </div>
           </section>
 
+          <section className="section-card">
+            <span className="eyebrow">Ocorrencia</span>
+            <h2>Encontrou algum problema?</h2>
+            <OccurrenceForm visit={visit} />
+          </section>
+
           <button
             className="primary-button action-wide"
             disabled={busy}
@@ -1066,5 +1072,97 @@ function SupervisorHome({ me }: { me: Me }) {
         </div>
       </section>
     </main>
+  );
+}
+
+
+function OccurrenceForm({ visit }: { visit: Visit }) {
+  const [occurrenceType, setOccurrenceType] = useState("FALHA_EQUIPAMENTO");
+  const [severity, setSeverity] = useState("MEDIA");
+  const [description, setDescription] = useState("");
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    if (description.trim().length < 3) {
+      setFeedback("Descreva brevemente o problema encontrado.");
+      return;
+    }
+    const operationId = uuid();
+    const body = {
+      visit_id: visit.id,
+      station_id: visit.station_id,
+      occurrence_type: occurrenceType,
+      severity,
+      description: description.trim(),
+      detected_at: new Date().toISOString(),
+    };
+    setBusy(true);
+    try {
+      const result = await runOrQueue<Occurrence>(
+        {
+          id: operationId,
+          method: "POST",
+          path: "/api/v1/occurrences",
+          body,
+          createdAt: new Date().toISOString(),
+        },
+        () =>
+          api<Occurrence>("/api/v1/occurrences", {
+            method: "POST",
+            body: JSON.stringify(body),
+          }),
+      );
+      setFeedback(
+        result.queued
+          ? "Ocorrencia salva no aparelho. Sera enviada quando houver conexao."
+          : "Ocorrencia registrada para a supervisao.",
+      );
+      setDescription("");
+    } catch {
+      setFeedback("Nao foi possivel registrar a ocorrencia.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="occurrence-form">
+      <div className="occurrence-controls">
+        <label>
+          Tipo
+          <select value={occurrenceType} onChange={(event) => setOccurrenceType(event.target.value)}>
+            <option value="FALHA_EQUIPAMENTO">Falha de equipamento</option>
+            <option value="LIMPEZA">Limpeza</option>
+            <option value="CLORACAO">Cloracao</option>
+            <option value="ESTRUTURA">Estrutura</option>
+            <option value="OUTRO">Outro</option>
+          </select>
+        </label>
+        <label>
+          Criticidade
+          <select value={severity} onChange={(event) => setSeverity(event.target.value)}>
+            <option value="BAIXA">Baixa</option>
+            <option value="MEDIA">Media</option>
+            <option value="ALTA">Alta</option>
+            <option value="CRITICA">Critica</option>
+          </select>
+        </label>
+      </div>
+      <label>
+        Descricao
+        <textarea
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+          placeholder="Ex.: Aerador II parado e com ruido antes da parada."
+          rows={3}
+        />
+      </label>
+      <button className="small-button" disabled={busy} onClick={() => void submit()}>
+        <AlertTriangle size={15} />
+        {busy ? "Salvando..." : "Registrar ocorrencia"}
+      </button>
+      {feedback && <span className="inline-feedback">{feedback}</span>}
+    </div>
   );
 }
