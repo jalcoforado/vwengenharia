@@ -34,7 +34,7 @@ import OperationalAdmin, {
   type ClientRecord,
   type DevelopmentRecord,
 } from "./components/OperationalAdmin";
-import { api, clearSession, downloadApi, hasSession, login } from "./lib/api";
+import { api, clearSession, downloadApi, hasSession, login, openApiDocument } from "./lib/api";
 import { cacheValue, outboxCount, queueUpload, readCache } from "./offline/db";
 import { runOrQueue, syncOutbox } from "./lib/sync";
 
@@ -797,6 +797,16 @@ function VisitScreen({
           onClick={() => void onCommand(visit, "start")}
         >
           Iniciar visita
+        </button>
+      )}
+
+      {["AGUARDANDO_REVISAO", "REVISADA", "DEVOLVIDA"].includes(visit.status) && (
+        <button
+          className="secondary-button action-wide"
+          disabled={busy}
+          onClick={() => void openApiDocument(`/api/v1/reports/visits/${visit.id}.html`)}
+        >
+          Relatorio da visita
         </button>
       )}
 
