@@ -1740,3 +1740,61 @@ button:not(:disabled):active { transform: translateY(1px); }
     overflow-wrap: anywhere;
   }
 }
+
+
+/* Lightweight toast feedback */
+.toast {
+  position: fixed;
+  top: 78px;
+  right: 18px;
+  z-index: 80;
+  width: min(420px, calc(100vw - 28px));
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 13px;
+  border: 1px solid var(--vw-border);
+  border-radius: 14px;
+  background: rgba(255,255,255,.98);
+  box-shadow: 0 18px 48px rgba(16,24,20,.14);
+  backdrop-filter: blur(14px);
+}
+.toast span {
+  font-size: 12px;
+  line-height: 1.45;
+}
+.toast-success {
+  border-color: #cfe4d6;
+  color: var(--vw-success-text);
+}
+.toast-warning {
+  border-color: #edd8a7;
+  color: var(--vw-warning-text);
+}
+.toast-info {
+  border-color: #cfdbea;
+  color: var(--vw-info-text);
+}
+.toast-close {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: currentColor;
+}
+.toast-close:hover {
+  background: rgba(0,0,0,.045);
+}
+
+@media (max-width: 760px) {
+  .toast {
+    top: 68px;
+    left: 10px;
+    right: 10px;
+    width: auto;
+  }
+}
