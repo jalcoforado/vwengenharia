@@ -754,6 +754,14 @@ function Home({
         </div>
       </section>
 
+      <SyncHealthCard
+        online={online}
+        summary={syncSummary}
+        errors={syncErrors}
+        syncing={syncing}
+        onSync={onSync}
+      />
+
       <section className="section-card">
         <div className="section-heading">
           <div>
@@ -1929,7 +1937,7 @@ function EvidenceCapture({ onFile }: { onFile: (file: File) => Promise<void> }) 
       <p>
         {lastName
           ? `${lastName} salvo. O envio sera retomado automaticamente se estiver offline.`
-          : "Fotos, videos curtos ou PDF de ate 50 MB."}
+          : "Fotos sao otimizadas automaticamente. Videos curtos ou PDF de ate 50 MB."}
       </p>
     </div>
   );
