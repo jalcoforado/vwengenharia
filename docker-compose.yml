@@ -15,29 +15,17 @@ services:
     ports:
       - "6379:6379"
 
-  minio:
-    image: quay.io/minio/aistor/minio:latest
-    command: server /data --console-address ":9001"
+  s3mock:
+    image: adobe/s3mock:5.2.2
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: change-me
+      COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS: vwengenharia
+      COM_ADOBE_TESTING_S3MOCK_STORE_ROOT: /s3mockroot
+      COM_ADOBE_TESTING_S3MOCK_STORE_RETAIN_FILES_ON_EXIT: "true"
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "9000:9090"
     volumes:
-      - minio_data:/data
-
-  minio-init:
-    image: quay.io/minio/aistor/mc:latest
-    depends_on:
-      - minio
-    entrypoint: >
-      /bin/sh -c "
-      until mc alias set local http://minio:9000 minioadmin change-me; do sleep 2; done;
-      mc mb --ignore-existing local/vwengenharia;
-      exit 0;
-      "
+      - s3mock_data:/s3mockroot
 
 volumes:
   postgres_data:
-  minio_data:
+  s3mock_data:
