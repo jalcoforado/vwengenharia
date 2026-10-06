@@ -62,6 +62,11 @@ docker compose \
 
 O seed e idempotente e pode ser executado novamente sem duplicar o conjunto demonstrativo.
 
+As contas demonstrativas sao autoritativas neste ambiente: a cada execucao do seed,
+nome, perfil e senha sao sincronizados com o arquivo `.env.homologation`.
+Assim, se a senha do arquivo mudar ou existir um volume antigo, basta executar o launcher
+novamente; nao e necessario apagar o banco apenas para corrigir credenciais.
+
 ## 4. Abrir o ERP
 
 Por padrao:
