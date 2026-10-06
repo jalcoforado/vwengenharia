@@ -4,6 +4,7 @@ import {
   ArrowRight,
   ArrowLeft,
   Camera,
+  CalendarDays,
   CheckCircle2,
   ClipboardCheck,
   Clock3,
@@ -20,6 +21,7 @@ import {
   ShieldCheck,
   Sparkles,
   Shield,
+  UserRound,
   Wrench,
 } from "lucide-react";
 
@@ -1037,6 +1039,7 @@ function SupervisorHome({ me }: { me: Me }) {
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [occurrences, setOccurrences] = useState<Occurrence[]>([]);
   const [reviews, setReviews] = useState<Visit[]>([]);
+  const [visits, setVisits] = useState<Visit[]>([]);
   const [stations, setStations] = useState<Station[]>([]);
   const [adminStations, setAdminStations] = useState<AdminStation[]>([]);
   const [clients, setClients] = useState<ClientRecord[]>([]);
@@ -1098,6 +1101,7 @@ function SupervisorHome({ me }: { me: Me }) {
       setOverview(summary);
       setWorkOrders(orders);
       setOccurrences(occurrenceList);
+      setVisits(visitList);
       setReviews(visitList.filter((visit) => visit.status === "AGUARDANDO_REVISAO"));
       setAdminStations(stationList);
       setStations(
@@ -1183,6 +1187,28 @@ function SupervisorHome({ me }: { me: Me }) {
   const waitingReview = overview?.visits_waiting_review ?? 0;
   const attentionCount = overdueOrders + criticalOrders + waitingReview;
   const operationHealthy = attentionCount === 0 && alerts.length === 0;
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const endOfToday = new Date(startOfToday);
+  endOfToday.setDate(endOfToday.getDate() + 1);
+  const endOfWeek = new Date(startOfToday);
+  endOfWeek.setDate(endOfWeek.getDate() + 7);
+  const scheduledVisits = visits
+    .filter((visit) => !["REVISADA", "CANCELADA"].includes(visit.status))
+    .sort((a, b) => new Date(a.scheduled_for).getTime() - new Date(b.scheduled_for).getTime());
+  const todayVisits = scheduledVisits.filter((visit) => {
+    const time = new Date(visit.scheduled_for).getTime();
+    return time >= startOfToday.getTime() && time < endOfToday.getTime();
+  });
+  const overdueVisits = scheduledVisits.filter(
+    (visit) =>
+      visit.status === "PROGRAMADA" &&
+      new Date(visit.scheduled_for).getTime() < startOfToday.getTime(),
+  );
+  const nextSevenDaysVisits = scheduledVisits.filter((visit) => {
+    const time = new Date(visit.scheduled_for).getTime();
+    return time >= startOfToday.getTime() && time < endOfWeek.getTime();
+  });
 
   return (
     <main className="content">
@@ -1534,6 +1560,74 @@ function SupervisorHome({ me }: { me: Me }) {
 
       {managementView === "OPERATIONS" && (
         <>
+      <section className="section-card agenda-command">
+        <div className="section-heading">
+          <div>
+            <span className="eyebrow">Agenda operacional</span>
+            <h2>Proximas visitas</h2>
+            <p className="section-copy">Priorize atrasos e organize a equipe sem perder o contexto da operacao.</p>
+          </div>
+          <button className="secondary-button" onClick={() => setManagementView("CONFIG")}>
+            <CalendarDays size={16} />
+            Planejar agenda
+          </button>
+        </div>
+
+        <div className="agenda-summary">
+          <div className={overdueVisits.length ? "agenda-summary-item agenda-summary-danger" : "agenda-summary-item"}>
+            <strong>{overdueVisits.length}</strong>
+            <span>Atrasadas</span>
+          </div>
+          <div className="agenda-summary-item">
+            <strong>{todayVisits.length}</strong>
+            <span>Hoje</span>
+          </div>
+          <div className="agenda-summary-item">
+            <strong>{nextSevenDaysVisits.length}</strong>
+            <span>Proximos 7 dias</span>
+          </div>
+        </div>
+
+        <div className="agenda-timeline">
+          {scheduledVisits.slice(0, 16).map((visit) => {
+            const scheduled = new Date(visit.scheduled_for);
+            const isOverdue =
+              visit.status === "PROGRAMADA" && scheduled.getTime() < startOfToday.getTime();
+            const technician = teamMap.get(visit.technician_membership_id);
+            return (
+              <div className={isOverdue ? "agenda-row agenda-row-overdue" : "agenda-row"} key={visit.id}>
+                <div className="agenda-date">
+                  <span>{new Intl.DateTimeFormat("pt-BR", { weekday: "short" }).format(scheduled).replace(".", "")}</span>
+                  <strong>{new Intl.DateTimeFormat("pt-BR", { day: "2-digit" }).format(scheduled)}</strong>
+                  <small>{new Intl.DateTimeFormat("pt-BR", { month: "short" }).format(scheduled).replace(".", "")}</small>
+                </div>
+                <div className="agenda-main">
+                  <div>
+                    <strong>{stationMap.get(visit.station_id)?.name ?? "Estacao"}</strong>
+                    <span>
+                      {new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(scheduled)}
+                      {" · "}
+                      {technician?.name ?? "Sem tecnico"}
+                    </span>
+                  </div>
+                  <div className="agenda-meta">
+                    {isOverdue && <span className="sla overdue">Atrasada</span>}
+                    <span className={"status status-" + visit.status.toLowerCase()}>
+                      {statusLabel(visit.status)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {scheduledVisits.length === 0 && (
+            <div className="empty-state">
+              Agenda sem visitas pendentes. Gere o proximo ciclo em Configuracao.
+            </div>
+          )}
+        </div>
+      </section>
+
       <MaterialRequestsAdmin
         requests={materialRequests}
         stations={adminStations}
