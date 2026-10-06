@@ -15,6 +15,13 @@ import {
   Wrench,
 } from "lucide-react";
 
+import OperationalAdmin, {
+  type AdminStation,
+  type AssetRecord,
+  type AssetTypeRecord,
+  type ClientRecord,
+  type DevelopmentRecord,
+} from "./components/OperationalAdmin";
 import { api, clearSession, hasSession, login } from "./lib/api";
 import { cacheValue, outboxCount, queueUpload, readCache } from "./offline/db";
 import { runOrQueue, syncOutbox } from "./lib/sync";
@@ -956,6 +963,11 @@ function SupervisorHome({ me }: { me: Me }) {
   const [occurrences, setOccurrences] = useState<Occurrence[]>([]);
   const [reviews, setReviews] = useState<Visit[]>([]);
   const [stations, setStations] = useState<Station[]>([]);
+  const [adminStations, setAdminStations] = useState<AdminStation[]>([]);
+  const [clients, setClients] = useState<ClientRecord[]>([]);
+  const [developments, setDevelopments] = useState<DevelopmentRecord[]>([]);
+  const [assetTypes, setAssetTypes] = useState<AssetTypeRecord[]>([]);
+  const [assets, setAssets] = useState<AssetRecord[]>([]);
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [visitPlans, setVisitPlans] = useState<VisitPlan[]>([]);
   const [templates, setTemplates] = useState<ChecklistTemplateSummary[]>([]);
@@ -971,6 +983,10 @@ function SupervisorHome({ me }: { me: Me }) {
         occurrenceList,
         visitList,
         stationList,
+        clientList,
+        developmentList,
+        assetTypeList,
+        assetList,
         teamList,
         planList,
         templateList,
@@ -979,7 +995,11 @@ function SupervisorHome({ me }: { me: Me }) {
         api<WorkOrder[]>("/api/v1/work-orders?limit=100"),
         api<Occurrence[]>("/api/v1/occurrences?limit=100"),
         api<Visit[]>("/api/v1/visits?limit=200"),
-        api<Station[]>("/api/v1/stations?limit=500"),
+        api<AdminStation[]>("/api/v1/stations?limit=500"),
+        api<ClientRecord[]>("/api/v1/clients?limit=500"),
+        api<DevelopmentRecord[]>("/api/v1/developments?limit=500"),
+        api<AssetTypeRecord[]>("/api/v1/asset-types?limit=500"),
+        api<AssetRecord[]>("/api/v1/assets?limit=1000"),
         api<TeamMember[]>("/api/v1/team?active_only=true"),
         api<VisitPlan[]>("/api/v1/visit-plans?active_only=false"),
         api<ChecklistTemplateSummary[]>("/api/v1/checklist-templates"),
@@ -988,7 +1008,19 @@ function SupervisorHome({ me }: { me: Me }) {
       setWorkOrders(orders);
       setOccurrences(occurrenceList);
       setReviews(visitList.filter((visit) => visit.status === "AGUARDANDO_REVISAO"));
-      setStations(stationList);
+      setAdminStations(stationList);
+      setStations(
+        stationList.map((station) => ({
+          id: station.id,
+          name: station.name,
+          code: station.code,
+          station_type: station.station_type,
+        })),
+      );
+      setClients(clientList);
+      setDevelopments(developmentList);
+      setAssetTypes(assetTypeList);
+      setAssets(assetList);
       setTeam(teamList);
       setVisitPlans(planList);
       setTemplates(templateList);
@@ -1236,6 +1268,15 @@ function SupervisorHome({ me }: { me: Me }) {
           )}
         </section>
       </div>
+
+      <OperationalAdmin
+        clients={clients}
+        developments={developments}
+        stations={adminStations}
+        assetTypes={assetTypes}
+        assets={assets}
+        onChanged={load}
+      />
 
       <section className="section-card">
         <span className="eyebrow">Ocorrencias</span>
