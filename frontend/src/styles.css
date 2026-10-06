@@ -1967,3 +1967,24 @@ button:not(:disabled):active { transform: translateY(1px); }
     grid-template-columns: 1fr;
   }
 }
+
+
+.work-order-toolbar {
+  grid-template-columns: minmax(0, 1fr) 190px 180px;
+}
+@media (max-width: 820px) {
+  .work-order-toolbar {
+    grid-template-columns: 1fr 1fr;
+  }
+  .work-order-toolbar .search-field {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 560px) {
+  .work-order-toolbar {
+    grid-template-columns: 1fr;
+  }
+  .work-order-toolbar .search-field {
+    grid-column: auto;
+  }
+}
