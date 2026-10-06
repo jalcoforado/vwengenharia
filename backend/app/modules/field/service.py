@@ -1,3 +1,4 @@
+import asyncio
 import re
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
@@ -19,8 +20,10 @@ from app.models.field import (
 )
 from app.models.identity import Membership, Role
 from app.models.operations import Asset, AssetStatus, AssetType, Station
+from app.core.config import settings
 from app.modules.auth.dependencies import AuthContext
 from app.modules.core_registers.service import add_audit, tenant_get_or_404
+from app.services.storage import get_storage
 from app.modules.field.schemas import (
     AttachmentRegisterCreate,
     ChecklistItemCreate,
@@ -823,3 +826,89 @@ async def build_field_bootstrap(
         "measurements": measurements,
         "attachments": attachments,
     }
+
+
+ALLOWED_EVIDENCE_TYPES = {
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "video/mp4",
+    "video/quicktime",
+    "application/pdf",
+}
+
+
+async def presign_attachment_upload(
+    session: AsyncSession,
+    context: AuthContext,
+    visit_id: UUID,
+    payload: AttachmentRegisterCreate,
+) -> dict:
+    if payload.content_type not in ALLOWED_EVIDENCE_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="unsupported_attachment_type",
+        )
+    attachment = await register_attachment(session, context, visit_id, payload)
+    upload_url = get_storage().presign_put(
+        object_key=attachment.object_key,
+        content_type=attachment.content_type,
+    )
+    return {
+        "attachment": attachment,
+        "upload_url": upload_url,
+        "expires_in": settings.s3_presign_seconds,
+        "required_headers": {"Content-Type": attachment.content_type},
+    }
+
+
+async def complete_attachment_upload(
+    session: AsyncSession,
+    context: AuthContext,
+    attachment_id: UUID,
+) -> Attachment:
+    attachment = await tenant_get_or_404(
+        session,
+        Attachment,
+        context.tenant.id,
+        attachment_id,
+    )
+    await get_accessible_visit(session, context, attachment.visit_id)
+
+    metadata = await asyncio.to_thread(
+        get_storage().object_metadata,
+        object_key=attachment.object_key,
+    )
+    if metadata is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="attachment_not_uploaded",
+        )
+
+    actual_size = int(metadata.get("ContentLength", 0))
+    if attachment.size_bytes is not None and actual_size != attachment.size_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="attachment_size_mismatch",
+        )
+
+    stored_type = metadata.get("ContentType")
+    if stored_type and stored_type != attachment.content_type:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="attachment_content_type_mismatch",
+        )
+
+    attachment.storage_status = "UPLOADED"
+    attachment.uploaded_at = datetime.now(UTC)
+    add_audit(
+        session,
+        context,
+        action="ATTACHMENT_UPLOAD_COMPLETE",
+        entity_type="attachment",
+        entity_id=attachment.id,
+        fields=["storage_status", "uploaded_at"],
+    )
+    await session.commit()
+    await session.refresh(attachment)
+    return attachment
