@@ -73,7 +73,7 @@ jobs:
         run: docker compose --env-file .env.homologation.example -f docker-compose.app.yml -f docker-compose.homologation.yml config > /dev/null
       - name: Start homologation stack
         run: |
-          docker compose --env-file .env.homologation.example -f docker-compose.app.yml -f docker-compose.homologation.yml up -d --build postgres redis minio minio-init migrate backend frontend
+          docker compose --env-file .env.homologation.example -f docker-compose.app.yml -f docker-compose.homologation.yml up -d --build postgres redis s3mock migrate backend frontend
       - name: Seed homologation data
         run: |
           docker compose --env-file .env.homologation.example -f docker-compose.app.yml -f docker-compose.homologation.yml run --rm seed
