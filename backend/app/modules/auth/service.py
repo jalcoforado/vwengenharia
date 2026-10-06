@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -63,7 +63,7 @@ async def issue_tokens(
         membership_id=membership.id,
         token_hash=hash_refresh_token(raw_refresh),
         expires_at=refresh_expires_at(),
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     session.add(record)
     session.add(
@@ -97,7 +97,7 @@ async def rotate_refresh_token(session: AsyncSession, *, raw_token: str) -> Toke
     stmt = select(RefreshToken).where(RefreshToken.token_hash == token_hash).with_for_update()
     record = (await session.execute(stmt)).scalar_one_or_none()
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if record is None or record.revoked_at is not None or record.expires_at <= now:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_refresh_token"
