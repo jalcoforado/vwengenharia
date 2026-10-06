@@ -1609,3 +1609,134 @@ button:not(:disabled):active { transform: translateY(1px); }
     padding-bottom: 142px;
   }
 }
+
+
+/* Offline sync professionalism */
+.sync-control {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border-radius: 999px;
+  padding: 7px 10px;
+  border: 1px solid rgba(255,255,255,.12);
+  font-size: 11px;
+  font-weight: 800;
+}
+.sync-control-ok {
+  background: rgba(111,211,149,.12);
+  color: #c8f2d6;
+}
+.sync-control-pending {
+  background: rgba(240,189,79,.16);
+  color: #ffe2a2;
+}
+.sync-control-error {
+  background: rgba(244,126,101,.18);
+  color: #ffd0c8;
+}
+.sync-control:disabled {
+  opacity: .7;
+  cursor: default;
+}
+
+.sync-health-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 14px 18px;
+  align-items: center;
+  margin-bottom: 18px;
+  padding: 15px 16px;
+  border: 1px solid #d9e4dd;
+  border-radius: 16px;
+  background: #f9fbfa;
+  box-shadow: var(--vw-shadow-sm);
+}
+.sync-health-error {
+  border-color: #efd1ca;
+  background: #fff9f8;
+}
+.sync-health-main {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.sync-health-icon {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--vw-primary-soft);
+  color: #315e43;
+}
+.sync-health-error .sync-health-icon {
+  background: var(--vw-danger-bg);
+  color: var(--vw-danger-text);
+}
+.sync-health-main > div:last-child {
+  display: grid;
+  gap: 3px;
+}
+.sync-health-main strong {
+  font-size: 13px;
+}
+.sync-health-main span {
+  color: var(--vw-text-secondary);
+  font-size: 11px;
+}
+.sync-error-list {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 7px;
+  padding-top: 10px;
+  border-top: 1px solid #eadfdc;
+}
+.sync-error-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  font-size: 11px;
+}
+.sync-error-row span {
+  color: var(--vw-text-tertiary);
+  text-transform: uppercase;
+  font-weight: 800;
+  letter-spacing: .04em;
+}
+.sync-error-row strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sync-error-row em {
+  color: var(--vw-danger-text);
+  font-style: normal;
+}
+
+@media (max-width: 760px) {
+  .sync-control span {
+    display: none;
+  }
+  .sync-control {
+    width: 36px;
+    justify-content: center;
+    padding: 7px;
+  }
+  .sync-health-card {
+    grid-template-columns: 1fr;
+  }
+  .sync-health-card > .small-button {
+    width: 100%;
+  }
+  .sync-error-row {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+  .sync-error-row strong {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
