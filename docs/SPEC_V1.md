@@ -46,7 +46,11 @@ Principais problemas a resolver:
 
 ### 4.2 Planejamento e visitas
 
-- programar visita
+- criar plano recorrente de visitas por estacao
+- definir tecnico, checklist, frequencia, inicio e fim opcional
+- gerar agenda futura a partir dos planos sem duplicidade
+- pausar/reativar plano
+- programar visita avulsa
 - atribuir tecnico
 - iniciar/finalizar visita
 - checklist por template
@@ -397,18 +401,19 @@ Nunca transformar automaticamente valores ambiguos sem regra aprovada.
 
 ## 14. Criterios de aceite do MVP
 
-1. Tecnico consegue executar visita inteira sem internet apos sincronizar sua agenda.
-2. Ao recuperar conexao, dados sincronizam sem duplicar registros.
-3. Toda visita finalizada possui autor, horarios e trilha de sincronizacao.
-4. Medicao ausente nao e representada por zero.
-5. Ocorrencia pode gerar OS com responsavel, prioridade e prazo.
-6. Dashboard identifica OS fora do SLA.
-7. Toda leitura/escrita de negocio respeita tenant_id.
-8. Usuario de um tenant nao acessa dados de outro tenant.
-9. Fotos ficam fora do PostgreSQL e vinculadas por metadados.
-10. APIs de integracao respeitam tenant e RBAC.
-11. O ERP nao possui dependencia de LLM/IA generativa.
-12. Migracao historica fornece contagem de entrada, sucesso, erro e reconciliacao.
+1. Gestor consegue criar um plano recorrente e gerar a agenda futura sem duplicar visitas em novas execucoes.
+2. Tecnico consegue executar visita inteira sem internet apos sincronizar sua agenda.
+3. Ao recuperar conexao, dados sincronizam sem duplicar registros.
+4. Toda visita finalizada possui autor, horarios e trilha de sincronizacao.
+5. Medicao ausente nao e representada por zero.
+6. Ocorrencia pode gerar OS com responsavel, prioridade e prazo.
+7. Dashboard identifica OS fora do SLA.
+8. Toda leitura/escrita de negocio respeita tenant_id.
+9. Usuario de um tenant nao acessa dados de outro tenant.
+10. Fotos ficam fora do PostgreSQL e vinculadas por metadados.
+11. APIs de integracao respeitam tenant e RBAC.
+12. O ERP nao possui dependencia de LLM/IA generativa.
+13. Migracao historica fornece contagem de entrada, sucesso, erro e reconciliacao.
 
 ## 15. Fora do MVP
 
