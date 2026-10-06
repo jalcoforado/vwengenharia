@@ -21,6 +21,7 @@ import LegacyMigrationAdmin from "./components/LegacyMigrationAdmin";
 import ChecklistAdmin from "./components/ChecklistAdmin";
 import WorkOrdersAdmin from "./components/WorkOrdersAdmin";
 import StationOverview from "./components/StationOverview";
+import { AccountSettings, IntegrationSettings } from "./components/SettingsPanels";
 import {
   MaterialRequestsAdmin,
   type MaterialRequest,
@@ -731,6 +732,8 @@ function Home({
           })}
         </div>
       </section>
+
+      <AccountSettings />
     </main>
   );
 }
@@ -1454,7 +1457,10 @@ function SupervisorHome({ me }: { me: Me }) {
       )}
 
       {managementView === "CONFIG" && (
-        <ChecklistAdmin templates={templates} onChanged={load} />
+        <>
+          <ChecklistAdmin templates={templates} onChanged={load} />
+          <AccountSettings />
+        </>
       )}
 
       {managementView === "OPERATIONS" && (
@@ -1511,6 +1517,7 @@ function SupervisorHome({ me }: { me: Me }) {
           {["SUPERADMIN", "ADMIN", "GESTOR"].includes(me.role) && (
             <AuditViewer team={team} />
           )}
+          {["SUPERADMIN", "ADMIN"].includes(me.role) && <IntegrationSettings />}
           {["SUPERADMIN", "ADMIN"].includes(me.role) && (
             <LegacyMigrationAdmin stations={adminStations} team={team} />
           )}
