@@ -4,8 +4,16 @@ from fastapi import APIRouter, Depends
 
 from app.models.identity import Role
 from app.modules.auth.dependencies import AuthContext, SessionDep, require_roles
-from app.modules.client_portal.schemas import ClientAccessCreate, ClientAccessRead, ClientPortalResponse
-from app.modules.client_portal.service import build_client_portal, grant_client_access, list_client_access
+from app.modules.client_portal.schemas import (
+    ClientAccessCreate,
+    ClientAccessRead,
+    ClientPortalResponse,
+)
+from app.modules.client_portal.service import (
+    build_client_portal,
+    grant_client_access,
+    list_client_access,
+)
 
 router = APIRouter(tags=["portal-cliente"])
 ClientContextDep = Annotated[
