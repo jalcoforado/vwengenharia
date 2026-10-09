@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { EllipsisVertical, KeyRound, Lock, LockOpen, Pencil, Search, UserPlus } from "lucide-react";
 
 import { api } from "../lib/api";
-import { Avatar, RowMenu, TableHead, useRowMenu, useSort, type RowMenuItem } from "./AdminTable";
+import { Avatar, RowMenu, TableHead, useFormPanel, useRowMenu, useSort, type RowMenuItem } from "./AdminTable";
 import { formatDocument, isValidCpfCnpj, normalizeDocument } from "../lib/document";
 import { formatPhone, isCompletePhone } from "../lib/phone";
 
@@ -98,6 +98,7 @@ export default function CollaboratorAdmin({
   const [busy, setBusy] = useState(false);
   const { sortKey, sortAsc, toggleSort, sortBy } = useSort<SortKey>("name");
   const { menu, openMenu, closeMenu } = useRowMenu();
+  const panel = useFormPanel();
 
   async function load() {
     try {
@@ -157,6 +158,19 @@ export default function CollaboratorAdmin({
     setContactWhatsapp(formatPhone(item.contact_whatsapp));
     setContactEmail(item.contact_email ?? "");
     setFeedback(null);
+    panel.show();
+  }
+
+  function openNew() {
+    resetForm();
+    setFeedback(null);
+    panel.show();
+  }
+
+  function closeForm() {
+    resetForm();
+    setFeedback(null);
+    panel.hide();
   }
 
   async function save() {
@@ -185,8 +199,13 @@ export default function CollaboratorAdmin({
           contact_email: contactEmail.trim() || null,
         }),
       });
-      setFeedback(editingId ? "Colaborador atualizado." : "Colaborador cadastrado. Ele ainda não tem acesso ao app.");
-      resetForm();
+      if (editingId) {
+        setRowFeedback("Colaborador atualizado.");
+        closeForm();
+      } else {
+        resetForm();
+        setFeedback("Colaborador cadastrado, ainda sem acesso ao app. O formulário segue aberto para o próximo.");
+      }
       await load();
     } catch (error) {
       setFeedback(errorMessage(error, "Não foi possível salvar o colaborador."));
@@ -294,9 +313,38 @@ export default function CollaboratorAdmin({
     : [];
 
   return (
-    <div className={canManage ? "admin-panel" : "admin-panel admin-panel-single"}>
+    <div className="admin-stack">
+      {canManage && panel.open && (
+        <div className="compact-form admin-create-form" ref={panel.ref}>
+          <h3 className="form-title">{editingId ? <Pencil size={17} /> : <UserPlus size={17} />}{editingId ? "Editar colaborador" : "Novo colaborador"}</h3>
+          <div className="compact-form-grid">
+            <label><span>Nome <b className="required-mark">*</b></span><input required aria-required="true" placeholder="Nome completo" value={name} onChange={(e) => setName(e.target.value)} /></label>
+            <label><span>CPF <b className="required-mark">*</b></span><input required aria-required="true" inputMode="numeric" placeholder="000.000.000-00" value={document} onChange={(e) => setDocument(e.target.value)} /></label>
+            <label><span>Grupo <b className="required-mark">*</b></span>
+              <select required aria-required="true" value={category} onChange={(e) => setCategory(e.target.value as CollaboratorCategory)}>
+                {CATEGORIES.map(([value, text]) => <option key={value} value={value}>{text}</option>)}
+              </select>
+            </label>
+            <label>Email<input type="email" placeholder="email@exemplo.com" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} /></label>
+            <label><span>WhatsApp <b className="required-mark">*</b></span><input required aria-required="true" type="tel" inputMode="numeric" placeholder="(85) 99999-9999" value={contactWhatsapp} onChange={(e) => setContactWhatsapp(formatPhone(e.target.value))} /></label>
+            <label>Telefone<input type="tel" inputMode="numeric" placeholder="(85) 3333-3333" value={contactPhone} onChange={(e) => setContactPhone(formatPhone(e.target.value))} /></label>
+          </div>
+          <p className="required-hint">
+            <b className="required-mark">*</b> Obrigatório. O acesso ao app é opcional e criado depois, na lista.
+          </p>
+          <div className="admin-actions form-submit">
+            <button className="primary-button" disabled={busy} onClick={() => void save()}>
+              {!editingId && <UserPlus size={17} />}
+              {busy ? "Salvando..." : editingId ? "Salvar alterações" : "Cadastrar colaborador"}
+            </button>
+            <button className="text-button" disabled={busy} onClick={closeForm}>{editingId ? "Cancelar" : "Fechar"}</button>
+          </div>
+          {feedback && <span className="inline-feedback">{feedback}</span>}
+        </div>
+      )}
       <div className="client-list-column">
-        <label className="search-field">
+        <div className="admin-toolbar">
+<label className="search-field">
           <Search size={16} />
           <input
             value={search}
@@ -305,6 +353,11 @@ export default function CollaboratorAdmin({
             aria-label="Buscar colaborador"
           />
         </label>
+{canManage && !panel.open && (
+<button className="primary-button" disabled={busy} onClick={openNew}><UserPlus size={17} /> Novo colaborador</button>
+)}
+</div>
+{rowFeedback && <span className="inline-feedback" role="status">{rowFeedback}</span>}
         <div className="admin-list collab-table" role="table" aria-label="Colaboradores">
           <TableHead columns={SORT_COLUMNS} sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} />
           {sorted.map((item) => {
@@ -386,39 +439,10 @@ export default function CollaboratorAdmin({
           )}
         </div>
         {menu && menuItem && <RowMenu menu={menu} items={menuItems} busy={busy} onClose={closeMenu} />}
-        {rowFeedback && <span className="inline-feedback">{rowFeedback}</span>}
         {!canManage && (
           <span className="required-hint">Somente administradores cadastram colaboradores e liberam acessos.</span>
         )}
       </div>
-      {canManage && (
-        <div className="compact-form admin-create-form">
-          <h3 className="form-title">{editingId ? <Pencil size={17} /> : <UserPlus size={17} />}{editingId ? "Editar colaborador" : "Novo colaborador"}</h3>
-          <div className="compact-form-grid">
-            <label><span>Nome <b className="required-mark">*</b></span><input required aria-required="true" placeholder="Nome completo" value={name} onChange={(e) => setName(e.target.value)} /></label>
-            <label><span>CPF <b className="required-mark">*</b></span><input required aria-required="true" inputMode="numeric" placeholder="000.000.000-00" value={document} onChange={(e) => setDocument(e.target.value)} /></label>
-            <label><span>Grupo <b className="required-mark">*</b></span>
-              <select required aria-required="true" value={category} onChange={(e) => setCategory(e.target.value as CollaboratorCategory)}>
-                {CATEGORIES.map(([value, text]) => <option key={value} value={value}>{text}</option>)}
-              </select>
-            </label>
-            <label>Email<input type="email" placeholder="email@exemplo.com" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} /></label>
-            <label><span>WhatsApp <b className="required-mark">*</b></span><input required aria-required="true" type="tel" inputMode="numeric" placeholder="(85) 99999-9999" value={contactWhatsapp} onChange={(e) => setContactWhatsapp(formatPhone(e.target.value))} /></label>
-            <label>Telefone<input type="tel" inputMode="numeric" placeholder="(85) 3333-3333" value={contactPhone} onChange={(e) => setContactPhone(formatPhone(e.target.value))} /></label>
-          </div>
-          <p className="required-hint">
-            <b className="required-mark">*</b> Obrigatório. O acesso ao app é opcional e criado depois, na lista.
-          </p>
-          <div className="admin-actions form-submit">
-            <button className="primary-button" disabled={busy} onClick={() => void save()}>
-              {!editingId && <UserPlus size={17} />}
-              {busy ? "Salvando..." : editingId ? "Salvar alterações" : "Cadastrar colaborador"}
-            </button>
-            {editingId && <button className="text-button" disabled={busy} onClick={resetForm}>Cancelar</button>}
-          </div>
-          {feedback && <span className="inline-feedback">{feedback}</span>}
-        </div>
-      )}
     </div>
   );
 }

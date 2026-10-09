@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Building2, EllipsisVertical, Layers, LocateFixed, Pencil, Search, Settings, User, UserPlus, Users, type LucideIcon } from "lucide-react";
 
 import { api } from "../lib/api";
-import { Avatar, RowMenu, TableHead, useRowMenu, useSort, type RowMenuItem } from "./AdminTable";
+import { Avatar, RowMenu, TableHead, useFormPanel, useRowMenu, useSort, type RowMenuItem } from "./AdminTable";
 import CollaboratorAdmin from "./CollaboratorAdmin";
 import { formatDocument, isValidCpfCnpj, normalizeDocument } from "../lib/document";
 import { optimizeEvidenceImage } from "../lib/media";
@@ -252,6 +252,7 @@ function ClientAdmin({
   const [portalPassword, setPortalPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [search, setSearch] = useState("");
+  const [listFeedback, setListFeedback] = useState<string | null>(null);
   const developmentMap = new Map(developments.map((item) => [item.id, item]));
 
   const term = search.trim().toLowerCase();
@@ -279,6 +280,7 @@ function ClientAdmin({
 
   const { sortKey, sortAsc, toggleSort, sortBy } = useSort<ClientSortKey>("name");
   const { menu, openMenu, closeMenu } = useRowMenu();
+  const panel = useFormPanel();
   const sortedClients = sortBy(visibleClients, (client, key) => {
     if (key === "role") return client.contact_role ?? "";
     if (key === "contact") return (client.contact_whatsapp || client.contact_phone || "").replace(/\D/g, "");
@@ -302,6 +304,19 @@ function ClientAdmin({
     setContactPhone(formatPhone(client.contact_phone));
     setContactWhatsapp(formatPhone(client.contact_whatsapp));
     setFeedback(null);
+    panel.show();
+  }
+
+  function openNew() {
+    resetForm();
+    setFeedback(null);
+    panel.show();
+  }
+
+  function closeForm() {
+    resetForm();
+    setFeedback(null);
+    panel.hide();
   }
 
   async function toggle(client: ClientRecord) {
@@ -311,10 +326,10 @@ function ClientAdmin({
         method: "PATCH",
         body: JSON.stringify({ is_active: !client.is_active }),
       });
-      setFeedback(client.is_active ? "Responsável inativado." : "Responsável reativado.");
+      setListFeedback(client.is_active ? "Responsável inativado." : "Responsável reativado.");
       await onChanged();
     } catch {
-      setFeedback("Não foi possível alterar o responsável.");
+      setListFeedback("Não foi possível alterar o responsável.");
     } finally {
       setBusy(false);
     }
@@ -350,8 +365,13 @@ function ClientAdmin({
           contact_whatsapp: contactWhatsapp.trim() || null,
         }),
       });
-      setFeedback(editingId ? "Responsável atualizado." : "Responsável cadastrado.");
-      resetForm();
+      if (editingId) {
+        setListFeedback("Responsável atualizado.");
+        closeForm();
+      } else {
+        resetForm();
+        setFeedback("Responsável cadastrado. O formulário segue aberto para o próximo.");
+      }
       await onChanged();
     } catch (error) {
       const status =
@@ -516,9 +536,41 @@ function ClientAdmin({
     : [];
 
   return (
-    <div className="admin-panel">
+    <div className="admin-stack">
+      {panel.open && (
+      <div className="compact-form admin-create-form" ref={panel.ref}>
+        <h3 className="form-title">{editingId ? <Pencil size={17} /> : <UserPlus size={17} />}{editingId ? "Editar responsável" : "Novo responsável"}</h3>
+        <div className="compact-form-grid">
+          <label><span>Nome <b className="required-mark">*</b></span><input required aria-required="true" placeholder="Nome completo" value={name} onChange={(e) => setName(e.target.value)} /></label>
+          <label><span>Função <b className="required-mark">*</b></span>
+            <select required aria-required="true" value={contactRole} onChange={(e) => setContactRole(e.target.value)}>
+              <option value="">Selecione</option>
+              {CLIENT_ROLES.map((role) => <option key={role} value={role}>{role}</option>)}
+              {contactRole && !CLIENT_ROLES.includes(contactRole) && <option value={contactRole}>{contactRole} (cadastro antigo)</option>}
+            </select>
+          </label>
+          <label><span>CPF/CNPJ <b className="required-mark">*</b></span><input required aria-required="true" inputMode="numeric" placeholder="CPF ou CNPJ" value={document} onChange={(e) => setDocument(e.target.value)} /></label>
+          <label>Email<input type="email" placeholder="email@exemplo.com" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} /></label>
+          <label><span>WhatsApp <b className="required-mark">**</b></span><input type="tel" inputMode="numeric" placeholder="(85) 99999-9999" value={contactWhatsapp} onChange={(e) => setContactWhatsapp(formatPhone(e.target.value))} /></label>
+          <label><span>Telefone <b className="required-mark">**</b></span><input type="tel" inputMode="numeric" placeholder="(85) 3333-3333" value={contactPhone} onChange={(e) => setContactPhone(formatPhone(e.target.value))} /></label>
+          <label>Contato alternativo<input value={contactName} onChange={(e) => setContactName(e.target.value)} /></label>
+        </div>
+        <p className="required-hint">
+          <b className="required-mark">*</b> Obrigatório. <b className="required-mark">**</b> Informe ao menos um: WhatsApp ou Telefone.
+        </p>
+        <div className="admin-actions form-submit">
+          <button className="primary-button" disabled={busy} onClick={() => void save()}>
+            {!editingId && <UserPlus size={17} />}
+            {busy ? "Salvando..." : editingId ? "Salvar alterações" : "Cadastrar responsável"}
+          </button>
+          <button className="text-button" disabled={busy} onClick={closeForm}>{editingId ? "Cancelar" : "Fechar"}</button>
+        </div>
+        {feedback && <span className="inline-feedback">{feedback}</span>}
+      </div>
+      )}
       <div className="client-list-column">
-      <label className="search-field">
+      <div className="admin-toolbar">
+<label className="search-field">
         <Search size={16} />
         <input
           value={search}
@@ -527,6 +579,11 @@ function ClientAdmin({
           aria-label="Buscar responsável"
         />
       </label>
+{!panel.open && (
+<button className="primary-button" disabled={busy} onClick={openNew}><UserPlus size={17} /> Novo responsável</button>
+)}
+</div>
+{listFeedback && <span className="inline-feedback" role="status">{listFeedback}</span>}
       <div className="admin-list collab-table" role="table" aria-label="Responsáveis">
         <TableHead columns={CLIENT_COLUMNS} sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} />
         {sortedClients.map((client) => {
@@ -662,35 +719,6 @@ function ClientAdmin({
       </div>
       {menu && menuClient && <RowMenu menu={menu} items={menuItems} busy={busy} onClose={closeMenu} />}
       </div>
-      <div className="compact-form admin-create-form">
-        <h3 className="form-title">{editingId ? <Pencil size={17} /> : <UserPlus size={17} />}{editingId ? "Editar responsável" : "Novo responsável"}</h3>
-        <div className="compact-form-grid">
-          <label><span>Nome <b className="required-mark">*</b></span><input required aria-required="true" placeholder="Nome completo" value={name} onChange={(e) => setName(e.target.value)} /></label>
-          <label><span>Função <b className="required-mark">*</b></span>
-            <select required aria-required="true" value={contactRole} onChange={(e) => setContactRole(e.target.value)}>
-              <option value="">Selecione</option>
-              {CLIENT_ROLES.map((role) => <option key={role} value={role}>{role}</option>)}
-              {contactRole && !CLIENT_ROLES.includes(contactRole) && <option value={contactRole}>{contactRole} (cadastro antigo)</option>}
-            </select>
-          </label>
-          <label><span>CPF/CNPJ <b className="required-mark">*</b></span><input required aria-required="true" inputMode="numeric" placeholder="CPF ou CNPJ" value={document} onChange={(e) => setDocument(e.target.value)} /></label>
-          <label>Email<input type="email" placeholder="email@exemplo.com" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} /></label>
-          <label><span>WhatsApp <b className="required-mark">**</b></span><input type="tel" inputMode="numeric" placeholder="(85) 99999-9999" value={contactWhatsapp} onChange={(e) => setContactWhatsapp(formatPhone(e.target.value))} /></label>
-          <label><span>Telefone <b className="required-mark">**</b></span><input type="tel" inputMode="numeric" placeholder="(85) 3333-3333" value={contactPhone} onChange={(e) => setContactPhone(formatPhone(e.target.value))} /></label>
-          <label>Contato alternativo<input value={contactName} onChange={(e) => setContactName(e.target.value)} /></label>
-        </div>
-        <p className="required-hint">
-          <b className="required-mark">*</b> Obrigatório. <b className="required-mark">**</b> Informe ao menos um: WhatsApp ou Telefone.
-        </p>
-        <div className="admin-actions form-submit">
-          <button className="primary-button" disabled={busy} onClick={() => void save()}>
-            {!editingId && <UserPlus size={17} />}
-            {busy ? "Salvando..." : editingId ? "Salvar alterações" : "Cadastrar responsável"}
-          </button>
-          {editingId && <button className="text-button" disabled={busy} onClick={resetForm}>Cancelar</button>}
-        </div>
-        {feedback && <span className="inline-feedback">{feedback}</span>}
-      </div>
     </div>
   );
 }
@@ -723,6 +751,7 @@ function DevelopmentAdmin({ clients, developments, onChanged }: { clients: Clien
   const [search, setSearch] = useState("");
   const { sortKey, sortAsc, toggleSort, sortBy } = useSort<DevelopmentSortKey>("name");
   const { menu, openMenu, closeMenu } = useRowMenu();
+  const panel = useFormPanel();
   const clientMap = new Map(clients.map((item) => [item.id, item]));
 
   function summary(item: DevelopmentRecord): string {
@@ -847,6 +876,19 @@ function DevelopmentAdmin({ clients, developments, onChanged }: { clients: Clien
     setPhotoFile(null); setPhotoUrl(null); setPhotoInputKey((key) => key + 1);
     if (item.has_facade_photo) void loadPhoto(item.id);
     setFeedback(null);
+    panel.show();
+  }
+
+  function openNew() {
+    resetForm();
+    setFeedback(null);
+    panel.show();
+  }
+
+  function closeForm() {
+    resetForm();
+    setFeedback(null);
+    panel.hide();
   }
 
   async function toggle(item: DevelopmentRecord) {
@@ -926,9 +968,14 @@ function DevelopmentAdmin({ clients, developments, onChanged }: { clients: Clien
           photoFailed = true;
         }
       }
-      const done = editingId ? "Empreendimento atualizado." : "Empreendimento cadastrado.";
-      resetForm();
-      setFeedback(photoFailed ? done + " A foto da fachada não foi enviada; edite o cadastro e tente de novo." : done);
+      const photoNote = photoFailed ? " A foto da fachada não foi enviada; edite o cadastro e tente de novo." : "";
+      if (editingId) {
+        setRowFeedback("Empreendimento atualizado." + photoNote);
+        closeForm();
+      } else {
+        resetForm();
+        setFeedback("Empreendimento cadastrado." + photoNote + " O formulário segue aberto para o próximo.");
+      }
       await onChanged();
     } catch (error) {
       const status =
@@ -954,9 +1001,68 @@ function DevelopmentAdmin({ clients, developments, onChanged }: { clients: Clien
     : [];
 
   return (
-    <div className="admin-panel">
+    <div className="admin-stack">
+      {panel.open && (
+      <div className="compact-form admin-create-form" ref={panel.ref}>
+        <h3 className="form-title">{editingId ? <Pencil size={17} /> : <Building2 size={17} />}{editingId ? "Editar empreendimento" : "Novo empreendimento"}</h3>
+        <div className="compact-form-grid">
+          <label className="form-span-2"><span>Nome <b className="required-mark">*</b></span><input required aria-required="true" placeholder="Nome do empreendimento" value={name} onChange={(e) => setName(e.target.value)} /></label>
+          <label><span>Tipo <b className="required-mark">*</b></span>
+            <select required aria-required="true" value={developmentType} onChange={(e) => setDevelopmentType(e.target.value)}>
+              <option value="">Selecione</option>
+              {DEVELOPMENT_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
+              {developmentType && !DEVELOPMENT_TYPES.includes(developmentType) && <option value={developmentType}>{developmentType} (cadastro antigo)</option>}
+            </select>
+          </label>
+          <label><span>CNPJ <b className="required-mark">*</b></span><input required aria-required="true" inputMode="numeric" placeholder="00.000.000/0000-00" value={document} onChange={(e) => setDocument(e.target.value)} /></label>
+          <label className="form-span-2"><span>Responsável principal <b className="required-mark">*</b></span><select required aria-required="true" value={clientId} onChange={(e) => setClientId(e.target.value)}><option value="">Selecione</option>{clients.filter((x) => x.is_active || x.id === clientId).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+          <label>Telefone<input type="tel" inputMode="numeric" placeholder="(85) 3333-3333" value={contactPhone} onChange={(e) => setContactPhone(formatPhone(e.target.value))} /></label>
+          <label>Email<input type="email" placeholder="email@exemplo.com" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} /></label>
+        </div>
+        <span className="eyebrow">Endereço</span>
+        <div className="compact-form-grid">
+          <label className="form-span-2"><span>Logradouro <b className="required-mark">*</b></span><input required aria-required="true" placeholder="Rua, avenida..." value={addressLine} onChange={(e) => setAddressLine(e.target.value)} /></label>
+          <label>Número<input placeholder="Ex.: 1200 ou S/N" value={addressNumber} onChange={(e) => setAddressNumber(e.target.value)} /></label>
+          <label>Complemento<input placeholder="Bloco, torre..." value={addressComplement} onChange={(e) => setAddressComplement(e.target.value)} /></label>
+          <label>Bairro<input value={addressDistrict} onChange={(e) => setAddressDistrict(e.target.value)} /></label>
+          <label>CEP<input inputMode="numeric" placeholder="00000-000" value={postalCode} onChange={(e) => setPostalCode(e.target.value)} /></label>
+          <label><span>Município <b className="required-mark">*</b></span><input required aria-required="true" value={city} onChange={(e) => setCity(e.target.value)} /></label>
+          <label><span>UF <b className="required-mark">*</b></span><input required aria-required="true" maxLength={2} value={state} onChange={(e) => setState(e.target.value.toUpperCase())} /></label>
+          <label>Latitude<input inputMode="decimal" placeholder="-3,731900" value={latitude} onChange={(e) => setLatitude(e.target.value)} /></label>
+          <label>Longitude<input inputMode="decimal" placeholder="-38,526700" value={longitude} onChange={(e) => setLongitude(e.target.value)} /></label>
+        </div>
+        <button type="button" className="small-button form-inline-button" disabled={busy} onClick={useMyLocation}>
+          <LocateFixed size={16} /> Usar minha localização
+        </button>
+        <span className="eyebrow">Operação</span>
+        <div className="compact-form-grid">
+          <label>Número de economias<input inputMode="numeric" placeholder="Ex.: 120" value={unitsCount} onChange={(e) => setUnitsCount(e.target.value)} /></label>
+          <label>Horário de acesso<input placeholder="Ex.: seg a sex, 8h às 17h" value={accessHours} onChange={(e) => setAccessHours(e.target.value)} /></label>
+          <label className="form-span-2">Foto da fachada
+            <input key={photoInputKey} type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)} />
+          </label>
+        </div>
+        {photoUrl && !photoFile && (
+          <div className="facade-photo">
+            <a href={photoUrl} target="_blank" rel="noreferrer"><img src={photoUrl} alt={"Fachada de " + name} /></a>
+            <button type="button" className="text-button" disabled={busy} onClick={() => void removePhoto()}>Remover foto</button>
+          </div>
+        )}
+        {photoFile && <span className="required-hint">Nova foto selecionada: {photoFile.name}. Ela é enviada ao salvar{photoUrl ? " e substitui a atual" : ""}.</span>}
+        <p className="required-hint"><b className="required-mark">*</b> Obrigatório.</p>
+        <div className="admin-actions form-submit">
+          <button className="primary-button" disabled={busy} onClick={() => void save()}>
+            {!editingId && <Building2 size={17} />}
+            {busy ? "Salvando..." : editingId ? "Salvar alterações" : "Cadastrar empreendimento"}
+          </button>
+          <button className="text-button" disabled={busy} onClick={closeForm}>{editingId ? "Cancelar" : "Fechar"}</button>
+        </div>
+        {feedback && <span className="inline-feedback">{feedback}</span>}
+      </div>
+      )}
       <div className="client-list-column">
-        <label className="search-field">
+        <div className="admin-toolbar">
+<label className="search-field">
           <Search size={16} />
           <input
             value={search}
@@ -965,7 +1071,12 @@ function DevelopmentAdmin({ clients, developments, onChanged }: { clients: Clien
             aria-label="Buscar empreendimento"
           />
         </label>
-        <div className="admin-list collab-table" role="table" aria-label="Empreendimentos">
+{!panel.open && (
+<button className="primary-button" disabled={busy} onClick={openNew}><Building2 size={17} /> Novo empreendimento</button>
+)}
+</div>
+{rowFeedback && <span className="inline-feedback" role="status">{rowFeedback}</span>}
+        <div className="admin-list collab-table collab-table-wide" role="table" aria-label="Empreendimentos">
           <TableHead columns={DEVELOPMENT_COLUMNS} sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} />
           {sorted.map((item) => (
             <div className="client-entry" key={item.id}>
@@ -1019,63 +1130,6 @@ function DevelopmentAdmin({ clients, developments, onChanged }: { clients: Clien
           )}
         </div>
         {menu && menuItem && <RowMenu menu={menu} items={menuItems} busy={busy} onClose={closeMenu} />}
-        {rowFeedback && <span className="inline-feedback">{rowFeedback}</span>}
-      </div>
-      <div className="compact-form admin-create-form">
-        <h3 className="form-title">{editingId ? <Pencil size={17} /> : <Building2 size={17} />}{editingId ? "Editar empreendimento" : "Novo empreendimento"}</h3>
-        <div className="compact-form-grid">
-          <label className="form-span-2"><span>Nome <b className="required-mark">*</b></span><input required aria-required="true" placeholder="Nome do empreendimento" value={name} onChange={(e) => setName(e.target.value)} /></label>
-          <label><span>Tipo <b className="required-mark">*</b></span>
-            <select required aria-required="true" value={developmentType} onChange={(e) => setDevelopmentType(e.target.value)}>
-              <option value="">Selecione</option>
-              {DEVELOPMENT_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
-              {developmentType && !DEVELOPMENT_TYPES.includes(developmentType) && <option value={developmentType}>{developmentType} (cadastro antigo)</option>}
-            </select>
-          </label>
-          <label><span>CNPJ <b className="required-mark">*</b></span><input required aria-required="true" inputMode="numeric" placeholder="00.000.000/0000-00" value={document} onChange={(e) => setDocument(e.target.value)} /></label>
-          <label className="form-span-2"><span>Responsável principal <b className="required-mark">*</b></span><select required aria-required="true" value={clientId} onChange={(e) => setClientId(e.target.value)}><option value="">Selecione</option>{clients.filter((x) => x.is_active || x.id === clientId).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
-          <label>Telefone<input type="tel" inputMode="numeric" placeholder="(85) 3333-3333" value={contactPhone} onChange={(e) => setContactPhone(formatPhone(e.target.value))} /></label>
-          <label>Email<input type="email" placeholder="email@exemplo.com" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} /></label>
-        </div>
-        <span className="eyebrow">Endereço</span>
-        <div className="compact-form-grid">
-          <label className="form-span-2"><span>Logradouro <b className="required-mark">*</b></span><input required aria-required="true" placeholder="Rua, avenida..." value={addressLine} onChange={(e) => setAddressLine(e.target.value)} /></label>
-          <label>Número<input placeholder="Ex.: 1200 ou S/N" value={addressNumber} onChange={(e) => setAddressNumber(e.target.value)} /></label>
-          <label>Complemento<input placeholder="Bloco, torre..." value={addressComplement} onChange={(e) => setAddressComplement(e.target.value)} /></label>
-          <label>Bairro<input value={addressDistrict} onChange={(e) => setAddressDistrict(e.target.value)} /></label>
-          <label>CEP<input inputMode="numeric" placeholder="00000-000" value={postalCode} onChange={(e) => setPostalCode(e.target.value)} /></label>
-          <label><span>Município <b className="required-mark">*</b></span><input required aria-required="true" value={city} onChange={(e) => setCity(e.target.value)} /></label>
-          <label><span>UF <b className="required-mark">*</b></span><input required aria-required="true" maxLength={2} value={state} onChange={(e) => setState(e.target.value.toUpperCase())} /></label>
-          <label>Latitude<input inputMode="decimal" placeholder="-3,731900" value={latitude} onChange={(e) => setLatitude(e.target.value)} /></label>
-          <label>Longitude<input inputMode="decimal" placeholder="-38,526700" value={longitude} onChange={(e) => setLongitude(e.target.value)} /></label>
-        </div>
-        <button type="button" className="small-button form-inline-button" disabled={busy} onClick={useMyLocation}>
-          <LocateFixed size={16} /> Usar minha localização
-        </button>
-        <span className="eyebrow">Operação</span>
-        <div className="compact-form-grid">
-          <label>Número de economias<input inputMode="numeric" placeholder="Ex.: 120" value={unitsCount} onChange={(e) => setUnitsCount(e.target.value)} /></label>
-          <label>Horário de acesso<input placeholder="Ex.: seg a sex, 8h às 17h" value={accessHours} onChange={(e) => setAccessHours(e.target.value)} /></label>
-          <label className="form-span-2">Foto da fachada
-            <input key={photoInputKey} type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)} />
-          </label>
-        </div>
-        {photoUrl && !photoFile && (
-          <div className="facade-photo">
-            <a href={photoUrl} target="_blank" rel="noreferrer"><img src={photoUrl} alt={"Fachada de " + name} /></a>
-            <button type="button" className="text-button" disabled={busy} onClick={() => void removePhoto()}>Remover foto</button>
-          </div>
-        )}
-        {photoFile && <span className="required-hint">Nova foto selecionada: {photoFile.name}. Ela é enviada ao salvar{photoUrl ? " e substitui a atual" : ""}.</span>}
-        <p className="required-hint"><b className="required-mark">*</b> Obrigatório.</p>
-        <div className="admin-actions form-submit">
-          <button className="primary-button" disabled={busy} onClick={() => void save()}>
-            {!editingId && <Building2 size={17} />}
-            {busy ? "Salvando..." : editingId ? "Salvar alterações" : "Cadastrar empreendimento"}
-          </button>
-          {editingId && <button className="text-button" disabled={busy} onClick={resetForm}>Cancelar</button>}
-        </div>
-        {feedback && <span className="inline-feedback">{feedback}</span>}
       </div>
     </div>
   );

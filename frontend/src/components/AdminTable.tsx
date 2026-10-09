@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowUpDown } from "lucide-react";
 
 // Pecas comuns das listas em tabela dos Cadastros (Colaboradores e Responsaveis).
@@ -69,6 +69,27 @@ export function TableHead<K extends string>({
       <span role="columnheader" className="collab-col-actions">Ações</span>
     </div>
   );
+}
+
+// Formulario recolhivel acima da lista. Abre em "Novo" e em "Editar", rola ate ele e foca o primeiro campo.
+export function useFormPanel() {
+  const [open, setOpen] = useState(false);
+  const [shown, setShown] = useState(0);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open || !ref.current) return;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    ref.current.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+    ref.current.querySelector<HTMLElement>("input, select")?.focus({ preventScroll: true });
+  }, [open, shown]);
+
+  return {
+    open,
+    ref,
+    show: () => { setOpen(true); setShown((count) => count + 1); },
+    hide: () => setOpen(false),
+  };
 }
 
 type MenuState = { id: string; top: number; right: number } | null;

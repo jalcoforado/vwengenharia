@@ -2215,3 +2215,41 @@ button:not(:disabled):active { transform: translateY(1px); }
   display: block; width: 160px; height: 110px; object-fit: cover;
   border: 1px solid var(--mw-border); border-radius: var(--mw-radius-sm);
 }
+
+/* Cadastros: formulario recolhivel no topo, busca e lista em largura total */
+.admin-stack { display: grid; gap: 16px; min-width: 0; }
+.admin-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.admin-toolbar .search-field { flex: 1 1 260px; }
+.admin-toolbar .primary-button { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; }
+.admin-stack > .admin-create-form {
+  padding: 18px; border: 1px solid var(--mw-border); border-radius: var(--mw-radius-lg);
+  background: var(--mw-surface); box-shadow: var(--mw-shadow-sm); scroll-margin-top: 96px;
+}
+.admin-stack .compact-form-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.admin-stack .compact-form-grid .form-span-2 { grid-column: span 2; }
+.admin-stack .form-submit { justify-content: flex-start; }
+.admin-stack .form-submit .primary-button { flex: 0 1 auto; }
+.admin-stack .collab-head,
+.admin-stack .collab-row { grid-template-columns: minmax(0, 1fr) 150px 150px 96px 114px; }
+.admin-stack .collab-table-wide .collab-head,
+.admin-stack .collab-table-wide .collab-row { grid-template-columns: minmax(0, 1fr) 200px 150px 96px 84px; }
+.admin-stack .collab-row .collab-col-contact { display: block; }
+.admin-stack .collab-head .collab-col-contact { display: inline-flex; }
+@media (max-width: 1100px) {
+  .admin-stack .compact-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-stack .compact-form-grid .form-span-2 { grid-column: 1 / -1; }
+}
+@media (max-width: 820px) {
+  .admin-stack .collab-head,
+  .admin-stack .collab-row { grid-template-columns: minmax(0, 1fr) 130px 96px 114px; }
+  .admin-stack .collab-table-wide .collab-head,
+  .admin-stack .collab-table-wide .collab-row { grid-template-columns: minmax(0, 1fr) 150px 96px 84px; }
+  .admin-stack .collab-row .collab-col-contact,
+  .admin-stack .collab-head .collab-col-contact { display: none; }
+}
+@media (max-width: 650px) {
+  .admin-stack .compact-form-grid { grid-template-columns: 1fr; }
+  .admin-stack .collab-row,
+  .admin-stack .collab-table-wide .collab-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .admin-toolbar .primary-button { flex: 1 1 100%; justify-content: center; }
+}
