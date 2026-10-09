@@ -8,11 +8,12 @@ Todo acesso operacional e limitado pelo tenant da membership autenticada.
 
 ## Cadastros de pessoas e credenciais
 
-A MW trabalha com tres cadastros:
+A MW trabalha com quatro cadastros:
 
+- **Contratantes**: quem assina com a MW (PF ou PJ, com CPF/CNPJ). Um contratante pode ter varios empreendimentos (tabela `contracting_parties`).
 - **Colaboradores**: quem trabalha na MW (diretoria, backoffice, tecnicos). A credencial de acesso e opcional.
 - **Responsaveis**: pessoas fisicas ou juridicas que respondem por um ou mais empreendimentos (tabela `clients`).
-- **Empreendimentos**: os clientes da MW, sempre com um responsavel principal.
+- **Empreendimentos**: os locais atendidos, cada um ligado a um contratante e com um responsavel principal.
 
 Regras de credencial:
 

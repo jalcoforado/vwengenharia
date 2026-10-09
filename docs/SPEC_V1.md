@@ -163,6 +163,7 @@ Entidades principais:
 - memberships
 - collaborators
 - clients
+- contracting_parties
 - developments
 - client_development_contacts
 - stations

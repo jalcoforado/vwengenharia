@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from app.models.operations import AssetStatus, ContactScope
+from app.models.operations import AssetStatus, ContactScope, PersonType
 
 
 class ORMModel(BaseModel):
@@ -71,8 +71,41 @@ class ClientContactRead(ORMModel):
     updated_at: datetime
 
 
+class ContractingPartyCreate(BaseModel):
+    person_type: PersonType = PersonType.PJ
+    name: str = Field(min_length=2, max_length=200)
+    trade_name: str | None = Field(default=None, max_length=200)
+    document: str | None = Field(default=None, max_length=32)
+    contact_email: EmailStr | None = None
+    contact_phone: str | None = Field(default=None, max_length=40)
+
+
+class ContractingPartyUpdate(BaseModel):
+    person_type: PersonType | None = None
+    name: str | None = Field(default=None, min_length=2, max_length=200)
+    trade_name: str | None = Field(default=None, max_length=200)
+    document: str | None = Field(default=None, max_length=32)
+    contact_email: EmailStr | None = None
+    contact_phone: str | None = Field(default=None, max_length=40)
+    is_active: bool | None = None
+
+
+class ContractingPartyRead(ORMModel):
+    id: UUID
+    person_type: PersonType
+    name: str
+    trade_name: str | None
+    document: str | None
+    contact_email: str | None
+    contact_phone: str | None
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+
 class DevelopmentCreate(BaseModel):
     client_id: UUID
+    contracting_party_id: UUID | None = None
     name: str = Field(min_length=2, max_length=200)
     document: str | None = Field(default=None, max_length=32)
     contact_phone: str | None = Field(default=None, max_length=40)
@@ -93,6 +126,7 @@ class DevelopmentCreate(BaseModel):
 
 class DevelopmentUpdate(BaseModel):
     client_id: UUID | None = None
+    contracting_party_id: UUID | None = None
     name: str | None = Field(default=None, min_length=2, max_length=200)
     document: str | None = Field(default=None, max_length=32)
     contact_phone: str | None = Field(default=None, max_length=40)
@@ -115,6 +149,7 @@ class DevelopmentUpdate(BaseModel):
 class DevelopmentRead(ORMModel):
     id: UUID
     client_id: UUID
+    contracting_party_id: UUID | None
     name: str
     document: str | None
     contact_phone: str | None

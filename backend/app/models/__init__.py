@@ -52,7 +52,9 @@ from app.models.operations import (
     ClientDevelopmentContact,
     ClientMembershipAccess,
     ContactScope,
+    ContractingParty,
     Development,
+    PersonType,
     Station,
 )
 
@@ -72,6 +74,7 @@ __all__ = [
     "Collaborator",
     "CollaboratorGroup",
     "ContactScope",
+    "ContractingParty",
     "Development",
     "IntegrationCredential",
     "LegacyStationMapping",
@@ -87,6 +90,7 @@ __all__ = [
     "Occurrence",
     "OccurrenceSeverity",
     "OccurrenceStatus",
+    "PersonType",
     "RefreshToken",
     "RequestCategory",
     "RequestPriority",

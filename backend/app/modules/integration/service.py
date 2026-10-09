@@ -19,6 +19,7 @@ from app.models.operations import (
     Asset,
     Client,
     ClientDevelopmentContact,
+    ContractingParty,
     Development,
     Station,
 )
@@ -144,10 +145,23 @@ def _serialize(resource: IntegrationResource, row) -> dict:
                 "is_active": row.is_active,
             }
         )
+    elif resource == IntegrationResource.CONTRACTING_PARTIES:
+        payload.update(
+            {
+                "person_type": row.person_type,
+                "name": row.name,
+                "trade_name": row.trade_name,
+                "document": row.document,
+                "contact_email": row.contact_email,
+                "contact_phone": row.contact_phone,
+                "is_active": row.is_active,
+            }
+        )
     elif resource == IntegrationResource.DEVELOPMENTS:
         payload.update(
             {
                 "client_id": row.client_id,
+                "contracting_party_id": row.contracting_party_id,
                 "name": row.name,
                 "document": row.document,
                 "contact_phone": row.contact_phone,
@@ -284,6 +298,10 @@ def _serialize(resource: IntegrationResource, row) -> dict:
 
 _RESOURCE_CONFIG = {
     IntegrationResource.CLIENTS: (Client, Client.updated_at),
+    IntegrationResource.CONTRACTING_PARTIES: (
+        ContractingParty,
+        ContractingParty.updated_at,
+    ),
     IntegrationResource.DEVELOPMENTS: (Development, Development.updated_at),
     IntegrationResource.STATIONS: (Station, Station.updated_at),
     IntegrationResource.ASSETS: (Asset, Asset.updated_at),

@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { Building2, EllipsisVertical, Layers, LocateFixed, Pencil, Search, Settings, User, UserPlus, Users, type LucideIcon } from "lucide-react";
+import { Briefcase, Building2, EllipsisVertical, Layers, LocateFixed, Pencil, Search, Settings, User, UserPlus, Users, type LucideIcon } from "lucide-react";
 
 import { api } from "../lib/api";
 import { Avatar, RowMenu, TableHead, useFormPanel, useRowMenu, useSort, type RowMenuItem } from "./AdminTable";
 import CollaboratorAdmin from "./CollaboratorAdmin";
+import ContractingPartyAdmin, { contractingPartyLabel, type ContractingPartyRecord } from "./ContractingPartyAdmin";
 import { formatDocument, isValidCpfCnpj, normalizeDocument } from "../lib/document";
 import { optimizeEvidenceImage } from "../lib/media";
 import { formatPhone, isCompletePhone } from "../lib/phone";
@@ -55,6 +56,7 @@ const CLIENT_COLUMNS: [ClientSortKey, string, string][] = [
 export type DevelopmentRecord = {
   id: string;
   client_id: string;
+  contracting_party_id: string | null;
   name: string;
   document: string | null;
   contact_phone: string | null;
@@ -146,8 +148,22 @@ export default function OperationalAdmin({
   onChanged,
   onOpenStation,
 }: Props) {
-  const [tab, setTab] = useState<"COLABORADORES" | "CLIENTES" | "EMPREENDIMENTOS" | "ESTACOES" | "ATIVOS">("COLABORADORES");
+  const [tab, setTab] = useState<"COLABORADORES" | "CONTRATANTES" | "CLIENTES" | "EMPREENDIMENTOS" | "ESTACOES" | "ATIVOS">("COLABORADORES");
   const [collaboratorCount, setCollaboratorCount] = useState<number | null>(null);
+  const [parties, setParties] = useState<ContractingPartyRecord[]>([]);
+
+  // Os contratantes sao usados pela aba propria e pelo cadastro do empreendimento.
+  async function loadParties() {
+    try {
+      setParties(await api<ContractingPartyRecord[]>("/api/v1/contracting-parties?limit=500"));
+    } catch {
+      // Mantem a lista anterior; a aba mostra o que ja estava carregado.
+    }
+  }
+
+  useEffect(() => {
+    void loadParties();
+  }, []);
 
   // Os colaboradores sao carregados pela propria aba; aqui so buscamos o total para o resumo.
   useEffect(() => {
@@ -163,11 +179,12 @@ export default function OperationalAdmin({
           <span className="eyebrow">Administração operacional</span>
           <h2>Estrutura da operação</h2>
           <p className="section-copy">
-            Colaboradores são a equipe da MW. Cadastre o responsável, depois o empreendimento (o cliente da MW), suas estações e ativos.
+            Colaboradores são a equipe da MW. Cadastre o contratante (quem assina com a MW) e o responsável, depois o empreendimento (o local atendido), suas estações e ativos.
           </p>
         </div>
         <div className="admin-summary">
           {collaboratorCount !== null && <span><strong>{collaboratorCount}</strong> colaboradores</span>}
+          <span><strong>{parties.filter((item) => item.is_active).length}</strong> contratantes</span>
           <span><strong>{clients.filter((item) => item.is_active).length}</strong> responsáveis</span>
           <span><strong>{developments.filter((item) => item.is_active).length}</strong> empreendimentos</span>
           <span><strong>{stations.filter((item) => item.is_active).length}</strong> estações</span>
@@ -178,6 +195,7 @@ export default function OperationalAdmin({
       <div className="admin-tabs">
         {([
           ["COLABORADORES", "Colaboradores", Users],
+          ["CONTRATANTES", "Contratantes", Briefcase],
           ["CLIENTES", "Responsáveis", User],
           ["EMPREENDIMENTOS", "Empreendimentos", Building2],
           ["ESTACOES", "Estações", Settings],
@@ -196,6 +214,13 @@ export default function OperationalAdmin({
       {tab === "COLABORADORES" && (
         <CollaboratorAdmin canManage={canManageAccess} onChanged={onChanged} onActiveCount={setCollaboratorCount} />
       )}
+      {tab === "CONTRATANTES" && (
+        <ContractingPartyAdmin
+          parties={parties}
+          developmentCount={(partyId) => developments.filter((item) => item.contracting_party_id === partyId).length}
+          onChanged={loadParties}
+        />
+      )}
       {tab === "CLIENTES" && (
         <ClientAdmin
           clients={clients}
@@ -205,7 +230,7 @@ export default function OperationalAdmin({
         />
       )}
       {tab === "EMPREENDIMENTOS" && (
-        <DevelopmentAdmin clients={clients} developments={developments} onChanged={onChanged} />
+        <DevelopmentAdmin clients={clients} parties={parties} developments={developments} onChanged={onChanged} />
       )}
       {tab === "ESTACOES" && (
         <StationAdmin
@@ -723,11 +748,21 @@ function ClientAdmin({
   );
 }
 
-function DevelopmentAdmin({ clients, developments, onChanged }: { clients: ClientRecord[]; developments: DevelopmentRecord[]; onChanged: () => Promise<void> }) {
+function DevelopmentAdmin({
+  clients,
+  parties,
+  developments,
+  onChanged,
+}: {
+  clients: ClientRecord[];
+  parties: ContractingPartyRecord[];
+  developments: DevelopmentRecord[];
+  onChanged: () => Promise<void>;
+}) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [clientId, setClientId] = useState("");
   const [name, setName] = useState("");
-  const [document, setDocument] = useState("");
+  const [partyId, setPartyId] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [addressLine, setAddressLine] = useState("");
@@ -753,10 +788,16 @@ function DevelopmentAdmin({ clients, developments, onChanged }: { clients: Clien
   const { menu, openMenu, closeMenu } = useRowMenu();
   const panel = useFormPanel();
   const clientMap = new Map(clients.map((item) => [item.id, item]));
+  const partyMap = new Map(parties.map((item) => [item.id, item]));
+
+  function partyName(item: DevelopmentRecord): string {
+    const party = item.contracting_party_id ? partyMap.get(item.contracting_party_id) : undefined;
+    return party ? contractingPartyLabel(party) : "";
+  }
 
   function summary(item: DevelopmentRecord): string {
     return [
-      formatDocument(item.document),
+      partyName(item) ? "Contratante: " + partyName(item) : "Sem contratante",
       "Responsável principal: " + (clientMap.get(item.client_id)?.name ?? "não encontrado"),
       [item.city, item.state].filter(Boolean).join("/"),
     ].filter(Boolean).join(" · ");
@@ -768,7 +809,7 @@ function DevelopmentAdmin({ clients, developments, onChanged }: { clients: Clien
     if (!term) return true;
     const fields = [
       item.name,
-      item.document,
+      partyName(item),
       item.development_type,
       clientMap.get(item.client_id)?.name,
       item.city,
@@ -777,10 +818,11 @@ function DevelopmentAdmin({ clients, developments, onChanged }: { clients: Clien
       item.contact_email,
     ].map((value) => (value ?? "").toLowerCase());
     if (fields.some((value) => value.includes(term))) return true;
-    // Permite achar CNPJ e telefone digitando so os numeros.
+    // Permite achar o CNPJ do contratante e o telefone digitando so os numeros.
+    const partyDocument = item.contracting_party_id ? partyMap.get(item.contracting_party_id)?.document : null;
     return (
       termDigits.length >= 3 &&
-      [item.document, item.contact_phone].some((value) => (value ?? "").replace(/\D/g, "").includes(termDigits))
+      [partyDocument, item.contact_phone].some((value) => (value ?? "").replace(/\D/g, "").includes(termDigits))
     );
   });
 
@@ -793,7 +835,7 @@ function DevelopmentAdmin({ clients, developments, onChanged }: { clients: Clien
 
   function resetForm() {
     setEditingId(null);
-    setClientId(""); setName(""); setDocument(""); setContactPhone(""); setContactEmail("");
+    setClientId(""); setName(""); setPartyId(""); setContactPhone(""); setContactEmail("");
     setAddressLine(""); setCity("Fortaleza"); setState("CE"); setPostalCode("");
     setDevelopmentType(""); setAddressNumber(""); setAddressComplement(""); setAddressDistrict("");
     setLatitude(""); setLongitude(""); setUnitsCount(""); setAccessHours("");
@@ -858,7 +900,7 @@ function DevelopmentAdmin({ clients, developments, onChanged }: { clients: Clien
     setEditingId(item.id);
     setClientId(item.client_id);
     setName(item.name);
-    setDocument(formatDocument(item.document));
+    setPartyId(item.contracting_party_id ?? "");
     setContactPhone(formatPhone(item.contact_phone));
     setContactEmail(item.contact_email ?? "");
     setAddressLine(item.address_line ?? "");
@@ -908,12 +950,9 @@ function DevelopmentAdmin({ clients, developments, onChanged }: { clients: Clien
   }
 
   async function save() {
-    if (!clientId) return setFeedback("Selecione o responsável principal.");
     if (name.trim().length < 2) return setFeedback("Informe o nome do empreendimento.");
-    if (!document.trim()) return setFeedback("Informe o CNPJ do empreendimento.");
-    if (normalizeDocument(document).length !== 14 || !isValidCpfCnpj(document)) {
-      return setFeedback("CNPJ inválido. Confira os números digitados.");
-    }
+    if (!partyId) return setFeedback("Selecione o contratante.");
+    if (!clientId) return setFeedback("Selecione o responsável principal.");
     if (contactPhone.trim() && !isCompletePhone(contactPhone)) {
       return setFeedback("Telefone incompleto. Informe DDD e número.");
     }
@@ -943,7 +982,7 @@ function DevelopmentAdmin({ clients, developments, onChanged }: { clients: Clien
         body: JSON.stringify({
           client_id: clientId,
           name: name.trim(),
-          document: normalizeDocument(document),
+          contracting_party_id: partyId,
           contact_phone: contactPhone.trim() || null,
           contact_email: contactEmail.trim() || null,
           development_type: developmentType,
@@ -981,7 +1020,7 @@ function DevelopmentAdmin({ clients, developments, onChanged }: { clients: Clien
       const status =
         typeof error === "object" && error !== null && "status" in error ? error.status : null;
       if (status === 409) {
-        setFeedback("Já existe um empreendimento com esse CNPJ.");
+        setFeedback("Já existe um empreendimento com esse CNPJ. Edite o cadastro existente.");
       } else if (status === 422) {
         setFeedback("Confira os dados informados, em especial o email e a UF.");
       } else {
@@ -1014,7 +1053,14 @@ function DevelopmentAdmin({ clients, developments, onChanged }: { clients: Clien
               {developmentType && !DEVELOPMENT_TYPES.includes(developmentType) && <option value={developmentType}>{developmentType} (cadastro antigo)</option>}
             </select>
           </label>
-          <label><span>CNPJ <b className="required-mark">*</b></span><input required aria-required="true" inputMode="numeric" placeholder="00.000.000/0000-00" value={document} onChange={(e) => setDocument(e.target.value)} /></label>
+          <label><span>Contratante <b className="required-mark">*</b></span>
+            <select required aria-required="true" value={partyId} onChange={(e) => setPartyId(e.target.value)}>
+              <option value="">Selecione</option>
+              {parties.filter((x) => x.is_active || x.id === partyId).map((x) => (
+                <option key={x.id} value={x.id}>{contractingPartyLabel(x)}{x.document ? " · " + formatDocument(x.document) : ""}</option>
+              ))}
+            </select>
+          </label>
           <label className="form-span-2"><span>Responsável principal <b className="required-mark">*</b></span><select required aria-required="true" value={clientId} onChange={(e) => setClientId(e.target.value)}><option value="">Selecione</option>{clients.filter((x) => x.is_active || x.id === clientId).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
           <label>Telefone<input type="tel" inputMode="numeric" placeholder="(85) 3333-3333" value={contactPhone} onChange={(e) => setContactPhone(formatPhone(e.target.value))} /></label>
           <label>Email<input type="email" placeholder="email@exemplo.com" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} /></label>
@@ -1067,7 +1113,7 @@ function DevelopmentAdmin({ clients, developments, onChanged }: { clients: Clien
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar nome, CNPJ, tipo, responsável ou município"
+            placeholder="Buscar nome, contratante, tipo, responsável ou município"
             aria-label="Buscar empreendimento"
           />
         </label>
@@ -1120,7 +1166,7 @@ function DevelopmentAdmin({ clients, developments, onChanged }: { clients: Clien
           ))}
           {developments.length === 0 && (
             <div className="empty-state">
-              Nenhum empreendimento cadastrado. Cadastre primeiro o responsável principal na aba Responsáveis.
+              Nenhum empreendimento cadastrado. Cadastre primeiro o contratante e o responsável principal, nas abas ao lado.
             </div>
           )}
           {developments.length > 0 && visible.length === 0 && (

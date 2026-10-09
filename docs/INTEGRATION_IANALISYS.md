@@ -36,6 +36,7 @@ Recursos:
 
 - clients
 - client-contacts
+- contracting-parties
 - developments
 - stations
 - assets
@@ -55,6 +56,10 @@ Parâmetros:
 - offset: padrão 0
 
 Datas de watermark devem incluir timezone.
+
+### contracting-parties
+
+Quem contrata a MW (pessoa física ou jurídica): `person_type`, `name` (razão social ou nome), `trade_name`, `document` (CPF/CNPJ), `contact_email`, `contact_phone`, `is_active`. Um contratante pode ter vários empreendimentos; a ligação está em `developments.contracting_party_id`.
 
 ### client-contacts
 

@@ -9,6 +9,7 @@ from app.models.operations import (
     AssetType,
     Client,
     ClientDevelopmentContact,
+    ContractingParty,
     Development,
     Station,
 )
@@ -26,6 +27,9 @@ from app.modules.core_registers.schemas import (
     ClientCreate,
     ClientRead,
     ClientUpdate,
+    ContractingPartyCreate,
+    ContractingPartyRead,
+    ContractingPartyUpdate,
     DevelopmentCreate,
     DevelopmentRead,
     DevelopmentUpdate,
@@ -43,6 +47,7 @@ from app.modules.core_registers.service import (
     create_asset_type,
     create_client,
     create_client_contact,
+    create_contracting_party,
     create_development,
     create_station,
     ensure_client_document_is_unique,
@@ -53,6 +58,7 @@ from app.modules.core_registers.service import (
     remove_facade_photo,
     tenant_get_or_404,
     update_client_contact,
+    update_contracting_party,
     update_development,
     update_object,
     validate_update_parents,
@@ -166,6 +172,40 @@ async def patch_client_contact(
         session, ClientDevelopmentContact, context.tenant.id, contact_id
     )
     return await update_client_contact(session, context, contact, payload)
+
+
+@router.get("/contracting-parties", response_model=list[ContractingPartyRead])
+async def list_contracting_parties(
+    context: ReadContextDep,
+    session: SessionDep,
+    limit: PageLimit = 100,
+    offset: PageOffset = 0,
+) -> list[ContractingParty]:
+    return await list_tenant_objects(
+        session, ContractingParty, context.tenant.id, limit=limit, offset=offset
+    )
+
+
+@router.post(
+    "/contracting-parties",
+    response_model=ContractingPartyRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def post_contracting_party(
+    payload: ContractingPartyCreate, context: WriteContextDep, session: SessionDep
+) -> ContractingParty:
+    return await create_contracting_party(session, context, payload)
+
+
+@router.patch("/contracting-parties/{party_id}", response_model=ContractingPartyRead)
+async def patch_contracting_party(
+    party_id: UUID,
+    payload: ContractingPartyUpdate,
+    context: WriteContextDep,
+    session: SessionDep,
+) -> ContractingParty:
+    party = await tenant_get_or_404(session, ContractingParty, context.tenant.id, party_id)
+    return await update_contracting_party(session, context, party, payload)
 
 
 @router.get("/developments", response_model=list[DevelopmentRead])

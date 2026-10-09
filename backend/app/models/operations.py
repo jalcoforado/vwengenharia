@@ -60,6 +60,33 @@ class Client(TimestampMixin, Base):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
 
+class PersonType(str, enum.Enum):
+    PJ = "PJ"
+    PF = "PF"
+
+
+class ContractingParty(TimestampMixin, Base):
+    """Quem contrata a empresa (PF ou PJ). Pode ter varios empreendimentos."""
+
+    __tablename__ = "contracting_parties"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "document", name="uq_contracting_parties_tenant_document"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    person_type: Mapped[str] = mapped_column(String(2), nullable=False, default=PersonType.PJ.value)
+    # Razao social (PJ) ou nome completo (PF).
+    name: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
+    trade_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    document: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    contact_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    contact_phone: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
 class Development(TimestampMixin, Base):
     __tablename__ = "developments"
     __table_args__ = (
@@ -74,6 +101,12 @@ class Development(TimestampMixin, Base):
         Uuid(as_uuid=True),
         ForeignKey("clients.id", ondelete="RESTRICT"),
         nullable=False,
+        index=True,
+    )
+    contracting_party_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("contracting_parties.id", ondelete="RESTRICT"),
+        nullable=True,
         index=True,
     )
     name: Mapped[str] = mapped_column(String(200), nullable=False, index=True)

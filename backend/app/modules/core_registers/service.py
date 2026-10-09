@@ -16,6 +16,7 @@ from app.models.operations import (
     Client,
     ClientDevelopmentContact,
     ContactScope,
+    ContractingParty,
     Development,
     Station,
 )
@@ -451,8 +452,84 @@ async def update_client_contact(
     return contact
 
 
+async def ensure_contracting_party_document_is_unique(
+    session: AsyncSession,
+    tenant_id: UUID,
+    document: str | None,
+    *,
+    ignore_id: UUID | None = None,
+) -> None:
+    if not document:
+        return
+    stmt = select(ContractingParty.id).where(
+        ContractingParty.tenant_id == tenant_id, ContractingParty.document == document
+    )
+    if ignore_id is not None:
+        stmt = stmt.where(ContractingParty.id != ignore_id)
+    if (await session.execute(stmt)).first() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="contracting_party_document_already_exists",
+        )
+
+
+async def create_contracting_party(
+    session: AsyncSession, context: AuthContext, payload
+) -> ContractingParty:
+    await ensure_contracting_party_document_is_unique(
+        session, context.tenant.id, payload.document
+    )
+    data = payload.model_dump()
+    data["person_type"] = payload.person_type.value
+    party = ContractingParty(tenant_id=context.tenant.id, **data)
+    session.add(party)
+    await session.flush()
+    add_audit(
+        session,
+        context,
+        action="CONTRACTING_PARTY_CREATE",
+        entity_type="contracting_party",
+        entity_id=party.id,
+    )
+    await session.commit()
+    await session.refresh(party)
+    return party
+
+
+async def update_contracting_party(
+    session: AsyncSession,
+    context: AuthContext,
+    party: ContractingParty,
+    payload: BaseModel,
+) -> ContractingParty:
+    changes = payload.model_dump(exclude_unset=True)
+    await ensure_contracting_party_document_is_unique(
+        session, context.tenant.id, changes.get("document"), ignore_id=party.id
+    )
+    if changes.get("person_type") is not None:
+        changes["person_type"] = changes["person_type"].value
+    for field, value in changes.items():
+        setattr(party, field, value)
+    if changes:
+        add_audit(
+            session,
+            context,
+            action="CONTRACTING_PARTY_UPDATE",
+            entity_type="contracting_party",
+            entity_id=party.id,
+            fields=sorted(changes),
+        )
+        await session.commit()
+        await session.refresh(party)
+    return party
+
+
 async def create_development(session: AsyncSession, context: AuthContext, payload) -> Development:
     await tenant_get_or_404(session, Client, context.tenant.id, payload.client_id)
+    if payload.contracting_party_id is not None:
+        await tenant_get_or_404(
+            session, ContractingParty, context.tenant.id, payload.contracting_party_id
+        )
     await ensure_development_document_is_unique(
         session, context.tenant.id, payload.document
     )
@@ -551,6 +628,10 @@ async def validate_update_parents(
     changes = payload.model_dump(exclude_unset=True)
     if changes.get("client_id") is not None:
         await tenant_get_or_404(session, Client, context.tenant.id, changes["client_id"])
+    if changes.get("contracting_party_id") is not None:
+        await tenant_get_or_404(
+            session, ContractingParty, context.tenant.id, changes["contracting_party_id"]
+        )
     if changes.get("development_id") is not None:
         await tenant_get_or_404(
             session, Development, context.tenant.id, changes["development_id"]
