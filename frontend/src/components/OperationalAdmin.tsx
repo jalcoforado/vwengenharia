@@ -3,6 +3,7 @@ import { Search } from "lucide-react";
 
 import { api } from "../lib/api";
 import { formatDocument, isValidCpfCnpj, normalizeDocument } from "../lib/document";
+import { formatPhone, isCompletePhone } from "../lib/phone";
 
 export type ClientRecord = {
   id: string;
@@ -212,8 +213,8 @@ function ClientAdmin({
     setContactName(client.contact_name ?? "");
     setContactRole(client.contact_role ?? "");
     setContactEmail(client.contact_email ?? "");
-    setContactPhone(client.contact_phone ?? "");
-    setContactWhatsapp(client.contact_whatsapp ?? "");
+    setContactPhone(formatPhone(client.contact_phone));
+    setContactWhatsapp(formatPhone(client.contact_whatsapp));
     setFeedback(null);
   }
 
@@ -242,6 +243,12 @@ function ClientAdmin({
     }
     if (!contactPhone.trim() && !contactWhatsapp.trim()) {
       return setFeedback("Informe o telefone ou o WhatsApp do cliente.");
+    }
+    if (contactPhone.trim() && !isCompletePhone(contactPhone)) {
+      return setFeedback("Telefone incompleto. Informe DDD e numero.");
+    }
+    if (contactWhatsapp.trim() && !isCompletePhone(contactWhatsapp)) {
+      return setFeedback("WhatsApp incompleto. Informe DDD e numero.");
     }
     setBusy(true);
     try {
@@ -358,7 +365,7 @@ function ClientAdmin({
               <div>
                 <strong>{client.name}</strong>
                 <span>
-                  {[client.contact_role, client.contact_whatsapp || client.contact_phone, client.contact_email]
+                  {[client.contact_role, formatPhone(client.contact_whatsapp || client.contact_phone), client.contact_email]
                     .filter(Boolean)
                     .join(" · ") || formatDocument(client.document) || "Sem contato informado"}
                 </span>
@@ -430,8 +437,8 @@ function ClientAdmin({
           <label><span>Funcao <b className="required-mark">*</b></span><input required aria-required="true" value={contactRole} onChange={(e) => setContactRole(e.target.value)} /></label>
           <label><span>CPF/CNPJ <b className="required-mark">*</b></span><input required aria-required="true" value={document} onChange={(e) => setDocument(e.target.value)} /></label>
           <label>Email<input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} /></label>
-          <label><span>Telefone <b className="required-mark">**</b></span><input type="tel" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} /></label>
-          <label><span>WhatsApp <b className="required-mark">**</b></span><input type="tel" value={contactWhatsapp} onChange={(e) => setContactWhatsapp(e.target.value)} /></label>
+          <label><span>Telefone <b className="required-mark">**</b></span><input type="tel" inputMode="numeric" placeholder="(85) 3333-3333" value={contactPhone} onChange={(e) => setContactPhone(formatPhone(e.target.value))} /></label>
+          <label><span>WhatsApp <b className="required-mark">**</b></span><input type="tel" inputMode="numeric" placeholder="(85) 99999-9999" value={contactWhatsapp} onChange={(e) => setContactWhatsapp(formatPhone(e.target.value))} /></label>
           <label>Contato alternativo<input value={contactName} onChange={(e) => setContactName(e.target.value)} /></label>
         </div>
         <p className="required-hint">
