@@ -1,10 +1,12 @@
-from uuid import UUID
+import asyncio
+from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.models.audit import AuditEvent
 from app.models.base import Base
 from app.models.identity import Role
@@ -18,6 +20,10 @@ from app.models.operations import (
     Station,
 )
 from app.modules.auth.dependencies import AuthContext
+from app.services.storage import get_storage
+
+FACADE_PHOTO_TYPES = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
+FACADE_PHOTO_MAX_BYTES = 10 * 1024 * 1024
 
 
 async def tenant_get_or_404[ModelT: Base](
@@ -233,6 +239,113 @@ async def update_development(
         action="DEVELOPMENT_UPDATE",
         entity_type="development",
     )
+
+
+def _facade_photo_prefix(development: Development) -> str:
+    return f"{development.tenant_id}/developments/{development.id}/facade-"
+
+
+def _validate_facade_photo(content_type: str | None, size_bytes: int) -> None:
+    if content_type not in FACADE_PHOTO_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="unsupported_facade_photo_type",
+        )
+    if size_bytes > FACADE_PHOTO_MAX_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="facade_photo_too_large",
+        )
+
+
+def presign_facade_photo(development: Development, payload) -> dict:
+    """Devolve a URL para o navegador enviar a foto direto ao object storage."""
+    _validate_facade_photo(payload.content_type, payload.size_bytes)
+    object_key = (
+        _facade_photo_prefix(development) + uuid4().hex + FACADE_PHOTO_TYPES[payload.content_type]
+    )
+    upload_url = get_storage().presign_put(
+        object_key=object_key, content_type=payload.content_type
+    )
+    return {
+        "upload_url": upload_url,
+        "object_key": object_key,
+        "expires_in": settings.s3_presign_seconds,
+        "required_headers": {"Content-Type": payload.content_type},
+    }
+
+
+async def complete_facade_photo(
+    session: AsyncSession,
+    context: AuthContext,
+    development: Development,
+    object_key: str,
+) -> Development:
+    # A chave precisa ser do proprio empreendimento: impede apontar para arquivo de outro tenant.
+    if not object_key.startswith(_facade_photo_prefix(development)):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="invalid_facade_photo_key",
+        )
+    storage = get_storage()
+    metadata = await asyncio.to_thread(storage.object_metadata, object_key=object_key)
+    if metadata is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="facade_photo_not_uploaded"
+        )
+    try:
+        _validate_facade_photo(
+            metadata.get("ContentType"), int(metadata.get("ContentLength", 0))
+        )
+    except HTTPException:
+        await asyncio.to_thread(storage.delete_object, object_key=object_key)
+        raise
+
+    previous_key = development.facade_photo_key
+    development.facade_photo_key = object_key
+    development.facade_photo_content_type = metadata.get("ContentType")
+    add_audit(
+        session,
+        context,
+        action="DEVELOPMENT_FACADE_PHOTO_SET",
+        entity_type="development",
+        entity_id=development.id,
+    )
+    await session.commit()
+    await session.refresh(development)
+    if previous_key and previous_key != object_key:
+        await asyncio.to_thread(storage.delete_object, object_key=previous_key)
+    return development
+
+
+def facade_photo_url(development: Development) -> dict:
+    if development.facade_photo_key is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not_found")
+    return {
+        "url": get_storage().presign_get(object_key=development.facade_photo_key),
+        "expires_in": settings.s3_presign_seconds,
+    }
+
+
+async def remove_facade_photo(
+    session: AsyncSession, context: AuthContext, development: Development
+) -> Development:
+    previous_key = development.facade_photo_key
+    if previous_key is None:
+        return development
+    development.facade_photo_key = None
+    development.facade_photo_content_type = None
+    add_audit(
+        session,
+        context,
+        action="DEVELOPMENT_FACADE_PHOTO_REMOVE",
+        entity_type="development",
+        entity_id=development.id,
+    )
+    await session.commit()
+    await session.refresh(development)
+    await asyncio.to_thread(get_storage().delete_object, object_key=previous_key)
+    return development
 
 
 async def _ensure_client_contact_is_unique(

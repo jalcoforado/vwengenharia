@@ -33,6 +33,16 @@ class StorageService:
             ExpiresIn=settings.s3_presign_seconds,
         )
 
+    def presign_get(self, *, object_key: str) -> str:
+        return self.public.generate_presigned_url(
+            ClientMethod="get_object",
+            Params={"Bucket": settings.s3_bucket, "Key": object_key},
+            ExpiresIn=settings.s3_presign_seconds,
+        )
+
+    def delete_object(self, *, object_key: str) -> None:
+        self.internal.delete_object(Bucket=settings.s3_bucket, Key=object_key)
+
     def object_metadata(self, *, object_key: str) -> dict | None:
         try:
             return self.internal.head_object(

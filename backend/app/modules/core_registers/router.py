@@ -29,11 +29,16 @@ from app.modules.core_registers.schemas import (
     DevelopmentCreate,
     DevelopmentRead,
     DevelopmentUpdate,
+    FacadePhotoComplete,
+    FacadePhotoPresign,
+    FacadePhotoUpload,
+    FacadePhotoUrl,
     StationCreate,
     StationRead,
     StationUpdate,
 )
 from app.modules.core_registers.service import (
+    complete_facade_photo,
     create_asset,
     create_asset_type,
     create_client,
@@ -41,8 +46,11 @@ from app.modules.core_registers.service import (
     create_development,
     create_station,
     ensure_client_document_is_unique,
+    facade_photo_url,
     list_client_contacts,
     list_tenant_objects,
+    presign_facade_photo,
+    remove_facade_photo,
     tenant_get_or_404,
     update_client_contact,
     update_development,
@@ -204,6 +212,56 @@ async def patch_development(
     )
     await validate_update_parents(session, context, payload)
     return await update_development(session, context, development, payload)
+
+
+@router.post(
+    "/developments/{development_id}/facade-photo/presign", response_model=FacadePhotoUpload
+)
+async def presign_development_facade_photo(
+    development_id: UUID,
+    payload: FacadePhotoPresign,
+    context: WriteContextDep,
+    session: SessionDep,
+) -> dict:
+    development = await tenant_get_or_404(
+        session, Development, context.tenant.id, development_id
+    )
+    return presign_facade_photo(development, payload)
+
+
+@router.post(
+    "/developments/{development_id}/facade-photo/complete", response_model=DevelopmentRead
+)
+async def complete_development_facade_photo(
+    development_id: UUID,
+    payload: FacadePhotoComplete,
+    context: WriteContextDep,
+    session: SessionDep,
+) -> Development:
+    development = await tenant_get_or_404(
+        session, Development, context.tenant.id, development_id
+    )
+    return await complete_facade_photo(session, context, development, payload.object_key)
+
+
+@router.get("/developments/{development_id}/facade-photo", response_model=FacadePhotoUrl)
+async def get_development_facade_photo(
+    development_id: UUID, context: ReadContextDep, session: SessionDep
+) -> dict:
+    development = await tenant_get_or_404(
+        session, Development, context.tenant.id, development_id
+    )
+    return facade_photo_url(development)
+
+
+@router.delete("/developments/{development_id}/facade-photo", response_model=DevelopmentRead)
+async def delete_development_facade_photo(
+    development_id: UUID, context: WriteContextDep, session: SessionDep
+) -> Development:
+    development = await tenant_get_or_404(
+        session, Development, context.tenant.id, development_id
+    )
+    return await remove_facade_photo(session, context, development)
 
 
 @router.get("/stations", response_model=list[StationRead])

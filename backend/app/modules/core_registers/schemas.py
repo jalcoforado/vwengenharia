@@ -81,6 +81,14 @@ class DevelopmentCreate(BaseModel):
     city: str | None = Field(default=None, max_length=120)
     state: str | None = Field(default=None, min_length=2, max_length=2)
     postal_code: str | None = Field(default=None, max_length=12)
+    development_type: str | None = Field(default=None, max_length=60)
+    address_number: str | None = Field(default=None, max_length=20)
+    address_complement: str | None = Field(default=None, max_length=120)
+    address_district: str | None = Field(default=None, max_length=120)
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    units_count: int | None = Field(default=None, ge=0, le=1_000_000)
+    access_hours: str | None = Field(default=None, max_length=255)
 
 
 class DevelopmentUpdate(BaseModel):
@@ -93,6 +101,14 @@ class DevelopmentUpdate(BaseModel):
     city: str | None = Field(default=None, max_length=120)
     state: str | None = Field(default=None, min_length=2, max_length=2)
     postal_code: str | None = Field(default=None, max_length=12)
+    development_type: str | None = Field(default=None, max_length=60)
+    address_number: str | None = Field(default=None, max_length=20)
+    address_complement: str | None = Field(default=None, max_length=120)
+    address_district: str | None = Field(default=None, max_length=120)
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    units_count: int | None = Field(default=None, ge=0, le=1_000_000)
+    access_hours: str | None = Field(default=None, max_length=255)
     is_active: bool | None = None
 
 
@@ -107,9 +123,40 @@ class DevelopmentRead(ORMModel):
     city: str | None
     state: str | None
     postal_code: str | None
+    development_type: str | None
+    address_number: str | None
+    address_complement: str | None
+    address_district: str | None
+    latitude: float | None
+    longitude: float | None
+    units_count: int | None
+    access_hours: str | None
+    has_facade_photo: bool
     is_active: bool
     created_at: datetime
     updated_at: datetime
+
+
+class FacadePhotoPresign(BaseModel):
+    filename: str = Field(min_length=1, max_length=255)
+    content_type: str = Field(min_length=3, max_length=100)
+    size_bytes: int = Field(gt=0)
+
+
+class FacadePhotoUpload(BaseModel):
+    upload_url: str
+    object_key: str
+    expires_in: int
+    required_headers: dict[str, str]
+
+
+class FacadePhotoComplete(BaseModel):
+    object_key: str = Field(min_length=1, max_length=512)
+
+
+class FacadePhotoUrl(BaseModel):
+    url: str
+    expires_in: int
 
 
 class StationCreate(BaseModel):

@@ -84,7 +84,22 @@ class Development(TimestampMixin, Base):
     city: Mapped[str | None] = mapped_column(String(120), nullable=True)
     state: Mapped[str | None] = mapped_column(String(2), nullable=True)
     postal_code: Mapped[str | None] = mapped_column(String(12), nullable=True)
+    development_type: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    # address_line guarda o logradouro; numero, complemento e bairro ficam separados.
+    address_number: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    address_complement: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    address_district: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    latitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6), nullable=True)
+    longitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6), nullable=True)
+    units_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    access_hours: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    facade_photo_key: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    facade_photo_content_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    @property
+    def has_facade_photo(self) -> bool:
+        return self.facade_photo_key is not None
 
 
 class Station(TimestampMixin, Base):
