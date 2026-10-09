@@ -105,7 +105,7 @@ export default function ClientPortal({ userName }: { userName: string }) {
         <section className="section-card empty-state">
           <Building2 size={26} />
           <strong>Acesso ainda nao configurado</strong>
-          <span>Solicite a VW Engenharia para vincular seu usuario ao contrato correto.</span>
+          <span>Solicite a MW Engenharia para vincular seu usuario ao contrato correto.</span>
         </section>
       )}
 

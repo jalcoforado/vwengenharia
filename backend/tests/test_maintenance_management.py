@@ -20,7 +20,7 @@ async def test_preventive_maintenance_plan_and_execution_cycle() -> None:
 
     session_factory = get_session_factory()
     async with session_factory() as session:
-        tenant = Tenant(name=f"VW Maint {suffix}", slug=f"vw-maint-{suffix}")
+        tenant = Tenant(name=f"MW Maint {suffix}", slug=f"vw-maint-{suffix}")
         admin = User(
             email=admin_email,
             name="Gestor Manutencao",

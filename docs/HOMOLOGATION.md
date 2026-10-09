@@ -1,4 +1,4 @@
-# Homologacao Local - VW Engenharia ERP
+# Homologacao Local - MW Engenharia ERP
 
 ## Objetivo
 
@@ -101,7 +101,7 @@ A senha vem de `HOMOLOGATION_PASSWORD`.
 
 O conjunto demonstrativo inclui:
 
-- tenant VW Engenharia - Homologacao;
+- tenant MW Engenharia - Homologacao;
 - gestor;
 - tecnico de campo;
 - usuario de manutencao;

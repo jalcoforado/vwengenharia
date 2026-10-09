@@ -21,7 +21,7 @@ async def test_recurring_visit_plan_generates_idempotent_agenda() -> None:
 
     session_factory = get_session_factory()
     async with session_factory() as session:
-        tenant = Tenant(name=f"VW Plan {suffix}", slug=f"vw-plan-{suffix}")
+        tenant = Tenant(name=f"MW Plan {suffix}", slug=f"vw-plan-{suffix}")
         admin = User(
             email=admin_email,
             name="Gestor Planejamento",

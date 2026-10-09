@@ -94,7 +94,7 @@ async def main() -> None:
     tenant_slug = os.getenv("HOMOLOGATION_TENANT_SLUG", "vw-homologacao").strip()
     tenant_name = os.getenv(
         "HOMOLOGATION_TENANT_NAME",
-        "VW Engenharia - Homologacao",
+        "MW Engenharia - Homologacao",
     ).strip()
 
     admin_email = os.getenv(

@@ -1,4 +1,4 @@
-# Deploy e Homologacao - VW Engenharia ERP
+# Deploy e Homologacao - MW Engenharia ERP
 
 ## Objetivo
 
@@ -60,7 +60,7 @@ Exemplo:
 
 ```bash
 docker compose --env-file .env.production -f docker-compose.app.yml run --rm \
-  -e BOOTSTRAP_TENANT_NAME="VW Engenharia" \
+  -e BOOTSTRAP_TENANT_NAME="MW Engenharia" \
   -e BOOTSTRAP_TENANT_SLUG="vw-engenharia" \
   -e BOOTSTRAP_ADMIN_EMAIL="admin@example.com" \
   -e BOOTSTRAP_ADMIN_NAME="Administrador" \
@@ -176,7 +176,7 @@ Monitorar no minimo:
 - crescimento da fila offline/sincronizacao quando houver telemetria;
 - vencimento de backup.
 
-## Recomendacao para homologacao VW
+## Recomendacao para homologacao MW
 
 Antes de producao:
 

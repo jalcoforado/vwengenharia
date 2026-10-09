@@ -1,8 +1,8 @@
-# Integração ERP VW Engenharia -> iAnalisys
+# Integração ERP MW Engenharia -> iAnalisys
 
 ## Objetivo
 
-O ERP VW Engenharia é a fonte transacional. O iAnalisys consome dados operacionais por uma API somente leitura.
+O ERP MW Engenharia é a fonte transacional. O iAnalisys consome dados operacionais por uma API somente leitura.
 
 O iAnalisys não acessa diretamente o PostgreSQL do ERP e não reutiliza login de usuário.
 

@@ -3,7 +3,7 @@ export default function AppLoading() {
     <div className="app-shell loading-shell" aria-busy="true" aria-label="Carregando aplicacao">
       <header className="topbar">
         <div>
-          <span className="brand-kicker">VW Engenharia</span>
+          <span className="brand-kicker">MW Engenharia</span>
           <strong>Preparando operacao</strong>
         </div>
       </header>

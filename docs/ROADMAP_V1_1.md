@@ -2,9 +2,9 @@
 
 ## Objetivo
 
-Levar o ERP da VW Engenharia da V1 funcional para uma versao de homologacao e operacao real mais robusta, mantendo a fronteira arquitetural definida:
+Levar o ERP da MW Engenharia da V1 funcional para uma versao de homologacao e operacao real mais robusta, mantendo a fronteira arquitetural definida:
 
-- VW Engenharia ERP = operacao transacional;
+- MW Engenharia ERP = operacao transacional;
 - iAnalisys = BI, analise e IA;
 - nenhuma dependencia de LLM dentro do ERP.
 

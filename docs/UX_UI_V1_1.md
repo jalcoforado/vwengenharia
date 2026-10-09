@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Elevar o ERP da VW Engenharia de uma interface funcional para uma experiencia de produto SaaS premium, mantendo velocidade, legibilidade e operacao mobile-first.
+Elevar o ERP da MW Engenharia de uma interface funcional para uma experiencia de produto SaaS premium, mantendo velocidade, legibilidade e operacao mobile-first.
 
 A prioridade nao e decoracao. A UX deve reduzir tempo de decisao, erros de operacao e carga cognitiva.
 

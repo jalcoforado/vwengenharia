@@ -8,8 +8,8 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       manifest: {
-        name: "VW Engenharia",
-        short_name: "VW Engenharia",
+        name: "MW Engenharia",
+        short_name: "MW Engenharia",
         description: "Gestao operacional de campo",
         display: "standalone",
         start_url: "/",

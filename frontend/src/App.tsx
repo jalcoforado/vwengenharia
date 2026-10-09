@@ -565,7 +565,7 @@ export default function App() {
     <div className="app-shell">
       <header className="topbar">
         <div>
-          <span className="brand-kicker">VW Engenharia</span>
+          <span className="brand-kicker">MW Engenharia</span>
           <strong>
             {me?.role === "CLIENTE"
               ? "Portal do cliente"
@@ -675,8 +675,8 @@ function Login({ onSuccess }: { onSuccess: () => void }) {
   return (
     <main className="login-page">
       <section className="login-card">
-        <div className="brand-mark">VW</div>
-        <span className="brand-kicker">VW Engenharia</span>
+        <div className="brand-mark">MW</div>
+        <span className="brand-kicker">MW Engenharia</span>
         <h1>Operacao em campo</h1>
         <p>Visitas, checklist, medicoes e ocorrencias em um unico lugar.</p>
         <form onSubmit={submit}>

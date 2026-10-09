@@ -1,8 +1,8 @@
-# SPEC V1 - VW Engenharia
+# SPEC V1 - MW Engenharia
 
 ## 1. Objetivo
 
-Criar uma PWA para controlar o ciclo operacional da VW Engenharia:
+Criar uma PWA para controlar o ciclo operacional da MW Engenharia:
 
 `Cliente -> Empreendimento -> Estacao -> Ativo -> Planejamento -> Visita -> Checklist -> Ocorrencia -> OS -> Manutencao -> Evidencia -> Revisao`
 
@@ -325,7 +325,7 @@ Fluxo:
 3. normalizar nomes de estacao/tecnico;
 4. mapear estados textuais;
 5. sinalizar ambiguidades;
-6. reconciliar amostra com a VW;
+6. reconciliar amostra com a MW;
 7. carregar tabelas canonicas;
 8. emitir relatorio de reconciliacao.
 
@@ -432,7 +432,7 @@ Nunca transformar automaticamente valores ambiguos sem regra aprovada.
 
 ## 16. Fronteira definitiva com o iAnalisys
 
-O VW Engenharia e o ERP operacional e fonte transacional.
+O MW Engenharia e o ERP operacional e fonte transacional.
 
 O iAnalisys e a camada de inteligencia.
 
