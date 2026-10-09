@@ -2092,3 +2092,13 @@ button:not(:disabled):active { transform: translateY(1px); }
 .client-list-column { display: grid; gap: 10px; min-width: 0; }
 .required-mark { color: var(--mw-danger-text); font-weight: 800; }
 .required-hint { margin: 0; color: var(--mw-text-secondary); font-size: 12px; }
+.admin-panel-single { grid-template-columns: 1fr; }
+.client-contact-form { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.client-contact-form input {
+  min-height: 40px; border: 1px solid var(--mw-border-strong); border-radius: 10px;
+  background: white; padding: 8px 10px; color: var(--mw-text);
+}
+.portal-login {
+  display: grid; gap: 8px; padding-bottom: 10px; border-bottom: 1px solid var(--mw-border);
+}
+.portal-login .client-contact-form { padding-top: 0; border-top: 0; }

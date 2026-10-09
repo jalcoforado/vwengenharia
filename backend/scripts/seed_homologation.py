@@ -26,6 +26,7 @@ from app.models.maintenance import (
 from app.models.materials import MaterialRequest
 from app.models.operations import Asset, AssetType, Client, Development, Station
 from app.modules.core_registers.service import set_primary_contact
+from app.modules.team.service import ensure_collaborator_for_membership
 
 
 def required(name: str) -> str:
@@ -84,6 +85,7 @@ async def get_or_create_user(
     else:
         membership.role = role
         membership.is_active = True
+    await ensure_collaborator_for_membership(session, membership, user)
     return membership
 
 

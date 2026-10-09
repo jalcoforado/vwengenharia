@@ -161,6 +161,7 @@ Entidades principais:
 - tenants
 - users
 - memberships
+- collaborators
 - clients
 - developments
 - client_development_contacts

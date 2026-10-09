@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.field import Visit
-from app.models.identity import Membership, Role
+from app.models.identity import Membership, Role, User
 from app.models.maintenance import Occurrence, WorkOrder
 from app.models.operations import (
     Client,
@@ -14,6 +14,8 @@ from app.models.operations import (
 )
 from app.modules.auth.dependencies import AuthContext
 from app.modules.core_registers.service import add_audit
+from app.modules.team.schemas import TeamMemberCreate
+from app.modules.team.service import create_team_member
 
 
 def _granted_development_ids(context: AuthContext, client_ids):
@@ -279,8 +281,74 @@ async def list_client_access(
     context: AuthContext,
 ):
     stmt = (
-        select(ClientMembershipAccess)
+        select(ClientMembershipAccess, User)
+        .join(Membership, Membership.id == ClientMembershipAccess.membership_id)
+        .join(User, User.id == Membership.user_id)
         .where(ClientMembershipAccess.tenant_id == context.tenant.id)
         .order_by(ClientMembershipAccess.created_at.desc())
     )
-    return list((await session.execute(stmt)).scalars())
+    return [
+        {
+            "id": access.id,
+            "membership_id": access.membership_id,
+            "client_id": access.client_id,
+            "user_name": user.name,
+            "user_email": user.email,
+        }
+        for access, user in (await session.execute(stmt)).all()
+    ]
+
+
+async def create_portal_credential(
+    session: AsyncSession,
+    context: AuthContext,
+    *,
+    client_id,
+    email: str,
+    password: str,
+) -> dict:
+    """Cria o login de portal de um responsavel ja cadastrado."""
+    client = (
+        await session.execute(
+            select(Client).where(
+                Client.id == client_id,
+                Client.tenant_id == context.tenant.id,
+                Client.is_active.is_(True),
+            )
+        )
+    ).scalar_one_or_none()
+    if client is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="client_not_found")
+    existing = (
+        await session.execute(
+            select(ClientMembershipAccess.id).where(
+                ClientMembershipAccess.tenant_id == context.tenant.id,
+                ClientMembershipAccess.client_id == client.id,
+            )
+        )
+    ).first()
+    if existing is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="client_already_has_portal_credential",
+        )
+
+    membership = await create_team_member(
+        session,
+        context,
+        TeamMemberCreate(email=email, name=client.name, password=password, role=Role.CLIENTE),
+        allow_client_role=True,
+    )
+    access = await grant_client_access(
+        session,
+        context,
+        membership_id=membership.id,
+        client_id=client.id,
+    )
+    return {
+        "id": access.id,
+        "membership_id": access.membership_id,
+        "client_id": access.client_id,
+        "user_name": membership.user.name,
+        "user_email": membership.user.email,
+    }

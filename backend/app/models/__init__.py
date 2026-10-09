@@ -13,7 +13,15 @@ from app.models.field import (
     VisitPlan,
     VisitStatus,
 )
-from app.models.identity import Membership, RefreshToken, Role, Tenant, User
+from app.models.identity import (
+    Collaborator,
+    CollaboratorGroup,
+    Membership,
+    RefreshToken,
+    Role,
+    Tenant,
+    User,
+)
 from app.models.integration import IntegrationCredential
 from app.models.legacy import LegacyStationMapping, LegacyTechnicianMapping, LegacyVisitStage
 from app.models.maintenance import (
@@ -61,6 +69,8 @@ __all__ = [
     "Client",
     "ClientDevelopmentContact",
     "ClientMembershipAccess",
+    "Collaborator",
+    "CollaboratorGroup",
     "ContactScope",
     "Development",
     "IntegrationCredential",

@@ -1727,9 +1727,9 @@ function SupervisorHome({ me }: { me: Me }) {
                 </div>
               ))}
           </div>
-          {["ADMIN", "SUPERADMIN"].includes(me.role) && (
-            <TeamMemberForm onCreated={load} />
-          )}
+          <p className="section-copy">
+            Novos acessos sao criados em Cadastros, na aba Colaboradores.
+          </p>
         </section>
       </div>
 
@@ -1744,6 +1744,7 @@ function SupervisorHome({ me }: { me: Me }) {
         stations={adminStations}
         assetTypes={assetTypes}
         assets={assets}
+        canManageAccess={["ADMIN", "SUPERADMIN"].includes(me.role)}
         onChanged={load}
         onOpenStation={setSelectedStationId}
       />
@@ -2165,86 +2166,6 @@ function VisitPlanForm({
       </div>
       <button className="small-button" disabled={busy} onClick={() => void submit()}>
         {busy ? "Criando..." : "Criar plano"}
-      </button>
-      {feedback && <span className="inline-feedback">{feedback}</span>}
-    </div>
-  );
-}
-
-
-function TeamMemberForm({ onCreated }: { onCreated: () => Promise<void> }) {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [role, setRole] = useState("TECNICO");
-  const [feedback, setFeedback] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  async function submit() {
-    if (!name.trim() || !email.trim() || password.length < 12) {
-      setFeedback("Informe nome, email e senha inicial com pelo menos 12 caracteres.");
-      return;
-    }
-    setBusy(true);
-    try {
-      await api("/api/v1/team", {
-        method: "POST",
-        body: JSON.stringify({
-          name: name.trim(),
-          email: email.trim(),
-          password,
-          role,
-        }),
-      });
-      setFeedback("Membro adicionado.");
-      setName("");
-      setEmail("");
-      setPassword("");
-      await onCreated();
-    } catch {
-      setFeedback("Nao foi possivel adicionar o membro.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="compact-form">
-      <h3>Adicionar membro</h3>
-      <div className="compact-form-grid">
-        <label>
-          Nome
-          <input value={name} onChange={(event) => setName(event.target.value)} />
-        </label>
-        <label>
-          Email
-          <input
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-        </label>
-        <label>
-          Perfil
-          <select value={role} onChange={(event) => setRole(event.target.value)}>
-            <option value="TECNICO">Tecnico</option>
-            <option value="MANUTENCAO">Manutencao</option>
-            <option value="SUPERVISOR">Supervisor</option>
-            <option value="GESTOR">Gestor</option>
-            <option value="CLIENTE">Cliente</option>
-          </select>
-        </label>
-        <label>
-          Senha inicial
-          <input
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-        </label>
-      </div>
-      <button className="small-button" disabled={busy} onClick={() => void submit()}>
-        {busy ? "Adicionando..." : "Adicionar membro"}
       </button>
       {feedback && <span className="inline-feedback">{feedback}</span>}
     </div>

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Search } from "lucide-react";
 
 import { api } from "../lib/api";
+import CollaboratorAdmin from "./CollaboratorAdmin";
 import { formatDocument, isValidCpfCnpj, normalizeDocument } from "../lib/document";
 import { formatPhone, isCompletePhone } from "../lib/phone";
 
@@ -86,6 +87,7 @@ type Props = {
   stations: AdminStation[];
   assetTypes: AssetTypeRecord[];
   assets: AssetRecord[];
+  canManageAccess: boolean;
   onChanged: () => Promise<void>;
   onOpenStation?: (stationId: string) => void;
 };
@@ -96,10 +98,11 @@ export default function OperationalAdmin({
   stations,
   assetTypes,
   assets,
+  canManageAccess,
   onChanged,
   onOpenStation,
 }: Props) {
-  const [tab, setTab] = useState<"CLIENTES" | "EMPREENDIMENTOS" | "ESTACOES" | "ATIVOS">("CLIENTES");
+  const [tab, setTab] = useState<"COLABORADORES" | "CLIENTES" | "EMPREENDIMENTOS" | "ESTACOES" | "ATIVOS">("CLIENTES");
 
   return (
     <section className="section-card admin-hub">
@@ -108,7 +111,7 @@ export default function OperationalAdmin({
           <span className="eyebrow">Administracao operacional</span>
           <h2>Estrutura da operacao</h2>
           <p className="section-copy">
-            Cadastre o responsavel, depois o empreendimento (o cliente da MW), suas estacoes e ativos.
+            Colaboradores sao a equipe da MW. Cadastre o responsavel, depois o empreendimento (o cliente da MW), suas estacoes e ativos.
           </p>
         </div>
         <div className="admin-summary">
@@ -121,6 +124,7 @@ export default function OperationalAdmin({
 
       <div className="admin-tabs">
         {[
+          ["COLABORADORES", "Colaboradores"],
           ["CLIENTES", "Responsaveis"],
           ["EMPREENDIMENTOS", "Empreendimentos"],
           ["ESTACOES", "Estacoes"],
@@ -136,8 +140,16 @@ export default function OperationalAdmin({
         ))}
       </div>
 
+      {tab === "COLABORADORES" && (
+        <CollaboratorAdmin canManage={canManageAccess} onChanged={onChanged} />
+      )}
       {tab === "CLIENTES" && (
-        <ClientAdmin clients={clients} developments={developments} onChanged={onChanged} />
+        <ClientAdmin
+          clients={clients}
+          developments={developments}
+          canManageAccess={canManageAccess}
+          onChanged={onChanged}
+        />
       )}
       {tab === "EMPREENDIMENTOS" && (
         <DevelopmentAdmin clients={clients} developments={developments} onChanged={onChanged} />
@@ -160,10 +172,12 @@ export default function OperationalAdmin({
 function ClientAdmin({
   clients,
   developments,
+  canManageAccess,
   onChanged,
 }: {
   clients: ClientRecord[];
   developments: DevelopmentRecord[];
+  canManageAccess: boolean;
   onChanged: () => Promise<void>;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -180,6 +194,9 @@ function ClientAdmin({
   const [linkScope, setLinkScope] = useState<ContactScope>("TECNICO");
   const [feedback, setFeedback] = useState<string | null>(null);
   const [linkFeedback, setLinkFeedback] = useState<string | null>(null);
+  const [portalLogin, setPortalLogin] = useState<string | null>(null);
+  const [portalEmail, setPortalEmail] = useState("");
+  const [portalPassword, setPortalPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [search, setSearch] = useState("");
   const developmentMap = new Map(developments.map((item) => [item.id, item]));
@@ -300,13 +317,61 @@ function ClientAdmin({
     }
   }
 
+  async function loadPortalLogin(clientId: string) {
+    if (!canManageAccess) return;
+    try {
+      const accesses = await api<{ client_id: string; user_email: string | null }[]>(
+        "/api/v1/client-access",
+      );
+      setPortalLogin(accesses.find((item) => item.client_id === clientId)?.user_email ?? null);
+    } catch {
+      setPortalLogin(null);
+    }
+  }
+
+  async function createPortalLogin(client: ClientRecord) {
+    if (!portalEmail.trim() || portalPassword.length < 12) {
+      return setLinkFeedback("Informe o email e uma senha inicial com pelo menos 12 caracteres.");
+    }
+    setBusy(true);
+    try {
+      const created = await api<{ user_email: string | null }>(
+        "/api/v1/clients/" + client.id + "/portal-credential",
+        {
+          method: "POST",
+          body: JSON.stringify({ email: portalEmail.trim(), password: portalPassword }),
+        },
+      );
+      setPortalLogin(created.user_email);
+      setPortalPassword("");
+      setLinkFeedback(
+        "Login de portal criado. Ele so ve os empreendimentos com o portal liberado abaixo.",
+      );
+    } catch (error) {
+      const detail =
+        typeof error === "object" && error !== null && "detail" in error ? error.detail : null;
+      setLinkFeedback(
+        detail === "email_already_registered"
+          ? "Esse email ja e usado por outro acesso."
+          : detail === "client_already_has_portal_credential"
+            ? "Esse responsavel ja tem login de portal."
+            : "Nao foi possivel criar o login de portal. Confira o email.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function toggleExpanded(client: ClientRecord) {
     setLinkFeedback(null);
     setLinkDevelopmentId("");
     if (expandedId === client.id) return setExpandedId(null);
     setContacts([]);
+    setPortalLogin(null);
+    setPortalEmail(client.contact_email ?? "");
+    setPortalPassword("");
     setExpandedId(client.id);
-    await loadContacts(client.id);
+    await Promise.all([loadContacts(client.id), loadPortalLogin(client.id)]);
   }
 
   async function addLink(client: ClientRecord) {
@@ -416,6 +481,26 @@ function ClientAdmin({
             </div>
             {expandedId === client.id && (
               <div className="client-contacts">
+                {canManageAccess && (
+                  <div className="portal-login">
+                    <span className="eyebrow">Login no portal do cliente</span>
+                    {portalLogin ? (
+                      <span className="required-hint">
+                        Login: {portalLogin}. Ele ve apenas os empreendimentos com o portal liberado.
+                      </span>
+                    ) : (
+                      <div className="client-contact-form">
+                        <label>Email de login
+                          <input type="email" value={portalEmail} onChange={(e) => setPortalEmail(e.target.value)} />
+                        </label>
+                        <label>Senha inicial
+                          <input type="password" autoComplete="new-password" value={portalPassword} onChange={(e) => setPortalPassword(e.target.value)} />
+                        </label>
+                        <button className="small-button" disabled={busy} onClick={() => void createPortalLogin(client)}>Criar login</button>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <span className="eyebrow">Empreendimentos pelos quais responde</span>
                 {contacts.map((contact) => (
                   <div className="client-contact-row" key={contact.id}>

@@ -6,6 +6,21 @@ A autorizacao e aplicada no backend. A interface pode esconder acoes nao permiti
 
 Todo acesso operacional e limitado pelo tenant da membership autenticada.
 
+## Cadastros de pessoas e credenciais
+
+A MW trabalha com tres cadastros:
+
+- **Colaboradores**: quem trabalha na MW (diretoria, backoffice, tecnicos). A credencial de acesso e opcional.
+- **Responsaveis**: pessoas fisicas ou juridicas que respondem por um ou mais empreendimentos (tabela `clients`).
+- **Empreendimentos**: os clientes da MW, sempre com um responsavel principal.
+
+Regras de credencial:
+
+- toda credencial interna pertence a um colaborador; o caminho normal e criar o acesso a partir do colaborador (`POST /collaborators/{id}/credential`). `POST /team` continua aceito e registra o colaborador da credencial;
+- inativar o colaborador bloqueia a credencial e encerra as sessoes; reativar o colaborador nao devolve o acesso sozinho;
+- o grupo do colaborador (diretoria, backoffice, tecnico) descreve quem ele e na MW e nao concede permissao; a permissao vem do perfil abaixo;
+- login de portal (perfil CLIENTE) so nasce de um responsavel cadastrado (`POST /clients/{id}/portal-credential`); `POST /team` recusa o perfil CLIENTE.
+
 ## Perfis
 
 ### SUPERADMIN
