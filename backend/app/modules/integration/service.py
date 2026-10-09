@@ -46,7 +46,7 @@ async def create_integration_key(
             detail="integration_key_name_exists",
         )
 
-    secret = "vwk_" + secrets.token_urlsafe(32)
+    secret = "mwk_" + secrets.token_urlsafe(32)
     credential = IntegrationCredential(
         tenant_id=context.tenant.id,
         name=name,

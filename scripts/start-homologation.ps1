@@ -97,7 +97,7 @@ $MaintEmail = if ($envMap.ContainsKey("HOMOLOGATION_MAINTENANCE_EMAIL")) {
 $Password = if ($envMap.ContainsKey("HOMOLOGATION_PASSWORD")) {
   $envMap["HOMOLOGATION_PASSWORD"]
 } else {
-  "Homologacao-VW-2026!"
+  "Homologacao-MW-2026!"
 }
 
 $loginBody = @{

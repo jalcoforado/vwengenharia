@@ -19,7 +19,7 @@ O segredo completo é retornado somente na criação. O ERP armazena apenas SHA-
 Nas chamadas de integração:
 
 ```text
-X-Integration-Key: vwk_<segredo>
+X-Integration-Key: mwk_<segredo>
 ```
 
 O tenant é derivado da credencial. Não existe parâmetro tenant_id na API externa.

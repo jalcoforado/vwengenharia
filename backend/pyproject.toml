@@ -1,5 +1,5 @@
 [project]
-name = "vwengenharia-backend"
+name = "mwengenharia-backend"
 version = "1.0.0"
 description = "Backend da plataforma operacional MW Engenharia"
 requires-python = ">=3.12"

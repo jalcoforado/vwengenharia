@@ -61,7 +61,7 @@ Exemplo:
 ```bash
 docker compose --env-file .env.production -f docker-compose.app.yml run --rm \
   -e BOOTSTRAP_TENANT_NAME="MW Engenharia" \
-  -e BOOTSTRAP_TENANT_SLUG="vw-engenharia" \
+  -e BOOTSTRAP_TENANT_SLUG="mw-engenharia" \
   -e BOOTSTRAP_ADMIN_EMAIL="admin@example.com" \
   -e BOOTSTRAP_ADMIN_NAME="Administrador" \
   -e BOOTSTRAP_ADMIN_PASSWORD="<senha-forte>" \
@@ -92,7 +92,7 @@ O compose de aplicacao nao publica PostgreSQL nem Redis diretamente na interface
 Exemplo:
 
 ```text
-https://arquivos.vw.exemplo.com
+https://arquivos.mw.exemplo.com
 ```
 
 `S3_ENDPOINT` e o endpoint usado pelo backend para consultar metadados dos objetos.
@@ -126,7 +126,7 @@ Exemplo manual:
 
 ```bash
 docker compose --env-file .env.production -f docker-compose.app.yml exec -T postgres \
-  pg_dump -U vw -d vwengenharia > vwengenharia.sql
+  pg_dump -U mw -d mwengenharia > mwengenharia.sql
 ```
 
 ### Object storage

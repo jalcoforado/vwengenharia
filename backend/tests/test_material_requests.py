@@ -21,7 +21,7 @@ async def test_material_request_from_field_to_fulfillment() -> None:
 
     session_factory = get_session_factory()
     async with session_factory() as session:
-        tenant = Tenant(name=f"MW Materials {suffix}", slug=f"vw-mat-{suffix}")
+        tenant = Tenant(name=f"MW Materials {suffix}", slug=f"mw-mat-{suffix}")
         admin = User(
             email=admin_email,
             name="Gestor Materiais",
@@ -159,7 +159,7 @@ async def test_field_material_request_requires_assigned_visit() -> None:
 
     session_factory = get_session_factory()
     async with session_factory() as session:
-        tenant = Tenant(name=f"MW Materials Field {suffix}", slug=f"vw-mf-{suffix}")
+        tenant = Tenant(name=f"MW Materials Field {suffix}", slug=f"mw-mf-{suffix}")
         user = User(
             email=email,
             name="Tecnico",

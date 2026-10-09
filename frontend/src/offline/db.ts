@@ -36,13 +36,17 @@ export type SyncQueueSummary = {
   total: number;
 };
 
-class VWOfflineDB extends Dexie {
+// Nome anterior do banco offline. Dados pendentes (outbox/uploads) nos
+// aparelhos de campo sao copiados para o banco novo na primeira abertura.
+const LEGACY_DB_NAME = "vwengenharia";
+
+class MWOfflineDB extends Dexie {
   outbox!: Table<OutboxItem, string>;
   pendingUploads!: Table<PendingUpload, string>;
   cache!: Table<CacheRecord, string>;
 
   constructor() {
-    super("vwengenharia");
+    super("mwengenharia");
     this.version(1).stores({
       outbox: "id, createdAt",
       cache: "key, savedAt",
@@ -55,7 +59,30 @@ class VWOfflineDB extends Dexie {
   }
 }
 
-export const db = new VWOfflineDB();
+export const db = new MWOfflineDB();
+
+db.on("ready", async () => {
+  if (!(await Dexie.exists(LEGACY_DB_NAME))) {
+    return;
+  }
+  const legacy = new Dexie(LEGACY_DB_NAME);
+  await legacy.open();
+  const names = new Set(legacy.tables.map((table) => table.name));
+  const [outbox, uploads, cache] = await Promise.all([
+    names.has("outbox") ? legacy.table<OutboxItem, string>("outbox").toArray() : [],
+    names.has("pendingUploads")
+      ? legacy.table<PendingUpload, string>("pendingUploads").toArray()
+      : [],
+    names.has("cache") ? legacy.table<CacheRecord, string>("cache").toArray() : [],
+  ]);
+  await db.transaction("rw", db.outbox, db.pendingUploads, db.cache, async () => {
+    await db.outbox.bulkPut(outbox);
+    await db.pendingUploads.bulkPut(uploads);
+    await db.cache.bulkPut(cache);
+  });
+  legacy.close();
+  await Dexie.delete(LEGACY_DB_NAME);
+});
 
 export async function cacheValue(key: string, value: unknown) {
   await db.cache.put({ key, value, savedAt: new Date().toISOString() });

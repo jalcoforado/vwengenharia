@@ -11,19 +11,19 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_DB: vwengenharia
-          POSTGRES_USER: vw
-          POSTGRES_PASSWORD: vw
+          POSTGRES_DB: mwengenharia
+          POSTGRES_USER: mw
+          POSTGRES_PASSWORD: mw
         ports:
           - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U vw -d vwengenharia"
+          --health-cmd="pg_isready -U mw -d mwengenharia"
           --health-interval=5s
           --health-timeout=5s
           --health-retries=10
     env:
       APP_ENV: test
-      DATABASE_URL: postgresql+asyncpg://vw:vw@localhost:5432/vwengenharia
+      DATABASE_URL: postgresql+asyncpg://mw:mw@localhost:5432/mwengenharia
       JWT_SECRET: test-secret-must-have-at-least-32-bytes-long
     defaults:
       run:
@@ -60,9 +60,9 @@ jobs:
       - name: Validate application compose
         run: docker compose --env-file .env.production.example -f docker-compose.app.yml config > /dev/null
       - name: Build backend image
-        run: docker build -t vwengenharia-backend:ci ./backend
+        run: docker build -t mwengenharia-backend:ci ./backend
       - name: Build frontend image
-        run: docker build -t vwengenharia-frontend:ci ./frontend
+        run: docker build -t mwengenharia-frontend:ci ./frontend
       - name: Validate Windows launcher syntax
         shell: pwsh
         run: |
@@ -97,7 +97,7 @@ jobs:
       - name: Smoke test homologation stack
         env:
           BASE_URL: http://127.0.0.1:18080
-          HOMOLOGATION_PASSWORD: Homologacao-VW-2026!
+          HOMOLOGATION_PASSWORD: Homologacao-MW-2026!
           HOMOLOGATION_ADMIN_EMAIL: gestor.homologacao@example.com
           HOMOLOGATION_TECH_EMAIL: tecnico.homologacao@example.com
         run: sh scripts/smoke_homologation.sh

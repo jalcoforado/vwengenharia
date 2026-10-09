@@ -20,7 +20,7 @@ async def test_field_flow_is_offline_safe_and_scoped_to_assigned_technician() ->
 
     session_factory = get_session_factory()
     async with session_factory() as session:
-        tenant = Tenant(name=f"MW Field {suffix}", slug=f"vw-field-{suffix}")
+        tenant = Tenant(name=f"MW Field {suffix}", slug=f"mw-field-{suffix}")
         admin = User(
             email=admin_email,
             name="Supervisor Campo",

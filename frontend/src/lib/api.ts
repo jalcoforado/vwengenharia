@@ -5,7 +5,7 @@ export type ApiError = {
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
-let accessToken: string | null = sessionStorage.getItem("vw_access_token");
+let accessToken: string | null = sessionStorage.getItem("mw_access_token");
 
 export function hasSession() {
   return Boolean(accessToken);
@@ -19,13 +19,13 @@ export async function clearSession() {
     });
   } finally {
     accessToken = null;
-    sessionStorage.removeItem("vw_access_token");
+    sessionStorage.removeItem("mw_access_token");
   }
 }
 
 function saveAccessToken(access: string) {
   accessToken = access;
-  sessionStorage.setItem("vw_access_token", access);
+  sessionStorage.setItem("mw_access_token", access);
 }
 
 async function decodeError(response: Response): Promise<ApiError> {
@@ -49,7 +49,7 @@ async function refreshSession(): Promise<boolean> {
   });
   if (!response.ok) {
     accessToken = null;
-    sessionStorage.removeItem("vw_access_token");
+    sessionStorage.removeItem("mw_access_token");
     return false;
   }
   const body = await response.json();
