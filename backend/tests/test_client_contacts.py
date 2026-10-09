@@ -253,3 +253,74 @@ async def test_client_contacts_link_clients_to_developments_by_scope() -> None:
             )
         )
         assert audited == 5
+
+
+@pytest.mark.asyncio
+async def test_client_document_is_unique_per_tenant() -> None:
+    suffix = uuid4().hex[:10]
+    admin_email = f"admin-document-{suffix}@example.com"
+    password = "senha-segura-123"
+    document = f"DOC-{suffix}"
+
+    session_factory = get_session_factory()
+    async with session_factory() as session:
+        tenant_a = Tenant(name=f"Documento A {suffix}", slug=f"documento-a-{suffix}")
+        tenant_b = Tenant(name=f"Documento B {suffix}", slug=f"documento-b-{suffix}")
+        admin = User(
+            email=admin_email,
+            name="Admin Documento",
+            password_hash=hash_password(password),
+        )
+        session.add_all([tenant_a, tenant_b, admin])
+        await session.flush()
+        session.add(
+            Membership(tenant_id=tenant_a.id, user_id=admin.id, role=Role.ADMIN.value)
+        )
+        # O mesmo documento em outro tenant nao gera conflito.
+        session.add(Client(tenant_id=tenant_b.id, name="Outro Tenant", document=document))
+        await session.commit()
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as http:
+        login = await http.post(
+            "/api/v1/auth/login",
+            json={"email": admin_email, "password": password},
+        )
+        assert login.status_code == 200
+        headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+        first = await http.post(
+            "/api/v1/clients",
+            headers=headers,
+            json={"name": f"Primeiro {suffix}", "document": document},
+        )
+        assert first.status_code == 201
+
+        duplicate = await http.post(
+            "/api/v1/clients",
+            headers=headers,
+            json={"name": f"Repetido {suffix}", "document": document},
+        )
+        assert duplicate.status_code == 409
+        assert duplicate.json()["detail"] == "client_document_already_exists"
+
+        second = await http.post(
+            "/api/v1/clients",
+            headers=headers,
+            json={"name": f"Segundo {suffix}"},
+        )
+        assert second.status_code == 201
+
+        taken = await http.patch(
+            f"/api/v1/clients/{second.json()['id']}",
+            headers=headers,
+            json={"document": document},
+        )
+        assert taken.status_code == 409
+
+        same_client = await http.patch(
+            f"/api/v1/clients/{first.json()['id']}",
+            headers=headers,
+            json={"document": document, "contact_role": "Sindico"},
+        )
+        assert same_client.status_code == 200

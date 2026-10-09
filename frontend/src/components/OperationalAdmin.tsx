@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Search } from "lucide-react";
 
 import { api } from "../lib/api";
+import { formatDocument, isValidCpfCnpj, normalizeDocument } from "../lib/document";
 
 export type ClientRecord = {
   id: string;
@@ -207,7 +208,7 @@ function ClientAdmin({
   function startEdit(client: ClientRecord) {
     setEditingId(client.id);
     setName(client.name);
-    setDocument(client.document ?? "");
+    setDocument(formatDocument(client.document));
     setContactName(client.contact_name ?? "");
     setContactRole(client.contact_role ?? "");
     setContactEmail(client.contact_email ?? "");
@@ -236,6 +237,9 @@ function ClientAdmin({
     if (name.trim().length < 2) return setFeedback("Informe o nome do cliente.");
     if (!contactRole.trim()) return setFeedback("Informe a funcao do cliente.");
     if (!document.trim()) return setFeedback("Informe o CPF/CNPJ do cliente.");
+    if (!isValidCpfCnpj(document)) {
+      return setFeedback("CPF/CNPJ invalido. Confira os numeros digitados.");
+    }
     if (!contactPhone.trim() && !contactWhatsapp.trim()) {
       return setFeedback("Informe o telefone ou o WhatsApp do cliente.");
     }
@@ -245,7 +249,7 @@ function ClientAdmin({
         method: editingId ? "PATCH" : "POST",
         body: JSON.stringify({
           name: name.trim(),
-          document: document.trim() || null,
+          document: normalizeDocument(document),
           contact_name: contactName.trim() || null,
           contact_role: contactRole.trim() || null,
           contact_email: contactEmail.trim() || null,
@@ -256,8 +260,16 @@ function ClientAdmin({
       setFeedback(editingId ? "Cliente atualizado." : "Cliente cadastrado.");
       resetForm();
       await onChanged();
-    } catch {
-      setFeedback(editingId ? "Nao foi possivel atualizar o cliente." : "Nao foi possivel cadastrar o cliente.");
+    } catch (error) {
+      const status =
+        typeof error === "object" && error !== null && "status" in error ? error.status : null;
+      if (status === 409) {
+        setFeedback("Ja existe um cliente com esse CPF/CNPJ. Use a busca para localiza-lo.");
+      } else if (status === 422) {
+        setFeedback("Confira os dados informados, em especial o email.");
+      } else {
+        setFeedback(editingId ? "Nao foi possivel atualizar o cliente." : "Nao foi possivel cadastrar o cliente.");
+      }
     } finally {
       setBusy(false);
     }
@@ -348,7 +360,7 @@ function ClientAdmin({
                 <span>
                   {[client.contact_role, client.contact_whatsapp || client.contact_phone, client.contact_email]
                     .filter(Boolean)
-                    .join(" · ") || client.document || "Sem contato informado"}
+                    .join(" · ") || formatDocument(client.document) || "Sem contato informado"}
                 </span>
               </div>
               <div className="admin-actions">

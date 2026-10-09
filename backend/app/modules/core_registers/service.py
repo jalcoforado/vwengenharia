@@ -73,7 +73,27 @@ async def list_tenant_objects[ModelT: Base](
     return list((await session.execute(stmt)).scalars().all())
 
 
+async def ensure_client_document_is_unique(
+    session: AsyncSession,
+    tenant_id: UUID,
+    document: str | None,
+    *,
+    ignore_id: UUID | None = None,
+) -> None:
+    if not document:
+        return
+    stmt = select(Client.id).where(Client.tenant_id == tenant_id, Client.document == document)
+    if ignore_id is not None:
+        stmt = stmt.where(Client.id != ignore_id)
+    if (await session.execute(stmt)).first() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="client_document_already_exists",
+        )
+
+
 async def create_client(session: AsyncSession, context: AuthContext, payload) -> Client:
+    await ensure_client_document_is_unique(session, context.tenant.id, payload.document)
     client = Client(tenant_id=context.tenant.id, **payload.model_dump())
     session.add(client)
     await session.flush()

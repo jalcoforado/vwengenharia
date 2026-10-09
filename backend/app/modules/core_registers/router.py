@@ -40,6 +40,7 @@ from app.modules.core_registers.service import (
     create_client_contact,
     create_development,
     create_station,
+    ensure_client_document_is_unique,
     list_client_contacts,
     list_tenant_objects,
     tenant_get_or_404,
@@ -102,6 +103,9 @@ async def patch_client(
     session: SessionDep,
 ) -> Client:
     client = await tenant_get_or_404(session, Client, context.tenant.id, client_id)
+    await ensure_client_document_is_unique(
+        session, context.tenant.id, payload.document, ignore_id=client.id
+    )
     return await update_object(
         session,
         context,
