@@ -2,7 +2,7 @@ import mwSymbol from "../assets/mw-symbol.png";
 
 export default function AppLoading() {
   return (
-    <div className="app-shell loading-shell" aria-busy="true" aria-label="Carregando aplicacao">
+    <div className="app-shell loading-shell" aria-busy="true" aria-label="Carregando aplicação">
       <header className="topbar">
         <div className="topbar-brand">
           <span className="brand-logo-tile">
@@ -10,7 +10,7 @@ export default function AppLoading() {
           </span>
           <div>
             <span className="brand-kicker">MW Engenharia</span>
-            <strong>Preparando operacao</strong>
+            <strong>Preparando operação</strong>
           </div>
         </div>
       </header>

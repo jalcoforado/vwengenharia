@@ -10,7 +10,7 @@ export default defineConfig({
       manifest: {
         name: "MW Engenharia",
         short_name: "MW Engenharia",
-        description: "Gestao operacional de campo",
+        description: "Gestão operacional de campo",
         display: "standalone",
         start_url: "/",
         theme_color: "#813a2a",

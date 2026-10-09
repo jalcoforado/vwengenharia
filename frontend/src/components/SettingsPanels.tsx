@@ -28,7 +28,7 @@ export function AccountSettings() {
       return;
     }
     if (newPassword !== confirmPassword) {
-      setFeedback("A confirmacao da nova senha nao confere.");
+      setFeedback("A confirmação da nova senha não confere.");
       return;
     }
     setBusy(true);
@@ -43,9 +43,9 @@ export function AccountSettings() {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-      setFeedback("Senha alterada. Outras sessoes foram revogadas.");
+      setFeedback("Senha alterada. Outras sessões foram revogadas.");
     } catch {
-      setFeedback("Nao foi possivel alterar a senha. Confira a senha atual.");
+      setFeedback("Não foi possível alterar a senha. Confira a senha atual.");
     } finally {
       setBusy(false);
     }
@@ -54,7 +54,7 @@ export function AccountSettings() {
   return (
     <section className="section-card">
       <span className="eyebrow">Conta</span>
-      <h2>Seguranca da conta</h2>
+      <h2>Segurança da conta</h2>
       <div className="compact-form settings-form">
         <div className="compact-form-grid">
           <label>
@@ -109,7 +109,7 @@ export function IntegrationSettings() {
     try {
       setKeys(await api<IntegrationKey[]>("/api/v1/integration-keys"));
     } catch {
-      setFeedback("Nao foi possivel carregar as chaves de integracao.");
+      setFeedback("Não foi possível carregar as chaves de integração.");
     }
   }
 
@@ -119,7 +119,7 @@ export function IntegrationSettings() {
 
   async function createKey() {
     if (name.trim().length < 2) {
-      setFeedback("Informe um nome para a integracao.");
+      setFeedback("Informe um nome para a integração.");
       return;
     }
     setBusy(true);
@@ -129,10 +129,10 @@ export function IntegrationSettings() {
         body: JSON.stringify({ name: name.trim() }),
       });
       setNewSecret(created.secret);
-      setFeedback("Chave criada. Copie o segredo agora: ele nao sera exibido novamente.");
+      setFeedback("Chave criada. Copie o segredo agora: ele não será exibido novamente.");
       await load();
     } catch {
-      setFeedback("Nao foi possivel criar a chave. O nome pode ja estar em uso.");
+      setFeedback("Não foi possível criar a chave. O nome pode já estar em uso.");
     } finally {
       setBusy(false);
     }
@@ -148,7 +148,7 @@ export function IntegrationSettings() {
       if (newSecret?.startsWith(key.key_prefix)) setNewSecret(null);
       await load();
     } catch {
-      setFeedback("Nao foi possivel revogar a chave.");
+      setFeedback("Não foi possível revogar a chave.");
     } finally {
       setBusy(false);
     }
@@ -158,7 +158,7 @@ export function IntegrationSettings() {
     if (!newSecret) return;
     try {
       await navigator.clipboard.writeText(newSecret);
-      setFeedback("Segredo copiado para a area de transferencia.");
+      setFeedback("Segredo copiado para a área de transferência.");
     } catch {
       setFeedback("Copie o segredo manualmente.");
     }
@@ -168,17 +168,17 @@ export function IntegrationSettings() {
     <section className="section-card">
       <div className="section-heading">
         <div>
-          <span className="eyebrow">Integracao</span>
+          <span className="eyebrow">Integração</span>
           <h2>iAnalisys</h2>
           <p className="section-copy">
-            Credenciais read-only por tenant para sincronizacao segura com o iAnalisys.
+            Credenciais read-only por tenant para sincronização segura com o iAnalisys.
           </p>
         </div>
       </div>
 
       {newSecret && (
         <div className="secret-once">
-          <strong>Segredo exibido uma unica vez</strong>
+          <strong>Segredo exibido uma única vez</strong>
           <code>{newSecret}</code>
           <button className="small-button" onClick={() => void copySecret()}>
             Copiar segredo
@@ -188,7 +188,7 @@ export function IntegrationSettings() {
 
       <div className="integration-create">
         <label>
-          Nome da integracao
+          Nome da integração
           <input value={name} onChange={(event) => setName(event.target.value)} />
         </label>
         <button className="small-button" disabled={busy} onClick={() => void createKey()}>
@@ -221,7 +221,7 @@ export function IntegrationSettings() {
           </div>
         ))}
         {keys.length === 0 && (
-          <div className="empty-state">Nenhuma chave de integracao criada.</div>
+          <div className="empty-state">Nenhuma chave de integração criada.</div>
         )}
       </div>
 

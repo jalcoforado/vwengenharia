@@ -42,7 +42,7 @@ export default function ClientAccessAdmin({
     try {
       setAccesses(await api<ClientAccess[]>("/api/v1/client-access"));
     } catch {
-      setFeedback("Nao foi possivel carregar os acessos de clientes.");
+      setFeedback("Não foi possível carregar os acessos de clientes.");
     }
   }
 
@@ -52,7 +52,7 @@ export default function ClientAccessAdmin({
 
   async function grant() {
     if (!membershipId || !clientId) {
-      setFeedback("Selecione o login de portal e o responsavel.");
+      setFeedback("Selecione o login de portal e o responsável.");
       return;
     }
     setBusy(true);
@@ -69,7 +69,7 @@ export default function ClientAccessAdmin({
       setClientId("");
       await load();
     } catch {
-      setFeedback("Nao foi possivel vincular o acesso.");
+      setFeedback("Não foi possível vincular o acesso.");
     } finally {
       setBusy(false);
     }
@@ -82,14 +82,14 @@ export default function ClientAccessAdmin({
           <span className="eyebrow">Portal do cliente</span>
           <h2>Acessos externos</h2>
           <p className="section-copy">
-            Ligue cada login de portal ao responsavel que ele representa. O que ele ve depende da liberacao de portal feita por empreendimento, na aba Responsaveis dos Cadastros.
+            Ligue cada login de portal ao responsável que ele representa. O que ele vê depende da liberação de portal feita por empreendimento, na aba Responsáveis dos Cadastros.
           </p>
         </div>
       </div>
 
       <div className="client-access-form">
         <label>
-          Usuario cliente
+          Usuário cliente
           <select value={membershipId} onChange={(event) => setMembershipId(event.target.value)}>
             <option value="">Selecione</option>
             {clientUsers.map((member) => (
@@ -100,7 +100,7 @@ export default function ClientAccessAdmin({
           </select>
         </label>
         <label>
-          Responsavel
+          Responsável
           <select value={clientId} onChange={(event) => setClientId(event.target.value)}>
             <option value="">Selecione</option>
             {clients.filter((item) => item.is_active).map((client) => (
@@ -116,7 +116,7 @@ export default function ClientAccessAdmin({
 
       {clientUsers.length === 0 && (
         <div className="empty-state">
-          <strong>Nenhum usuario CLIENTE cadastrado</strong>
+          <strong>Nenhum usuário CLIENTE cadastrado</strong>
           <span>Crie um membro com perfil Cliente antes de conceder acesso ao portal.</span>
         </div>
       )}
@@ -126,11 +126,11 @@ export default function ClientAccessAdmin({
           {accesses.map((item) => (
             <div className="admin-row" key={item.id}>
               <div>
-                <strong>{memberMap.get(item.membership_id)?.name ?? "Usuario cliente"}</strong>
+                <strong>{memberMap.get(item.membership_id)?.name ?? "Usuário cliente"}</strong>
                 <span>{memberMap.get(item.membership_id)?.email ?? item.membership_id}</span>
               </div>
               <span className="status status-revisada">
-                {clientMap.get(item.client_id)?.name ?? "Responsavel"}
+                {clientMap.get(item.client_id)?.name ?? "Responsável"}
               </span>
             </div>
           ))}

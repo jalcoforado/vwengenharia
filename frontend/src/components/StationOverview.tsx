@@ -63,7 +63,7 @@ export default function StationOverview({
     try {
       setData(await api<StationOverviewData>("/api/v1/stations/" + stationId + "/overview"));
     } catch {
-      setError("Nao foi possivel carregar a visao da estacao.");
+      setError("Não foi possível carregar a visão da estação.");
     } finally {
       setBusy(false);
     }
@@ -83,8 +83,8 @@ export default function StationOverview({
     <section className="section-card station-overview">
       <div className="section-heading station-overview-heading">
         <div>
-          <span className="eyebrow">Visao 360</span>
-          <h2>{data?.station.name ?? "Estacao"}</h2>
+          <span className="eyebrow">Visão 360</span>
+          <h2>{data?.station.name ?? "Estação"}</h2>
           <p className="section-copy">
             {[data?.station.code, data?.station.station_type].filter(Boolean).join(" · ")}
           </p>
@@ -110,11 +110,11 @@ export default function StationOverview({
             </div>
             <div className="metric-card">
               <strong>{data.summary.unavailable_assets}</strong>
-              <span>Indisponiveis</span>
+              <span>Indisponíveis</span>
             </div>
             <div className="metric-card">
               <strong>{data.summary.open_occurrences}</strong>
-              <span>Ocorrencias abertas</span>
+              <span>Ocorrências abertas</span>
             </div>
             <div className="metric-card">
               <strong>{data.summary.open_work_orders}</strong>
@@ -132,18 +132,18 @@ export default function StationOverview({
 
           <div className="station-health-strip">
             <span>
-              Ultima visita:{" "}
+              Última visita:{" "}
               <strong>
                 {lastVisit
                   ? new Intl.DateTimeFormat("pt-BR", {
                       dateStyle: "short",
                       timeStyle: "short",
                     }).format(new Date(lastVisit.finished_at ?? lastVisit.scheduled_for))
-                  : "sem historico"}
+                  : "sem histórico"}
               </strong>
             </span>
             <span>
-              Solicitacoes abertas: <strong>{data.summary.open_material_requests}</strong>
+              Solicitações abertas: <strong>{data.summary.open_material_requests}</strong>
             </span>
           </div>
 
@@ -153,7 +153,7 @@ export default function StationOverview({
                 <div className="admin-row" key={asset.id}>
                   <div>
                     <strong>{asset.name}</strong>
-                    <span>{asset.manufacturer || asset.model || "Sem identificacao complementar"}</span>
+                    <span>{asset.manufacturer || asset.model || "Sem identificação complementar"}</span>
                   </div>
                   <span className={asset.status === "OPERANDO" ? "status status-revisada" : "status"}>
                     {asset.status.replaceAll("_", " ")}
@@ -162,7 +162,7 @@ export default function StationOverview({
               ))}
             </OverviewBlock>
 
-            <OverviewBlock title="Ultimas visitas">
+            <OverviewBlock title="Últimas visitas">
               {data.visits.slice(0, 8).map((visit) => (
                 <div className="admin-row" key={visit.id}>
                   <div>
@@ -171,14 +171,14 @@ export default function StationOverview({
                         new Date(visit.scheduled_for),
                       )}
                     </strong>
-                    <span>{visit.notes || "Sem observacao"}</span>
+                    <span>{visit.notes || "Sem observação"}</span>
                   </div>
                   <span className="status">{visit.status.replaceAll("_", " ")}</span>
                 </div>
               ))}
             </OverviewBlock>
 
-            <OverviewBlock title="Ocorrencias">
+            <OverviewBlock title="Ocorrências">
               {data.occurrences.slice(0, 8).map((item) => (
                 <div className="admin-row" key={item.id}>
                   <div>
@@ -192,7 +192,7 @@ export default function StationOverview({
               ))}
             </OverviewBlock>
 
-            <OverviewBlock title="Ordens de servico">
+            <OverviewBlock title="Ordens de serviço">
               {data.work_orders.slice(0, 8).map((item) => (
                 <div className="admin-row" key={item.id}>
                   <div>
@@ -210,7 +210,7 @@ export default function StationOverview({
               ))}
             </OverviewBlock>
 
-            <OverviewBlock title="Manutencao preventiva">
+            <OverviewBlock title="Manutenção preventiva">
               {data.maintenance_plans.slice(0, 8).map((item) => (
                 <div className="admin-row" key={item.id}>
                   <div>
@@ -218,7 +218,7 @@ export default function StationOverview({
                       {data.assets.find((asset) => asset.id === item.asset_id)?.name ?? "Ativo"}
                     </strong>
                     <span>
-                      A cada {item.frequency_days} dias · proxima{" "}
+                      A cada {item.frequency_days} dias · próxima{" "}
                       {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(
                         new Date(item.next_due_at),
                       )}
@@ -229,7 +229,7 @@ export default function StationOverview({
               ))}
             </OverviewBlock>
 
-            <OverviewBlock title="Materiais e servicos">
+            <OverviewBlock title="Materiais e serviços">
               {data.material_requests.slice(0, 8).map((item) => (
                 <div className="admin-row" key={item.id}>
                   <div>

@@ -28,9 +28,9 @@ export function SyncControl({
       disabled={!online || syncing}
       title={
         !online
-          ? "Sem conexao. Os dados permanecem salvos no aparelho."
+          ? "Sem conexão. Os dados permanecem salvos no aparelho."
           : summary.failed > 0
-            ? "Ha itens com falha. Clique para tentar novamente."
+            ? "Há itens com falha. Clique para tentar novamente."
             : summary.total > 0
               ? "Clique para sincronizar agora."
               : "Tudo sincronizado."
@@ -76,11 +76,11 @@ export function SyncHealthCard({
             {!online
               ? "Trabalho offline protegido"
               : summary.failed > 0
-                ? "Sincronizacao precisa de atencao"
-                : "Dados aguardando sincronizacao"}
+                ? "Sincronização precisa de atenção"
+                : "Dados aguardando sincronização"}
           </strong>
           <span>
-            {summary.commands} operacao(oes) · {summary.uploads} arquivo(s)
+            {summary.commands} operação(oes) · {summary.uploads} arquivo(s)
             {summary.failed > 0 ? ` · ${summary.failed} com falha` : ""}
           </span>
         </div>
@@ -97,7 +97,7 @@ export function SyncHealthCard({
         <div className="sync-error-list">
           {errors.slice(0, 4).map((item) => (
             <div className="sync-error-row" key={item.kind + item.id}>
-              <span>{item.kind === "upload" ? "Arquivo" : "Operacao"}</span>
+              <span>{item.kind === "upload" ? "Arquivo" : "Operação"}</span>
               <strong>{item.label}</strong>
               <em>{item.error}</em>
             </div>

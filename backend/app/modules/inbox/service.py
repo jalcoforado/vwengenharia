@@ -70,9 +70,9 @@ async def build_inbox(
                         else "Visita programada"
                     ),
                     "message": (
-                        "A supervisao devolveu a visita para ajustes."
+                        "A supervisão devolveu a visita para ajustes."
                         if visit.status == VisitStatus.DEVOLVIDA.value
-                        else "Visita de campo atribuida a voce."
+                        else "Visita de campo atribuída a você."
                     ),
                     "entity_type": "visit",
                     "entity_id": visit.id,
@@ -102,7 +102,7 @@ async def build_inbox(
                 {
                     "kind": "WORK_ORDER",
                     "priority": order.priority,
-                    "title": "Ordem de servico atribuida",
+                    "title": "Ordem de serviço atribuída",
                     "message": order.description,
                     "entity_type": "work_order",
                     "entity_id": order.id,
@@ -129,8 +129,8 @@ async def build_inbox(
                 {
                     "kind": "MAINTENANCE",
                     "priority": "ALTA" if overdue else "MEDIA",
-                    "title": "Preventiva vencida" if overdue else "Preventiva proxima",
-                    "message": plan.instructions or "Executar manutencao preventiva do ativo.",
+                    "title": "Preventiva vencida" if overdue else "Preventiva próxima",
+                    "message": plan.instructions or "Executar manutenção preventiva do ativo.",
                     "entity_type": "maintenance_plan",
                     "entity_id": plan.id,
                     "due_at": plan.next_due_at,
@@ -159,7 +159,7 @@ async def build_inbox(
                 {
                     "kind": "MATERIAL_REQUEST",
                     "priority": request.priority,
-                    "title": "Solicitacao em andamento",
+                    "title": "Solicitação em andamento",
                     "message": request.item_name,
                     "entity_type": "material_request",
                     "entity_id": request.id,
@@ -184,7 +184,7 @@ async def build_inbox(
                 {
                     "kind": "VISIT_REVIEW",
                     "priority": "MEDIA",
-                    "title": "Visita aguardando revisao",
+                    "title": "Visita aguardando revisão",
                     "message": "Validar os dados enviados pela equipe de campo.",
                     "entity_type": "visit",
                     "entity_id": visit.id,
@@ -214,7 +214,7 @@ async def build_inbox(
                     {
                         "kind": "WORK_ORDER_MANAGEMENT",
                         "priority": "CRITICA" if order.sla_due_at < now else order.priority,
-                        "title": "OS fora do SLA" if order.sla_due_at < now else "OS critica",
+                        "title": "OS fora do SLA" if order.sla_due_at < now else "OS crítica",
                         "message": order.description,
                         "entity_type": "work_order",
                         "entity_id": order.id,
@@ -268,7 +268,7 @@ async def build_inbox(
                 {
                     "kind": "MATERIAL_MANAGEMENT",
                     "priority": request.priority,
-                    "title": "Solicitacao pendente",
+                    "title": "Solicitação pendente",
                     "message": request.item_name,
                     "entity_type": "material_request",
                     "entity_id": request.id,
