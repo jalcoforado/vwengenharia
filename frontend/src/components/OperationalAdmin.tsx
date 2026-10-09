@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Search } from "lucide-react";
 
 import { api } from "../lib/api";
 
@@ -171,7 +172,31 @@ function ClientAdmin({
   const [feedback, setFeedback] = useState<string | null>(null);
   const [linkFeedback, setLinkFeedback] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [search, setSearch] = useState("");
   const developmentMap = new Map(developments.map((item) => [item.id, item]));
+
+  const term = search.trim().toLowerCase();
+  const termDigits = term.replace(/\D/g, "");
+  const visibleClients = clients.filter((client) => {
+    if (!term) return true;
+    const fields = [
+      client.name,
+      client.document,
+      client.contact_role,
+      client.contact_phone,
+      client.contact_whatsapp,
+      client.contact_email,
+      client.contact_name,
+    ].map((value) => value ?? "");
+    if (fields.some((value) => value.toLowerCase().includes(term))) return true;
+    // Permite achar CPF/CNPJ e telefones digitando so os numeros.
+    return (
+      termDigits.length >= 3 &&
+      [client.document, client.contact_phone, client.contact_whatsapp].some((value) =>
+        (value ?? "").replace(/\D/g, "").includes(termDigits),
+      )
+    );
+  });
 
   function resetForm() {
     setEditingId(null);
@@ -209,6 +234,11 @@ function ClientAdmin({
 
   async function save() {
     if (name.trim().length < 2) return setFeedback("Informe o nome do cliente.");
+    if (!contactRole.trim()) return setFeedback("Informe a funcao do cliente.");
+    if (!document.trim()) return setFeedback("Informe o CPF/CNPJ do cliente.");
+    if (!contactPhone.trim() && !contactWhatsapp.trim()) {
+      return setFeedback("Informe o telefone ou o WhatsApp do cliente.");
+    }
     setBusy(true);
     try {
       await api(editingId ? "/api/v1/clients/" + editingId : "/api/v1/clients", {
@@ -299,8 +329,18 @@ function ClientAdmin({
 
   return (
     <div className="admin-panel">
+      <div className="client-list-column">
+      <label className="search-field">
+        <Search size={16} />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar nome, CPF/CNPJ, funcao, telefone ou email"
+          aria-label="Buscar cliente"
+        />
+      </label>
       <div className="admin-list">
-        {clients.map((client) => (
+        {visibleClients.map((client) => (
           <div className="client-entry" key={client.id}>
             <div className="admin-row">
               <div>
@@ -364,18 +404,27 @@ function ClientAdmin({
           </div>
         ))}
         {clients.length === 0 && <div className="empty-state">Nenhum cliente cadastrado.</div>}
+        {clients.length > 0 && visibleClients.length === 0 && (
+          <div className="empty-state">
+            Nenhum cliente encontrado para "{search.trim()}". Confira a grafia ou limpe a busca.
+          </div>
+        )}
+      </div>
       </div>
       <div className="compact-form admin-create-form">
         <h3>{editingId ? "Editar cliente" : "Novo cliente"}</h3>
         <div className="compact-form-grid">
-          <label>Nome<input value={name} onChange={(e) => setName(e.target.value)} /></label>
-          <label>Funcao<input value={contactRole} onChange={(e) => setContactRole(e.target.value)} /></label>
-          <label>Telefone<input type="tel" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} /></label>
-          <label>WhatsApp<input type="tel" value={contactWhatsapp} onChange={(e) => setContactWhatsapp(e.target.value)} /></label>
+          <label><span>Nome <b className="required-mark">*</b></span><input required aria-required="true" value={name} onChange={(e) => setName(e.target.value)} /></label>
+          <label><span>Funcao <b className="required-mark">*</b></span><input required aria-required="true" value={contactRole} onChange={(e) => setContactRole(e.target.value)} /></label>
+          <label><span>CPF/CNPJ <b className="required-mark">*</b></span><input required aria-required="true" value={document} onChange={(e) => setDocument(e.target.value)} /></label>
           <label>Email<input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} /></label>
-          <label>CNPJ/Documento<input value={document} onChange={(e) => setDocument(e.target.value)} /></label>
+          <label><span>Telefone <b className="required-mark">**</b></span><input type="tel" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} /></label>
+          <label><span>WhatsApp <b className="required-mark">**</b></span><input type="tel" value={contactWhatsapp} onChange={(e) => setContactWhatsapp(e.target.value)} /></label>
           <label>Contato alternativo<input value={contactName} onChange={(e) => setContactName(e.target.value)} /></label>
         </div>
+        <p className="required-hint">
+          <b className="required-mark">*</b> Obrigatorio. <b className="required-mark">**</b> Informe ao menos um: Telefone ou WhatsApp.
+        </p>
         <div className="admin-actions">
           <button className="small-button" disabled={busy} onClick={() => void save()}>
             {busy ? "Salvando..." : editingId ? "Salvar alteracoes" : "Cadastrar cliente"}
