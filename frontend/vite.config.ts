@@ -13,7 +13,7 @@ export default defineConfig({
         description: "Gestao operacional de campo",
         display: "standalone",
         start_url: "/",
-        theme_color: "#173c2a",
+        theme_color: "#813a2a",
         background_color: "#f3f6f4"
       }
     })
