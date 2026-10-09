@@ -112,6 +112,12 @@ Antes de liberar qualquer endpoint ao perfil CLIENTE:
 
 Por seguranca, nenhuma permissao ampla deve ser inferida apenas pela existencia desse papel.
 
+Regra de visibilidade do portal:
+- o login CLIENTE e ligado a um responsavel (client_membership_access);
+- o responsavel, principal ou adicional, so ve um empreendimento quando a responsabilidade dele naquele empreendimento tem o portal liberado explicitamente (client_development_contacts.portal_access);
+- somente ADMIN/SUPERADMIN concedem a liberacao; quem cadastra pode revoga-la;
+- inativar a responsabilidade ou trocar o responsavel principal revoga a liberacao.
+
 ## Matriz resumida
 
 | Capacidade | Superadmin | Admin | Gestor | Supervisor | Tecnico | Manutencao | Cliente |

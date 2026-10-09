@@ -7,11 +7,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit import AuditEvent
 from app.models.base import Base
+from app.models.identity import Role
 from app.models.operations import (
     Asset,
     AssetType,
     Client,
     ClientDevelopmentContact,
+    ContactScope,
     Development,
     Station,
 )
@@ -127,6 +129,112 @@ async def list_client_contacts(
     return list((await session.execute(stmt)).scalars().all())
 
 
+PORTAL_ADMIN_ROLES = {Role.SUPERADMIN.value, Role.ADMIN.value}
+
+
+def _require_portal_admin(context: AuthContext) -> None:
+    if context.membership.role not in PORTAL_ADMIN_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="portal_access_requires_admin",
+        )
+
+
+async def set_primary_contact(
+    session: AsyncSession,
+    development: Development,
+    client_id: UUID,
+) -> None:
+    """Mantem uma unica responsabilidade principal, igual a developments.client_id."""
+    rows = list(
+        (
+            await session.execute(
+                select(ClientDevelopmentContact).where(
+                    ClientDevelopmentContact.tenant_id == development.tenant_id,
+                    ClientDevelopmentContact.development_id == development.id,
+                )
+            )
+        ).scalars()
+    )
+    for row in rows:
+        if row.is_primary and row.client_id != client_id:
+            # O antigo principal segue como responsavel, mas sem visao no portal.
+            row.is_primary = False
+            row.portal_access = False
+    # Libera o indice de principal unico antes de promover o novo.
+    await session.flush()
+
+    current = next((row for row in rows if row.is_primary and row.client_id == client_id), None)
+    if current is not None:
+        return
+    general = next(
+        (
+            row
+            for row in rows
+            if row.client_id == client_id and row.scope == ContactScope.GERAL.value
+        ),
+        None,
+    )
+    if general is None:
+        session.add(
+            ClientDevelopmentContact(
+                tenant_id=development.tenant_id,
+                client_id=client_id,
+                development_id=development.id,
+                scope=ContactScope.GERAL.value,
+                is_primary=True,
+            )
+        )
+    else:
+        general.is_primary = True
+        general.is_active = True
+    await session.flush()
+
+
+async def ensure_development_document_is_unique(
+    session: AsyncSession,
+    tenant_id: UUID,
+    document: str | None,
+    *,
+    ignore_id: UUID | None = None,
+) -> None:
+    if not document:
+        return
+    stmt = select(Development.id).where(
+        Development.tenant_id == tenant_id, Development.document == document
+    )
+    if ignore_id is not None:
+        stmt = stmt.where(Development.id != ignore_id)
+    if (await session.execute(stmt)).first() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="development_document_already_exists",
+        )
+
+
+async def update_development(
+    session: AsyncSession,
+    context: AuthContext,
+    development: Development,
+    payload: BaseModel,
+) -> Development:
+    changes = payload.model_dump(exclude_unset=True)
+    await ensure_development_document_is_unique(
+        session, context.tenant.id, changes.get("document"), ignore_id=development.id
+    )
+    new_client_id = changes.get("client_id")
+    if new_client_id is not None and new_client_id != development.client_id:
+        await set_primary_contact(session, development, new_client_id)
+    return await update_object(
+        session,
+        context,
+        development,
+        payload,
+        action="DEVELOPMENT_UPDATE",
+        entity_type="development",
+    )
+
+
 async def _ensure_client_contact_is_unique(
     session: AsyncSession,
     tenant_id: UUID,
@@ -163,11 +271,14 @@ async def create_client_contact(
         development_id=payload.development_id,
         scope=payload.scope.value,
     )
+    if payload.portal_access:
+        _require_portal_admin(context)
     contact = ClientDevelopmentContact(
         tenant_id=context.tenant.id,
         client_id=payload.client_id,
         development_id=payload.development_id,
         scope=payload.scope.value,
+        portal_access=payload.portal_access,
     )
     session.add(contact)
     await session.flush()
@@ -190,6 +301,17 @@ async def update_client_contact(
     payload: BaseModel,
 ) -> ClientDevelopmentContact:
     changes = payload.model_dump(exclude_unset=True, exclude_none=True)
+    if changes.get("is_active") is False:
+        if contact.is_primary:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="primary_contact_cannot_be_deactivated",
+            )
+        # Quem deixa de responder pelo empreendimento perde a visao no portal.
+        changes["portal_access"] = False
+    if changes.get("portal_access") is True and not contact.portal_access:
+        # Revogar e livre para quem cadastra; conceder exige administrador.
+        _require_portal_admin(context)
     if "scope" in changes:
         changes["scope"] = changes["scope"].value
         await _ensure_client_contact_is_unique(
@@ -218,9 +340,13 @@ async def update_client_contact(
 
 async def create_development(session: AsyncSession, context: AuthContext, payload) -> Development:
     await tenant_get_or_404(session, Client, context.tenant.id, payload.client_id)
+    await ensure_development_document_is_unique(
+        session, context.tenant.id, payload.document
+    )
     development = Development(tenant_id=context.tenant.id, **payload.model_dump())
     session.add(development)
     await session.flush()
+    await set_primary_contact(session, development, development.client_id)
     add_audit(
         session,
         context,

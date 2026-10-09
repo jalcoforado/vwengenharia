@@ -52,7 +52,7 @@ export default function ClientAccessAdmin({
 
   async function grant() {
     if (!membershipId || !clientId) {
-      setFeedback("Selecione o usuario cliente e o cliente.");
+      setFeedback("Selecione o login de portal e o responsavel.");
       return;
     }
     setBusy(true);
@@ -82,7 +82,7 @@ export default function ClientAccessAdmin({
           <span className="eyebrow">Portal do cliente</span>
           <h2>Acessos externos</h2>
           <p className="section-copy">
-            Vincule cada usuario CLIENTE apenas aos contratos que ele pode visualizar.
+            Ligue cada login de portal ao responsavel que ele representa. O que ele ve depende da liberacao de portal feita por empreendimento, na aba Responsaveis dos Cadastros.
           </p>
         </div>
       </div>
@@ -100,7 +100,7 @@ export default function ClientAccessAdmin({
           </select>
         </label>
         <label>
-          Cliente
+          Responsavel
           <select value={clientId} onChange={(event) => setClientId(event.target.value)}>
             <option value="">Selecione</option>
             {clients.filter((item) => item.is_active).map((client) => (
@@ -130,7 +130,7 @@ export default function ClientAccessAdmin({
                 <span>{memberMap.get(item.membership_id)?.email ?? item.membership_id}</span>
               </div>
               <span className="status status-revisada">
-                {clientMap.get(item.client_id)?.name ?? "Cliente"}
+                {clientMap.get(item.client_id)?.name ?? "Responsavel"}
               </span>
             </div>
           ))}

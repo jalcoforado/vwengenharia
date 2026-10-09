@@ -5,9 +5,40 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.field import Visit
 from app.models.identity import Membership, Role
 from app.models.maintenance import Occurrence, WorkOrder
-from app.models.operations import Client, ClientMembershipAccess, Development, Station
+from app.models.operations import (
+    Client,
+    ClientDevelopmentContact,
+    ClientMembershipAccess,
+    Development,
+    Station,
+)
 from app.modules.auth.dependencies import AuthContext
 from app.modules.core_registers.service import add_audit
+
+
+def _granted_development_ids(context: AuthContext, client_ids):
+    """Empreendimentos liberados explicitamente para os responsaveis deste login."""
+    return select(ClientDevelopmentContact.development_id).where(
+        ClientDevelopmentContact.tenant_id == context.tenant.id,
+        ClientDevelopmentContact.client_id.in_(client_ids),
+        ClientDevelopmentContact.portal_access.is_(True),
+        ClientDevelopmentContact.is_active.is_(True),
+    )
+
+
+async def client_can_view_development(
+    session: AsyncSession,
+    context: AuthContext,
+    development_id,
+) -> bool:
+    client_ids = select(ClientMembershipAccess.client_id).where(
+        ClientMembershipAccess.tenant_id == context.tenant.id,
+        ClientMembershipAccess.membership_id == context.membership.id,
+    )
+    granted = _granted_development_ids(context, client_ids).where(
+        ClientDevelopmentContact.development_id == development_id
+    )
+    return (await session.execute(granted.limit(1))).first() is not None
 
 
 async def build_client_portal(
@@ -48,7 +79,7 @@ async def build_client_portal(
             await session.execute(
                 select(Development).where(
                     Development.tenant_id == context.tenant.id,
-                    Development.client_id.in_(client_ids),
+                    Development.id.in_(_granted_development_ids(context, client_ids)),
                 )
             )
         ).scalars()

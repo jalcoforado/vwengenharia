@@ -50,10 +50,12 @@ class ClientContactCreate(BaseModel):
     client_id: UUID
     development_id: UUID
     scope: ContactScope
+    portal_access: bool = False
 
 
 class ClientContactUpdate(BaseModel):
     scope: ContactScope | None = None
+    portal_access: bool | None = None
     is_active: bool | None = None
 
 
@@ -62,6 +64,8 @@ class ClientContactRead(ORMModel):
     client_id: UUID
     development_id: UUID
     scope: ContactScope
+    is_primary: bool
+    portal_access: bool
     is_active: bool
     created_at: datetime
     updated_at: datetime
@@ -70,6 +74,9 @@ class ClientContactRead(ORMModel):
 class DevelopmentCreate(BaseModel):
     client_id: UUID
     name: str = Field(min_length=2, max_length=200)
+    document: str | None = Field(default=None, max_length=32)
+    contact_phone: str | None = Field(default=None, max_length=40)
+    contact_email: EmailStr | None = None
     address_line: str | None = Field(default=None, max_length=255)
     city: str | None = Field(default=None, max_length=120)
     state: str | None = Field(default=None, min_length=2, max_length=2)
@@ -79,6 +86,9 @@ class DevelopmentCreate(BaseModel):
 class DevelopmentUpdate(BaseModel):
     client_id: UUID | None = None
     name: str | None = Field(default=None, min_length=2, max_length=200)
+    document: str | None = Field(default=None, max_length=32)
+    contact_phone: str | None = Field(default=None, max_length=40)
+    contact_email: EmailStr | None = None
     address_line: str | None = Field(default=None, max_length=255)
     city: str | None = Field(default=None, max_length=120)
     state: str | None = Field(default=None, min_length=2, max_length=2)
@@ -90,6 +100,9 @@ class DevelopmentRead(ORMModel):
     id: UUID
     client_id: UUID
     name: str
+    document: str | None
+    contact_phone: str | None
+    contact_email: str | None
     address_line: str | None
     city: str | None
     state: str | None

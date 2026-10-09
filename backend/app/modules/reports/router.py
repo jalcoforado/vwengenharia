@@ -12,8 +12,9 @@ from sqlalchemy import select
 from app.models.field import Attachment, ChecklistTemplateItem, Measurement, Visit, VisitAnswer
 from app.models.identity import Membership, Role, User
 from app.models.maintenance import MaintenancePlan, Occurrence, VisitReview, WorkOrder
-from app.models.operations import Client, ClientMembershipAccess, Development, Station
+from app.models.operations import Client, Development, Station
 from app.modules.auth.dependencies import AuthContext, SessionDep, require_roles
+from app.modules.client_portal.service import client_can_view_development
 
 router = APIRouter(prefix="/reports", tags=["relatorios"])
 
@@ -250,16 +251,7 @@ async def visit_report_html(
     if context.membership.role == Role.CLIENTE.value:
         if visit.status != "REVISADA":
             return Response(status_code=404)
-        allowed = (
-            await session.execute(
-                select(ClientMembershipAccess.id).where(
-                    ClientMembershipAccess.tenant_id == context.tenant.id,
-                    ClientMembershipAccess.membership_id == context.membership.id,
-                    ClientMembershipAccess.client_id == client.id,
-                )
-            )
-        ).scalar_one_or_none()
-        if allowed is None:
+        if not await client_can_view_development(session, context, development.id):
             return Response(status_code=404)
     technician = (
         await session.execute(

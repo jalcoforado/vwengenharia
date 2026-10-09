@@ -9,7 +9,13 @@ from app.db.session import get_session_factory
 from app.main import app
 from app.models.field import Visit
 from app.models.identity import Membership, Role, Tenant, User
-from app.models.operations import Client, ClientMembershipAccess, Development, Station
+from app.models.operations import (
+    Client,
+    ClientDevelopmentContact,
+    ClientMembershipAccess,
+    Development,
+    Station,
+)
 
 
 async def login(http: AsyncClient, email: str, password: str) -> dict[str, str]:
@@ -59,6 +65,23 @@ async def test_client_portal_is_scoped_to_explicit_access() -> None:
             name="Empreendimento negado",
         )
         session.add_all([allowed_development, denied_development])
+        await session.flush()
+
+        # Os dois empreendimentos estao liberados para o portal dos seus principais;
+        # o login abaixo so esta ligado ao responsavel permitido.
+        session.add_all(
+            [
+                ClientDevelopmentContact(
+                    tenant_id=tenant.id,
+                    client_id=development.client_id,
+                    development_id=development.id,
+                    scope="GERAL",
+                    is_primary=True,
+                    portal_access=True,
+                )
+                for development in (allowed_development, denied_development)
+            ]
+        )
         await session.flush()
 
         allowed_station = Station(

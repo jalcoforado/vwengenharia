@@ -161,9 +161,13 @@ async def test_client_contacts_link_clients_to_developments_by_scope() -> None:
         )
         assert by_development.status_code == 200
         assert {(item["client_id"], item["scope"]) for item in by_development.json()} == {
+            (sindico_id, "GERAL"),
             (sindico_id, "TECNICO"),
             (financeiro_id, "FINANCEIRO"),
         }
+        primary = [item for item in by_development.json() if item["is_primary"]]
+        assert [(item["client_id"], item["scope"]) for item in primary] == [(sindico_id, "GERAL")]
+        assert all(item["portal_access"] is False for item in by_development.json())
 
         by_client = await http.get(
             "/api/v1/client-contacts",
@@ -202,7 +206,8 @@ async def test_client_contacts_link_clients_to_developments_by_scope() -> None:
         assert exported.status_code == 200
         body = exported.json()
         assert body["tenant_id"] == str(tenant_a_id)
-        assert len(body["items"]) == 3
+        # Dois principais (um por empreendimento) e tres responsabilidades por area.
+        assert len(body["items"]) == 5
         lago_tecnico = next(
             item
             for item in body["items"]

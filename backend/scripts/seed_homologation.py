@@ -25,6 +25,7 @@ from app.models.maintenance import (
 )
 from app.models.materials import MaterialRequest
 from app.models.operations import Asset, AssetType, Client, Development, Station
+from app.modules.core_registers.service import set_primary_contact
 
 
 def required(name: str) -> str:
@@ -191,6 +192,7 @@ async def main() -> None:
             )
             session.add(development)
             await session.flush()
+        await set_primary_contact(session, development, development.client_id)
 
         station = (
             await session.execute(

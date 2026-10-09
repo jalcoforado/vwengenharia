@@ -45,6 +45,7 @@ from app.modules.core_registers.service import (
     list_tenant_objects,
     tenant_get_or_404,
     update_client_contact,
+    update_development,
     update_object,
     validate_update_parents,
 )
@@ -202,14 +203,7 @@ async def patch_development(
         session, Development, context.tenant.id, development_id
     )
     await validate_update_parents(session, context, payload)
-    return await update_object(
-        session,
-        context,
-        development,
-        payload,
-        action="DEVELOPMENT_UPDATE",
-        entity_type="development",
-    )
+    return await update_development(session, context, development, payload)
 
 
 @router.get("/stations", response_model=list[StationRead])

@@ -58,7 +58,7 @@ Datas de watermark devem incluir timezone.
 
 ### client-contacts
 
-Uma linha por cliente, empreendimento e área de responsabilidade. O cliente é a pessoa que responde por um ou mais empreendimentos; um empreendimento pode ter vários responsáveis.
+Uma linha por responsável, empreendimento e área de responsabilidade. Para a MW, o cliente é o empreendimento; o cadastro `clients` guarda os responsáveis, pessoas físicas ou jurídicas que respondem por um ou mais empreendimentos. Um empreendimento tem um responsável principal e pode ter outros.
 
 Correspondência com a dimensão Cliente do iAnalisys:
 
@@ -66,18 +66,22 @@ Correspondência com a dimensão Cliente do iAnalisys:
 | --- | --- | --- |
 | id_cliente | client_id | clients.id |
 | id_empreendimento | development_id | developments.id |
-| escopo_contato | scope | TECNICO, FINANCEIRO, COMERCIAL ou ADMINISTRATIVO |
+| escopo_contato | scope | GERAL, TECNICO, FINANCEIRO, COMERCIAL ou ADMINISTRATIVO |
 | nome | name | clients.name |
 | funcao | contact_role | clients.contact_role |
 | telefone | contact_phone | clients.contact_phone |
 | whatsapp | contact_whatsapp | clients.contact_whatsapp |
 | email | contact_email | clients.contact_email |
 
-O recurso também traz `id` (do vínculo), `is_active`, `created_at` e `updated_at`.
+O recurso também traz `id` (do vínculo), `is_primary`, `is_active`, `created_at` e `updated_at`.
+
+O responsável principal de cada empreendimento aparece como uma linha com `is_primary = true` e escopo `GERAL`, e coincide com `developments.client_id`.
 
 `updated_at` é o maior entre a alteração do vínculo e a do cliente. Assim, mudar o telefone de um cliente reenvia todas as linhas dele na carga incremental.
 
-O dono do empreendimento continua em `developments.client_id`. O vínculo de responsabilidade é um cadastro à parte e não altera o acesso do perfil CLIENTE ao portal.
+O recurso `developments` traz também `document` (CNPJ), `contact_phone` e `contact_email` do empreendimento.
+
+A liberação de portal por empreendimento não é exportada: é controle de acesso do ERP, não dado de negócio.
 
 ## Envelope
 

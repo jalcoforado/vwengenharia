@@ -7,12 +7,14 @@ from sqlalchemy import (
     Boolean,
     Date,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     String,
     Text,
     UniqueConstraint,
     Uuid,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -31,6 +33,7 @@ class AssetStatus(str, enum.Enum):
 
 
 class ContactScope(str, enum.Enum):
+    GERAL = "GERAL"
     TECNICO = "TECNICO"
     FINANCEIRO = "FINANCEIRO"
     COMERCIAL = "COMERCIAL"
@@ -59,6 +62,9 @@ class Client(TimestampMixin, Base):
 
 class Development(TimestampMixin, Base):
     __tablename__ = "developments"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "document", name="uq_developments_tenant_document"),
+    )
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
     tenant_id: Mapped[UUID] = mapped_column(
@@ -71,6 +77,9 @@ class Development(TimestampMixin, Base):
         index=True,
     )
     name: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
+    document: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    contact_phone: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    contact_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
     address_line: Mapped[str | None] = mapped_column(String(255), nullable=True)
     city: Mapped[str | None] = mapped_column(String(120), nullable=True)
     state: Mapped[str | None] = mapped_column(String(2), nullable=True)
@@ -196,6 +205,13 @@ class ClientDevelopmentContact(TimestampMixin, Base):
             "scope",
             name="uq_client_development_contacts",
         ),
+        Index(
+            "uq_client_development_contacts_primary",
+            "tenant_id",
+            "development_id",
+            unique=True,
+            postgresql_where=text("is_primary"),
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
@@ -218,4 +234,8 @@ class ClientDevelopmentContact(TimestampMixin, Base):
         index=True,
     )
     scope: Mapped[str] = mapped_column(String(32), nullable=False)
+    # Responsavel principal do empreendimento (espelha developments.client_id).
+    is_primary: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Liberacao explicita para o portal do cliente ver este empreendimento.
+    portal_access: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

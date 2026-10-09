@@ -149,6 +149,9 @@ def _serialize(resource: IntegrationResource, row) -> dict:
             {
                 "client_id": row.client_id,
                 "name": row.name,
+                "document": row.document,
+                "contact_phone": row.contact_phone,
+                "contact_email": row.contact_email,
                 "address_line": row.address_line,
                 "city": row.city,
                 "state": row.state,
@@ -337,6 +340,7 @@ async def _fetch_client_contacts(
             "client_id": contact.client_id,
             "development_id": contact.development_id,
             "scope": contact.scope,
+            "is_primary": contact.is_primary,
             "name": client.name,
             "contact_role": client.contact_role,
             "contact_phone": client.contact_phone,

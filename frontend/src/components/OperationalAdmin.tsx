@@ -17,17 +17,20 @@ export type ClientRecord = {
   is_active: boolean;
 };
 
-export type ContactScope = "TECNICO" | "FINANCEIRO" | "COMERCIAL" | "ADMINISTRATIVO";
+export type ContactScope = "GERAL" | "TECNICO" | "FINANCEIRO" | "COMERCIAL" | "ADMINISTRATIVO";
 
 export type ClientContactRecord = {
   id: string;
   client_id: string;
   development_id: string;
   scope: ContactScope;
+  is_primary: boolean;
+  portal_access: boolean;
   is_active: boolean;
 };
 
 const CONTACT_SCOPES: [ContactScope, string][] = [
+  ["GERAL", "Geral"],
   ["TECNICO", "Tecnico"],
   ["FINANCEIRO", "Financeiro"],
   ["COMERCIAL", "Comercial"],
@@ -38,6 +41,9 @@ export type DevelopmentRecord = {
   id: string;
   client_id: string;
   name: string;
+  document: string | null;
+  contact_phone: string | null;
+  contact_email: string | null;
   address_line: string | null;
   city: string | null;
   state: string | null;
@@ -102,11 +108,12 @@ export default function OperationalAdmin({
           <span className="eyebrow">Administracao operacional</span>
           <h2>Estrutura da operacao</h2>
           <p className="section-copy">
-            Cadastre a hierarquia Cliente → Empreendimento → Estacao → Ativo.
+            Cadastre o responsavel, depois o empreendimento (o cliente da MW), suas estacoes e ativos.
           </p>
         </div>
         <div className="admin-summary">
-          <span><strong>{clients.filter((item) => item.is_active).length}</strong> clientes</span>
+          <span><strong>{developments.filter((item) => item.is_active).length}</strong> empreendimentos</span>
+          <span><strong>{clients.filter((item) => item.is_active).length}</strong> responsaveis</span>
           <span><strong>{stations.filter((item) => item.is_active).length}</strong> estacoes</span>
           <span><strong>{assets.filter((item) => item.is_active).length}</strong> ativos</span>
         </div>
@@ -114,7 +121,7 @@ export default function OperationalAdmin({
 
       <div className="admin-tabs">
         {[
-          ["CLIENTES", "Clientes"],
+          ["CLIENTES", "Responsaveis"],
           ["EMPREENDIMENTOS", "Empreendimentos"],
           ["ESTACOES", "Estacoes"],
           ["ATIVOS", "Ativos"],
@@ -225,24 +232,24 @@ function ClientAdmin({
         method: "PATCH",
         body: JSON.stringify({ is_active: !client.is_active }),
       });
-      setFeedback(client.is_active ? "Cliente inativado." : "Cliente reativado.");
+      setFeedback(client.is_active ? "Responsavel inativado." : "Responsavel reativado.");
       await onChanged();
     } catch {
-      setFeedback("Nao foi possivel alterar o cliente.");
+      setFeedback("Nao foi possivel alterar o responsavel.");
     } finally {
       setBusy(false);
     }
   }
 
   async function save() {
-    if (name.trim().length < 2) return setFeedback("Informe o nome do cliente.");
-    if (!contactRole.trim()) return setFeedback("Informe a funcao do cliente.");
-    if (!document.trim()) return setFeedback("Informe o CPF/CNPJ do cliente.");
+    if (name.trim().length < 2) return setFeedback("Informe o nome do responsavel.");
+    if (!contactRole.trim()) return setFeedback("Informe a funcao do responsavel.");
+    if (!document.trim()) return setFeedback("Informe o CPF/CNPJ do responsavel.");
     if (!isValidCpfCnpj(document)) {
       return setFeedback("CPF/CNPJ invalido. Confira os numeros digitados.");
     }
     if (!contactPhone.trim() && !contactWhatsapp.trim()) {
-      return setFeedback("Informe o telefone ou o WhatsApp do cliente.");
+      return setFeedback("Informe o telefone ou o WhatsApp do responsavel.");
     }
     if (contactPhone.trim() && !isCompletePhone(contactPhone)) {
       return setFeedback("Telefone incompleto. Informe DDD e numero.");
@@ -264,18 +271,18 @@ function ClientAdmin({
           contact_whatsapp: contactWhatsapp.trim() || null,
         }),
       });
-      setFeedback(editingId ? "Cliente atualizado." : "Cliente cadastrado.");
+      setFeedback(editingId ? "Responsavel atualizado." : "Responsavel cadastrado.");
       resetForm();
       await onChanged();
     } catch (error) {
       const status =
         typeof error === "object" && error !== null && "status" in error ? error.status : null;
       if (status === 409) {
-        setFeedback("Ja existe um cliente com esse CPF/CNPJ. Use a busca para localiza-lo.");
+        setFeedback("Ja existe um responsavel com esse CPF/CNPJ. Use a busca para localiza-lo.");
       } else if (status === 422) {
         setFeedback("Confira os dados informados, em especial o email.");
       } else {
-        setFeedback(editingId ? "Nao foi possivel atualizar o cliente." : "Nao foi possivel cadastrar o cliente.");
+        setFeedback(editingId ? "Nao foi possivel atualizar o responsavel." : "Nao foi possivel cadastrar o responsavel.");
       }
     } finally {
       setBusy(false);
@@ -289,7 +296,7 @@ function ClientAdmin({
       );
     } catch {
       setContacts([]);
-      setLinkFeedback("Nao foi possivel carregar os empreendimentos do cliente.");
+      setLinkFeedback("Nao foi possivel carregar os empreendimentos do responsavel.");
     }
   }
 
@@ -322,7 +329,7 @@ function ClientAdmin({
         typeof error === "object" && error !== null && "status" in error && error.status === 409;
       setLinkFeedback(
         duplicated
-          ? "O cliente ja responde por essa area nesse empreendimento."
+          ? "O responsavel ja responde por essa area nesse empreendimento."
           : "Nao foi possivel registrar a responsabilidade.",
       );
     } finally {
@@ -346,6 +353,32 @@ function ClientAdmin({
     }
   }
 
+  async function togglePortal(contact: ClientContactRecord) {
+    setBusy(true);
+    try {
+      await api("/api/v1/client-contacts/" + contact.id, {
+        method: "PATCH",
+        body: JSON.stringify({ portal_access: !contact.portal_access }),
+      });
+      setLinkFeedback(
+        contact.portal_access
+          ? "Portal bloqueado para este empreendimento."
+          : "Portal liberado. O responsavel ve este empreendimento quando tiver login de portal.",
+      );
+      await loadContacts(contact.client_id);
+    } catch (error) {
+      const forbidden =
+        typeof error === "object" && error !== null && "status" in error && error.status === 403;
+      setLinkFeedback(
+        forbidden
+          ? "Somente administradores podem liberar o acesso ao portal."
+          : "Nao foi possivel alterar o acesso ao portal.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="admin-panel">
       <div className="client-list-column">
@@ -355,7 +388,7 @@ function ClientAdmin({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Buscar nome, CPF/CNPJ, funcao, telefone ou email"
-          aria-label="Buscar cliente"
+          aria-label="Buscar responsavel"
         />
       </label>
       <div className="admin-list">
@@ -388,19 +421,32 @@ function ClientAdmin({
                   <div className="client-contact-row" key={contact.id}>
                     <div>
                       <strong>{developmentMap.get(contact.development_id)?.name ?? "Empreendimento"}</strong>
-                      <span>{CONTACT_SCOPES.find(([value]) => value === contact.scope)?.[1] ?? contact.scope}</span>
+                      <span>
+                        {[
+                          contact.is_primary ? "Principal" : null,
+                          CONTACT_SCOPES.find(([value]) => value === contact.scope)?.[1] ?? contact.scope,
+                          contact.portal_access ? "Portal liberado" : "Portal bloqueado",
+                        ].filter(Boolean).join(" · ")}
+                      </span>
                     </div>
                     <div className="admin-actions">
                       <span className={contact.is_active ? "status status-revisada" : "status"}>{contact.is_active ? "Ativo" : "Inativo"}</span>
-                      <button className="text-button" disabled={busy} onClick={() => void toggleLink(contact)}>
-                        {contact.is_active ? "Inativar" : "Reativar"}
-                      </button>
+                      {contact.is_active && (
+                        <button className="text-button" disabled={busy} onClick={() => void togglePortal(contact)}>
+                          {contact.portal_access ? "Bloquear portal" : "Liberar portal"}
+                        </button>
+                      )}
+                      {!contact.is_primary && (
+                        <button className="text-button" disabled={busy} onClick={() => void toggleLink(contact)}>
+                          {contact.is_active ? "Inativar" : "Reativar"}
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
                 {contacts.length === 0 && (
                   <div className="empty-state">
-                    Nenhum empreendimento vinculado. Selecione abaixo o empreendimento e a area pela qual este cliente responde.
+                    Nenhum empreendimento vinculado. Selecione abaixo o empreendimento e a area pela qual este responsavel responde. O responsavel principal e definido no cadastro do empreendimento.
                   </div>
                 )}
                 <div className="client-contact-form">
@@ -422,16 +468,16 @@ function ClientAdmin({
             )}
           </div>
         ))}
-        {clients.length === 0 && <div className="empty-state">Nenhum cliente cadastrado.</div>}
+        {clients.length === 0 && <div className="empty-state">Nenhum responsavel cadastrado.</div>}
         {clients.length > 0 && visibleClients.length === 0 && (
           <div className="empty-state">
-            Nenhum cliente encontrado para "{search.trim()}". Confira a grafia ou limpe a busca.
+            Nenhum responsavel encontrado para "{search.trim()}". Confira a grafia ou limpe a busca.
           </div>
         )}
       </div>
       </div>
       <div className="compact-form admin-create-form">
-        <h3>{editingId ? "Editar cliente" : "Novo cliente"}</h3>
+        <h3>{editingId ? "Editar responsavel" : "Novo responsavel"}</h3>
         <div className="compact-form-grid">
           <label><span>Nome <b className="required-mark">*</b></span><input required aria-required="true" value={name} onChange={(e) => setName(e.target.value)} /></label>
           <label><span>Funcao <b className="required-mark">*</b></span><input required aria-required="true" value={contactRole} onChange={(e) => setContactRole(e.target.value)} /></label>
@@ -446,7 +492,7 @@ function ClientAdmin({
         </p>
         <div className="admin-actions">
           <button className="small-button" disabled={busy} onClick={() => void save()}>
-            {busy ? "Salvando..." : editingId ? "Salvar alteracoes" : "Cadastrar cliente"}
+            {busy ? "Salvando..." : editingId ? "Salvar alteracoes" : "Cadastrar responsavel"}
           </button>
           {editingId && <button className="text-button" disabled={busy} onClick={resetForm}>Cancelar</button>}
         </div>
@@ -457,8 +503,12 @@ function ClientAdmin({
 }
 
 function DevelopmentAdmin({ clients, developments, onChanged }: { clients: ClientRecord[]; developments: DevelopmentRecord[]; onChanged: () => Promise<void> }) {
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [clientId, setClientId] = useState("");
   const [name, setName] = useState("");
+  const [document, setDocument] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
   const [addressLine, setAddressLine] = useState("");
   const [city, setCity] = useState("Fortaleza");
   const [state, setState] = useState("CE");
@@ -466,6 +516,26 @@ function DevelopmentAdmin({ clients, developments, onChanged }: { clients: Clien
   const [feedback, setFeedback] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const clientMap = new Map(clients.map((item) => [item.id, item]));
+
+  function resetForm() {
+    setEditingId(null);
+    setClientId(""); setName(""); setDocument(""); setContactPhone(""); setContactEmail("");
+    setAddressLine(""); setCity("Fortaleza"); setState("CE"); setPostalCode("");
+  }
+
+  function startEdit(item: DevelopmentRecord) {
+    setEditingId(item.id);
+    setClientId(item.client_id);
+    setName(item.name);
+    setDocument(formatDocument(item.document));
+    setContactPhone(formatPhone(item.contact_phone));
+    setContactEmail(item.contact_email ?? "");
+    setAddressLine(item.address_line ?? "");
+    setCity(item.city ?? "");
+    setState(item.state ?? "");
+    setPostalCode(item.postal_code ?? "");
+    setFeedback(null);
+  }
 
   async function toggle(item: DevelopmentRecord) {
     setBusy(true);
@@ -483,18 +553,48 @@ function DevelopmentAdmin({ clients, developments, onChanged }: { clients: Clien
     }
   }
 
-  async function create() {
-    if (!clientId || name.trim().length < 2) return setFeedback("Selecione o cliente e informe o empreendimento.");
+  async function save() {
+    if (!clientId) return setFeedback("Selecione o responsavel principal.");
+    if (name.trim().length < 2) return setFeedback("Informe o nome do empreendimento.");
+    if (!document.trim()) return setFeedback("Informe o CNPJ do empreendimento.");
+    if (normalizeDocument(document).length !== 14 || !isValidCpfCnpj(document)) {
+      return setFeedback("CNPJ invalido. Confira os numeros digitados.");
+    }
+    if (contactPhone.trim() && !isCompletePhone(contactPhone)) {
+      return setFeedback("Telefone incompleto. Informe DDD e numero.");
+    }
     setBusy(true);
     try {
-      await api("/api/v1/developments", { method: "POST", body: JSON.stringify({
-        client_id: clientId, name: name.trim(), address_line: addressLine.trim() || null,
-        city: city.trim() || null, state: state.trim().toUpperCase() || null, postal_code: postalCode.trim() || null,
-      }) });
-      setName(""); setAddressLine(""); setPostalCode(""); setFeedback("Empreendimento cadastrado.");
+      await api(editingId ? "/api/v1/developments/" + editingId : "/api/v1/developments", {
+        method: editingId ? "PATCH" : "POST",
+        body: JSON.stringify({
+          client_id: clientId,
+          name: name.trim(),
+          document: normalizeDocument(document),
+          contact_phone: contactPhone.trim() || null,
+          contact_email: contactEmail.trim() || null,
+          address_line: addressLine.trim() || null,
+          city: city.trim() || null,
+          state: state.trim().toUpperCase() || null,
+          postal_code: postalCode.trim() || null,
+        }),
+      });
+      setFeedback(editingId ? "Empreendimento atualizado." : "Empreendimento cadastrado.");
+      resetForm();
       await onChanged();
-    } catch { setFeedback("Nao foi possivel cadastrar o empreendimento."); }
-    finally { setBusy(false); }
+    } catch (error) {
+      const status =
+        typeof error === "object" && error !== null && "status" in error ? error.status : null;
+      if (status === 409) {
+        setFeedback("Ja existe um empreendimento com esse CNPJ.");
+      } else if (status === 422) {
+        setFeedback("Confira os dados informados, em especial o email e a UF.");
+      } else {
+        setFeedback(editingId ? "Nao foi possivel atualizar o empreendimento." : "Nao foi possivel cadastrar o empreendimento.");
+      }
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -502,27 +602,51 @@ function DevelopmentAdmin({ clients, developments, onChanged }: { clients: Clien
       <div className="admin-list">
         {developments.map((item) => (
           <div className="admin-row" key={item.id}>
-            <div><strong>{item.name}</strong><span>{clientMap.get(item.client_id)?.name ?? "Cliente"} · {[item.city, item.state].filter(Boolean).join("/")}</span></div>
+            <div>
+              <strong>{item.name}</strong>
+              <span>
+                {[
+                  formatDocument(item.document),
+                  "Responsavel principal: " + (clientMap.get(item.client_id)?.name ?? "nao encontrado"),
+                  [item.city, item.state].filter(Boolean).join("/"),
+                ].filter(Boolean).join(" · ")}
+              </span>
+            </div>
             <div className="admin-actions">
               <span className={item.is_active ? "status status-revisada" : "status"}>{item.is_active ? "Ativo" : "Inativo"}</span>
+              <button className="text-button" disabled={busy} onClick={() => startEdit(item)}>Editar</button>
               <button className="text-button" disabled={busy} onClick={() => void toggle(item)}>
                 {item.is_active ? "Inativar" : "Reativar"}
               </button>
             </div>
           </div>
         ))}
+        {developments.length === 0 && (
+          <div className="empty-state">
+            Nenhum empreendimento cadastrado. Cadastre primeiro o responsavel principal na aba Responsaveis.
+          </div>
+        )}
       </div>
       <div className="compact-form admin-create-form">
-        <h3>Novo empreendimento</h3>
+        <h3>{editingId ? "Editar empreendimento" : "Novo empreendimento"}</h3>
         <div className="compact-form-grid">
-          <label>Cliente<select value={clientId} onChange={(e) => setClientId(e.target.value)}><option value="">Selecione</option>{clients.filter((x) => x.is_active).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
-          <label>Nome<input value={name} onChange={(e) => setName(e.target.value)} /></label>
+          <label><span>Nome <b className="required-mark">*</b></span><input required aria-required="true" value={name} onChange={(e) => setName(e.target.value)} /></label>
+          <label><span>CNPJ <b className="required-mark">*</b></span><input required aria-required="true" value={document} onChange={(e) => setDocument(e.target.value)} /></label>
+          <label><span>Responsavel principal <b className="required-mark">*</b></span><select required aria-required="true" value={clientId} onChange={(e) => setClientId(e.target.value)}><option value="">Selecione</option>{clients.filter((x) => x.is_active || x.id === clientId).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+          <label>Telefone<input type="tel" inputMode="numeric" placeholder="(85) 3333-3333" value={contactPhone} onChange={(e) => setContactPhone(formatPhone(e.target.value))} /></label>
+          <label>Email<input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} /></label>
           <label>Endereco<input value={addressLine} onChange={(e) => setAddressLine(e.target.value)} /></label>
           <label>Cidade<input value={city} onChange={(e) => setCity(e.target.value)} /></label>
           <label>UF<input maxLength={2} value={state} onChange={(e) => setState(e.target.value)} /></label>
           <label>CEP<input value={postalCode} onChange={(e) => setPostalCode(e.target.value)} /></label>
         </div>
-        <button className="small-button" disabled={busy} onClick={() => void create()}>{busy ? "Salvando..." : "Cadastrar empreendimento"}</button>
+        <p className="required-hint"><b className="required-mark">*</b> Obrigatorio.</p>
+        <div className="admin-actions">
+          <button className="small-button" disabled={busy} onClick={() => void save()}>
+            {busy ? "Salvando..." : editingId ? "Salvar alteracoes" : "Cadastrar empreendimento"}
+          </button>
+          {editingId && <button className="text-button" disabled={busy} onClick={resetForm}>Cancelar</button>}
+        </div>
         {feedback && <span className="inline-feedback">{feedback}</span>}
       </div>
     </div>
