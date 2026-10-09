@@ -1,10 +1,17 @@
+import mwSymbol from "../assets/mw-symbol.png";
+
 export default function AppLoading() {
   return (
     <div className="app-shell loading-shell" aria-busy="true" aria-label="Carregando aplicacao">
       <header className="topbar">
-        <div>
-          <span className="brand-kicker">MW Engenharia</span>
-          <strong>Preparando operacao</strong>
+        <div className="topbar-brand">
+          <span className="brand-logo-tile">
+            <img src={mwSymbol} alt="" />
+          </span>
+          <div>
+            <span className="brand-kicker">MW Engenharia</span>
+            <strong>Preparando operacao</strong>
+          </div>
         </div>
       </header>
       <main className="content">

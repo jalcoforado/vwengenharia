@@ -14,7 +14,12 @@ export default defineConfig({
         display: "standalone",
         start_url: "/",
         theme_color: "#813a2a",
-        background_color: "#f3f6f4"
+        background_color: "#ffffff",
+        icons: [
+          { src: "pwa-192.png", sizes: "192x192", type: "image/png" },
+          { src: "pwa-512.png", sizes: "512x512", type: "image/png" },
+          { src: "pwa-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" }
+        ]
       }
     })
   ],

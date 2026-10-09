@@ -55,6 +55,8 @@ import { cacheValue, outboxCount, queueUpload, readCache, type SyncQueueSummary 
 import { runOrQueue, syncOutbox } from "./lib/sync";
 import { SyncControl, SyncHealthCard } from "./components/SyncStatus";
 import Toast from "./components/Toast";
+import mwLogo from "./assets/mw-logo.png";
+import mwSymbol from "./assets/mw-symbol.png";
 
 type Visit = {
   id: string;
@@ -564,17 +566,22 @@ export default function App() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <div>
-          <span className="brand-kicker">MW Engenharia</span>
-          <strong>
-            {me?.role === "CLIENTE"
-              ? "Portal do cliente"
-              : selectedVisit
-                ? "Visita tecnica"
-                : isManagement
-                  ? "Cockpit operacional"
-                  : "Operacao de campo"}
-          </strong>
+        <div className="topbar-brand">
+          <span className="brand-logo-tile">
+            <img src={mwSymbol} alt="" />
+          </span>
+          <div>
+            <span className="brand-kicker">MW Engenharia</span>
+            <strong>
+              {me?.role === "CLIENTE"
+                ? "Portal do cliente"
+                : selectedVisit
+                  ? "Visita tecnica"
+                  : isManagement
+                    ? "Cockpit operacional"
+                    : "Operacao de campo"}
+            </strong>
+          </div>
         </div>
         <div className="top-actions">
           <span className={online ? "connection online" : "connection offline"}>
@@ -675,8 +682,7 @@ function Login({ onSuccess }: { onSuccess: () => void }) {
   return (
     <main className="login-page">
       <section className="login-card">
-        <div className="brand-mark">MW</div>
-        <span className="brand-kicker">MW Engenharia</span>
+        <img className="login-logo" src={mwLogo} alt="MW Engenharia" />
         <h1>Operacao em campo</h1>
         <p>Visitas, checklist, medicoes e ocorrencias em um unico lugar.</p>
         <form onSubmit={submit}>
