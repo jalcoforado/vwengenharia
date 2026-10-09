@@ -30,6 +30,13 @@ class AssetStatus(str, enum.Enum):
     NAO_APLICAVEL = "NAO_APLICAVEL"
 
 
+class ContactScope(str, enum.Enum):
+    TECNICO = "TECNICO"
+    FINANCEIRO = "FINANCEIRO"
+    COMERCIAL = "COMERCIAL"
+    ADMINISTRATIVO = "ADMINISTRATIVO"
+
+
 class Client(TimestampMixin, Base):
     __tablename__ = "clients"
     __table_args__ = (
@@ -45,6 +52,8 @@ class Client(TimestampMixin, Base):
     contact_name: Mapped[str | None] = mapped_column(String(160), nullable=True)
     contact_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
     contact_phone: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    contact_role: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    contact_whatsapp: Mapped[str | None] = mapped_column(String(40), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
 
@@ -173,3 +182,40 @@ class ClientMembershipAccess(TimestampMixin, Base):
         nullable=False,
         index=True,
     )
+
+
+class ClientDevelopmentContact(TimestampMixin, Base):
+    """Cliente que responde por um empreendimento em uma area de responsabilidade."""
+
+    __tablename__ = "client_development_contacts"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "client_id",
+            "development_id",
+            "scope",
+            name="uq_client_development_contacts",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    client_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("clients.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    development_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("developments.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    scope: Mapped[str] = mapped_column(String(32), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

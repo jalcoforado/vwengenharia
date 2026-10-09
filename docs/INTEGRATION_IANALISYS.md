@@ -35,6 +35,7 @@ GET /api/v1/integration/v1/{resource}
 Recursos:
 
 - clients
+- client-contacts
 - developments
 - stations
 - assets
@@ -54,6 +55,29 @@ Parâmetros:
 - offset: padrão 0
 
 Datas de watermark devem incluir timezone.
+
+### client-contacts
+
+Uma linha por cliente, empreendimento e área de responsabilidade. O cliente é a pessoa que responde por um ou mais empreendimentos; um empreendimento pode ter vários responsáveis.
+
+Correspondência com a dimensão Cliente do iAnalisys:
+
+| Dimensão Cliente | Campo no recurso | Origem no ERP |
+| --- | --- | --- |
+| id_cliente | client_id | clients.id |
+| id_empreendimento | development_id | developments.id |
+| escopo_contato | scope | TECNICO, FINANCEIRO, COMERCIAL ou ADMINISTRATIVO |
+| nome | name | clients.name |
+| funcao | contact_role | clients.contact_role |
+| telefone | contact_phone | clients.contact_phone |
+| whatsapp | contact_whatsapp | clients.contact_whatsapp |
+| email | contact_email | clients.contact_email |
+
+O recurso também traz `id` (do vínculo), `is_active`, `created_at` e `updated_at`.
+
+`updated_at` é o maior entre a alteração do vínculo e a do cliente. Assim, mudar o telefone de um cliente reenvia todas as linhas dele na carga incremental.
+
+O dono do empreendimento continua em `developments.client_id`. O vínculo de responsabilidade é um cadastro à parte e não altera o acesso do perfil CLIENTE ao portal.
 
 ## Envelope
 

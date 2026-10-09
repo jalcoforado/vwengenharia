@@ -25,6 +25,7 @@ class IntegrationKeyCreated(IntegrationKeyRead):
 
 class IntegrationResource(StrEnum):
     CLIENTS = "clients"
+    CLIENT_CONTACTS = "client-contacts"
     DEVELOPMENTS = "developments"
     STATIONS = "stations"
     ASSETS = "assets"

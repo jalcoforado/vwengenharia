@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from app.models.operations import AssetStatus
+from app.models.operations import AssetStatus, ContactScope
 
 
 class ORMModel(BaseModel):
@@ -17,6 +17,8 @@ class ClientCreate(BaseModel):
     contact_name: str | None = Field(default=None, max_length=160)
     contact_email: EmailStr | None = None
     contact_phone: str | None = Field(default=None, max_length=40)
+    contact_role: str | None = Field(default=None, max_length=120)
+    contact_whatsapp: str | None = Field(default=None, max_length=40)
 
 
 class ClientUpdate(BaseModel):
@@ -25,6 +27,8 @@ class ClientUpdate(BaseModel):
     contact_name: str | None = Field(default=None, max_length=160)
     contact_email: EmailStr | None = None
     contact_phone: str | None = Field(default=None, max_length=40)
+    contact_role: str | None = Field(default=None, max_length=120)
+    contact_whatsapp: str | None = Field(default=None, max_length=40)
     is_active: bool | None = None
 
 
@@ -35,6 +39,29 @@ class ClientRead(ORMModel):
     contact_name: str | None
     contact_email: str | None
     contact_phone: str | None
+    contact_role: str | None
+    contact_whatsapp: str | None
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class ClientContactCreate(BaseModel):
+    client_id: UUID
+    development_id: UUID
+    scope: ContactScope
+
+
+class ClientContactUpdate(BaseModel):
+    scope: ContactScope | None = None
+    is_active: bool | None = None
+
+
+class ClientContactRead(ORMModel):
+    id: UUID
+    client_id: UUID
+    development_id: UUID
+    scope: ContactScope
     is_active: bool
     created_at: datetime
     updated_at: datetime

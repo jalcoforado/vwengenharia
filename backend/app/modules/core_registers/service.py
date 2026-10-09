@@ -7,7 +7,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit import AuditEvent
 from app.models.base import Base
-from app.models.operations import Asset, AssetType, Client, Development, Station
+from app.models.operations import (
+    Asset,
+    AssetType,
+    Client,
+    ClientDevelopmentContact,
+    Development,
+    Station,
+)
 from app.modules.auth.dependencies import AuthContext
 
 
@@ -74,6 +81,119 @@ async def create_client(session: AsyncSession, context: AuthContext, payload) ->
     await session.commit()
     await session.refresh(client)
     return client
+
+
+async def list_client_contacts(
+    session: AsyncSession,
+    tenant_id: UUID,
+    *,
+    client_id: UUID | None = None,
+    development_id: UUID | None = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> list[ClientDevelopmentContact]:
+    stmt = select(ClientDevelopmentContact).where(
+        ClientDevelopmentContact.tenant_id == tenant_id
+    )
+    if client_id is not None:
+        stmt = stmt.where(ClientDevelopmentContact.client_id == client_id)
+    if development_id is not None:
+        stmt = stmt.where(ClientDevelopmentContact.development_id == development_id)
+    stmt = (
+        stmt.order_by(ClientDevelopmentContact.created_at, ClientDevelopmentContact.id)
+        .limit(limit)
+        .offset(offset)
+    )
+    return list((await session.execute(stmt)).scalars().all())
+
+
+async def _ensure_client_contact_is_unique(
+    session: AsyncSession,
+    tenant_id: UUID,
+    *,
+    client_id: UUID,
+    development_id: UUID,
+    scope: str,
+    ignore_id: UUID | None = None,
+) -> None:
+    stmt = select(ClientDevelopmentContact.id).where(
+        ClientDevelopmentContact.tenant_id == tenant_id,
+        ClientDevelopmentContact.client_id == client_id,
+        ClientDevelopmentContact.development_id == development_id,
+        ClientDevelopmentContact.scope == scope,
+    )
+    if ignore_id is not None:
+        stmt = stmt.where(ClientDevelopmentContact.id != ignore_id)
+    if (await session.execute(stmt)).first() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="client_contact_already_exists",
+        )
+
+
+async def create_client_contact(
+    session: AsyncSession, context: AuthContext, payload
+) -> ClientDevelopmentContact:
+    await tenant_get_or_404(session, Client, context.tenant.id, payload.client_id)
+    await tenant_get_or_404(session, Development, context.tenant.id, payload.development_id)
+    await _ensure_client_contact_is_unique(
+        session,
+        context.tenant.id,
+        client_id=payload.client_id,
+        development_id=payload.development_id,
+        scope=payload.scope.value,
+    )
+    contact = ClientDevelopmentContact(
+        tenant_id=context.tenant.id,
+        client_id=payload.client_id,
+        development_id=payload.development_id,
+        scope=payload.scope.value,
+    )
+    session.add(contact)
+    await session.flush()
+    add_audit(
+        session,
+        context,
+        action="CLIENT_CONTACT_CREATE",
+        entity_type="client_development_contact",
+        entity_id=contact.id,
+    )
+    await session.commit()
+    await session.refresh(contact)
+    return contact
+
+
+async def update_client_contact(
+    session: AsyncSession,
+    context: AuthContext,
+    contact: ClientDevelopmentContact,
+    payload: BaseModel,
+) -> ClientDevelopmentContact:
+    changes = payload.model_dump(exclude_unset=True, exclude_none=True)
+    if "scope" in changes:
+        changes["scope"] = changes["scope"].value
+        await _ensure_client_contact_is_unique(
+            session,
+            context.tenant.id,
+            client_id=contact.client_id,
+            development_id=contact.development_id,
+            scope=changes["scope"],
+            ignore_id=contact.id,
+        )
+    for field, value in changes.items():
+        setattr(contact, field, value)
+    if changes:
+        add_audit(
+            session,
+            context,
+            action="CLIENT_CONTACT_UPDATE",
+            entity_type="client_development_contact",
+            entity_id=contact.id,
+            fields=sorted(changes),
+        )
+        await session.commit()
+        await session.refresh(contact)
+    return contact
 
 
 async def create_development(session: AsyncSession, context: AuthContext, payload) -> Development:

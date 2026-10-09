@@ -9,8 +9,27 @@ export type ClientRecord = {
   contact_name: string | null;
   contact_email: string | null;
   contact_phone: string | null;
+  contact_role: string | null;
+  contact_whatsapp: string | null;
   is_active: boolean;
 };
+
+export type ContactScope = "TECNICO" | "FINANCEIRO" | "COMERCIAL" | "ADMINISTRATIVO";
+
+export type ClientContactRecord = {
+  id: string;
+  client_id: string;
+  development_id: string;
+  scope: ContactScope;
+  is_active: boolean;
+};
+
+const CONTACT_SCOPES: [ContactScope, string][] = [
+  ["TECNICO", "Tecnico"],
+  ["FINANCEIRO", "Financeiro"],
+  ["COMERCIAL", "Comercial"],
+  ["ADMINISTRATIVO", "Administrativo"],
+];
 
 export type DevelopmentRecord = {
   id: string;
@@ -107,7 +126,9 @@ export default function OperationalAdmin({
         ))}
       </div>
 
-      {tab === "CLIENTES" && <ClientAdmin clients={clients} onChanged={onChanged} />}
+      {tab === "CLIENTES" && (
+        <ClientAdmin clients={clients} developments={developments} onChanged={onChanged} />
+      )}
       {tab === "EMPREENDIMENTOS" && (
         <DevelopmentAdmin clients={clients} developments={developments} onChanged={onChanged} />
       )}
@@ -126,14 +147,49 @@ export default function OperationalAdmin({
   );
 }
 
-function ClientAdmin({ clients, onChanged }: { clients: ClientRecord[]; onChanged: () => Promise<void> }) {
+function ClientAdmin({
+  clients,
+  developments,
+  onChanged,
+}: {
+  clients: ClientRecord[];
+  developments: DevelopmentRecord[];
+  onChanged: () => Promise<void>;
+}) {
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [document, setDocument] = useState("");
   const [contactName, setContactName] = useState("");
+  const [contactRole, setContactRole] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
+  const [contactWhatsapp, setContactWhatsapp] = useState("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [contacts, setContacts] = useState<ClientContactRecord[]>([]);
+  const [linkDevelopmentId, setLinkDevelopmentId] = useState("");
+  const [linkScope, setLinkScope] = useState<ContactScope>("TECNICO");
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [linkFeedback, setLinkFeedback] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const developmentMap = new Map(developments.map((item) => [item.id, item]));
+
+  function resetForm() {
+    setEditingId(null);
+    setName(""); setDocument(""); setContactName(""); setContactRole("");
+    setContactEmail(""); setContactPhone(""); setContactWhatsapp("");
+  }
+
+  function startEdit(client: ClientRecord) {
+    setEditingId(client.id);
+    setName(client.name);
+    setDocument(client.document ?? "");
+    setContactName(client.contact_name ?? "");
+    setContactRole(client.contact_role ?? "");
+    setContactEmail(client.contact_email ?? "");
+    setContactPhone(client.contact_phone ?? "");
+    setContactWhatsapp(client.contact_whatsapp ?? "");
+    setFeedback(null);
+  }
 
   async function toggle(client: ClientRecord) {
     setBusy(true);
@@ -151,25 +207,91 @@ function ClientAdmin({ clients, onChanged }: { clients: ClientRecord[]; onChange
     }
   }
 
-  async function create() {
+  async function save() {
     if (name.trim().length < 2) return setFeedback("Informe o nome do cliente.");
     setBusy(true);
     try {
-      await api("/api/v1/clients", {
-        method: "POST",
+      await api(editingId ? "/api/v1/clients/" + editingId : "/api/v1/clients", {
+        method: editingId ? "PATCH" : "POST",
         body: JSON.stringify({
           name: name.trim(),
           document: document.trim() || null,
           contact_name: contactName.trim() || null,
+          contact_role: contactRole.trim() || null,
           contact_email: contactEmail.trim() || null,
           contact_phone: contactPhone.trim() || null,
+          contact_whatsapp: contactWhatsapp.trim() || null,
         }),
       });
-      setName(""); setDocument(""); setContactName(""); setContactEmail(""); setContactPhone("");
-      setFeedback("Cliente cadastrado.");
+      setFeedback(editingId ? "Cliente atualizado." : "Cliente cadastrado.");
+      resetForm();
       await onChanged();
     } catch {
-      setFeedback("Nao foi possivel cadastrar o cliente.");
+      setFeedback(editingId ? "Nao foi possivel atualizar o cliente." : "Nao foi possivel cadastrar o cliente.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function loadContacts(clientId: string) {
+    try {
+      setContacts(
+        await api<ClientContactRecord[]>("/api/v1/client-contacts?limit=500&client_id=" + clientId),
+      );
+    } catch {
+      setContacts([]);
+      setLinkFeedback("Nao foi possivel carregar os empreendimentos do cliente.");
+    }
+  }
+
+  async function toggleExpanded(client: ClientRecord) {
+    setLinkFeedback(null);
+    setLinkDevelopmentId("");
+    if (expandedId === client.id) return setExpandedId(null);
+    setContacts([]);
+    setExpandedId(client.id);
+    await loadContacts(client.id);
+  }
+
+  async function addLink(client: ClientRecord) {
+    if (!linkDevelopmentId) return setLinkFeedback("Selecione o empreendimento.");
+    setBusy(true);
+    try {
+      await api("/api/v1/client-contacts", {
+        method: "POST",
+        body: JSON.stringify({
+          client_id: client.id,
+          development_id: linkDevelopmentId,
+          scope: linkScope,
+        }),
+      });
+      setLinkDevelopmentId("");
+      setLinkFeedback("Responsabilidade registrada.");
+      await loadContacts(client.id);
+    } catch (error) {
+      const duplicated =
+        typeof error === "object" && error !== null && "status" in error && error.status === 409;
+      setLinkFeedback(
+        duplicated
+          ? "O cliente ja responde por essa area nesse empreendimento."
+          : "Nao foi possivel registrar a responsabilidade.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function toggleLink(contact: ClientContactRecord) {
+    setBusy(true);
+    try {
+      await api("/api/v1/client-contacts/" + contact.id, {
+        method: "PATCH",
+        body: JSON.stringify({ is_active: !contact.is_active }),
+      });
+      setLinkFeedback(contact.is_active ? "Responsabilidade inativada." : "Responsabilidade reativada.");
+      await loadContacts(contact.client_id);
+    } catch {
+      setLinkFeedback("Nao foi possivel alterar a responsabilidade.");
     } finally {
       setBusy(false);
     }
@@ -179,28 +301,87 @@ function ClientAdmin({ clients, onChanged }: { clients: ClientRecord[]; onChange
     <div className="admin-panel">
       <div className="admin-list">
         {clients.map((client) => (
-          <div className="admin-row" key={client.id}>
-            <div><strong>{client.name}</strong><span>{client.document || client.contact_name || "Sem documento informado"}</span></div>
-            <div className="admin-actions">
-              <span className={client.is_active ? "status status-revisada" : "status"}>{client.is_active ? "Ativo" : "Inativo"}</span>
-              <button className="text-button" disabled={busy} onClick={() => void toggle(client)}>
-                {client.is_active ? "Inativar" : "Reativar"}
-              </button>
+          <div className="client-entry" key={client.id}>
+            <div className="admin-row">
+              <div>
+                <strong>{client.name}</strong>
+                <span>
+                  {[client.contact_role, client.contact_whatsapp || client.contact_phone, client.contact_email]
+                    .filter(Boolean)
+                    .join(" · ") || client.document || "Sem contato informado"}
+                </span>
+              </div>
+              <div className="admin-actions">
+                <span className={client.is_active ? "status status-revisada" : "status"}>{client.is_active ? "Ativo" : "Inativo"}</span>
+                <button className="text-button" disabled={busy} onClick={() => void toggleExpanded(client)}>
+                  {expandedId === client.id ? "Fechar" : "Empreendimentos"}
+                </button>
+                <button className="text-button" disabled={busy} onClick={() => startEdit(client)}>Editar</button>
+                <button className="text-button" disabled={busy} onClick={() => void toggle(client)}>
+                  {client.is_active ? "Inativar" : "Reativar"}
+                </button>
+              </div>
             </div>
+            {expandedId === client.id && (
+              <div className="client-contacts">
+                <span className="eyebrow">Empreendimentos pelos quais responde</span>
+                {contacts.map((contact) => (
+                  <div className="client-contact-row" key={contact.id}>
+                    <div>
+                      <strong>{developmentMap.get(contact.development_id)?.name ?? "Empreendimento"}</strong>
+                      <span>{CONTACT_SCOPES.find(([value]) => value === contact.scope)?.[1] ?? contact.scope}</span>
+                    </div>
+                    <div className="admin-actions">
+                      <span className={contact.is_active ? "status status-revisada" : "status"}>{contact.is_active ? "Ativo" : "Inativo"}</span>
+                      <button className="text-button" disabled={busy} onClick={() => void toggleLink(contact)}>
+                        {contact.is_active ? "Inativar" : "Reativar"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {contacts.length === 0 && (
+                  <div className="empty-state">
+                    Nenhum empreendimento vinculado. Selecione abaixo o empreendimento e a area pela qual este cliente responde.
+                  </div>
+                )}
+                <div className="client-contact-form">
+                  <label>Empreendimento
+                    <select value={linkDevelopmentId} onChange={(e) => setLinkDevelopmentId(e.target.value)}>
+                      <option value="">Selecione</option>
+                      {developments.filter((x) => x.is_active).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+                    </select>
+                  </label>
+                  <label>Area de responsabilidade
+                    <select value={linkScope} onChange={(e) => setLinkScope(e.target.value as ContactScope)}>
+                      {CONTACT_SCOPES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                    </select>
+                  </label>
+                  <button className="small-button" disabled={busy} onClick={() => void addLink(client)}>Vincular</button>
+                </div>
+                {linkFeedback && <span className="inline-feedback">{linkFeedback}</span>}
+              </div>
+            )}
           </div>
         ))}
         {clients.length === 0 && <div className="empty-state">Nenhum cliente cadastrado.</div>}
       </div>
       <div className="compact-form admin-create-form">
-        <h3>Novo cliente</h3>
+        <h3>{editingId ? "Editar cliente" : "Novo cliente"}</h3>
         <div className="compact-form-grid">
           <label>Nome<input value={name} onChange={(e) => setName(e.target.value)} /></label>
-          <label>CNPJ/Documento<input value={document} onChange={(e) => setDocument(e.target.value)} /></label>
-          <label>Contato<input value={contactName} onChange={(e) => setContactName(e.target.value)} /></label>
+          <label>Funcao<input value={contactRole} onChange={(e) => setContactRole(e.target.value)} /></label>
+          <label>Telefone<input type="tel" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} /></label>
+          <label>WhatsApp<input type="tel" value={contactWhatsapp} onChange={(e) => setContactWhatsapp(e.target.value)} /></label>
           <label>Email<input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} /></label>
-          <label>Telefone<input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} /></label>
+          <label>CNPJ/Documento<input value={document} onChange={(e) => setDocument(e.target.value)} /></label>
+          <label>Contato alternativo<input value={contactName} onChange={(e) => setContactName(e.target.value)} /></label>
         </div>
-        <button className="small-button" disabled={busy} onClick={() => void create()}>{busy ? "Salvando..." : "Cadastrar cliente"}</button>
+        <div className="admin-actions">
+          <button className="small-button" disabled={busy} onClick={() => void save()}>
+            {busy ? "Salvando..." : editingId ? "Salvar alteracoes" : "Cadastrar cliente"}
+          </button>
+          {editingId && <button className="text-button" disabled={busy} onClick={resetForm}>Cancelar</button>}
+        </div>
         {feedback && <span className="inline-feedback">{feedback}</span>}
       </div>
     </div>

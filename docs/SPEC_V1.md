@@ -163,6 +163,7 @@ Entidades principais:
 - memberships
 - clients
 - developments
+- client_development_contacts
 - stations
 - asset_types
 - assets

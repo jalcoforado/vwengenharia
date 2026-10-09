@@ -4,7 +4,14 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 
 from app.models.identity import Role
-from app.models.operations import Asset, AssetType, Client, Development, Station
+from app.models.operations import (
+    Asset,
+    AssetType,
+    Client,
+    ClientDevelopmentContact,
+    Development,
+    Station,
+)
 from app.modules.auth.dependencies import AuthContext, SessionDep, require_roles
 from app.modules.core_registers.schemas import (
     AssetCreate,
@@ -13,6 +20,9 @@ from app.modules.core_registers.schemas import (
     AssetTypeRead,
     AssetTypeUpdate,
     AssetUpdate,
+    ClientContactCreate,
+    ClientContactRead,
+    ClientContactUpdate,
     ClientCreate,
     ClientRead,
     ClientUpdate,
@@ -27,10 +37,13 @@ from app.modules.core_registers.service import (
     create_asset,
     create_asset_type,
     create_client,
+    create_client_contact,
     create_development,
     create_station,
+    list_client_contacts,
     list_tenant_objects,
     tenant_get_or_404,
+    update_client_contact,
     update_object,
     validate_update_parents,
 )
@@ -97,6 +110,49 @@ async def patch_client(
         action="CLIENT_UPDATE",
         entity_type="client",
     )
+
+
+@router.get("/client-contacts", response_model=list[ClientContactRead])
+async def get_client_contacts(
+    context: ReadContextDep,
+    session: SessionDep,
+    limit: PageLimit = 100,
+    offset: PageOffset = 0,
+    client_id: UUID | None = None,
+    development_id: UUID | None = None,
+) -> list[ClientDevelopmentContact]:
+    return await list_client_contacts(
+        session,
+        context.tenant.id,
+        client_id=client_id,
+        development_id=development_id,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.post(
+    "/client-contacts",
+    response_model=ClientContactRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def post_client_contact(
+    payload: ClientContactCreate, context: WriteContextDep, session: SessionDep
+) -> ClientDevelopmentContact:
+    return await create_client_contact(session, context, payload)
+
+
+@router.patch("/client-contacts/{contact_id}", response_model=ClientContactRead)
+async def patch_client_contact(
+    contact_id: UUID,
+    payload: ClientContactUpdate,
+    context: WriteContextDep,
+    session: SessionDep,
+) -> ClientDevelopmentContact:
+    contact = await tenant_get_or_404(
+        session, ClientDevelopmentContact, context.tenant.id, contact_id
+    )
+    return await update_client_contact(session, context, contact, payload)
 
 
 @router.get("/developments", response_model=list[DevelopmentRead])
