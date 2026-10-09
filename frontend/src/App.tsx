@@ -1296,7 +1296,7 @@ function SupervisorHome({ me }: { me: Me }) {
         api<ClientRecord[]>("/api/v1/clients?limit=500"),
         api<DevelopmentRecord[]>("/api/v1/developments?limit=500"),
         api<AssetTypeRecord[]>("/api/v1/asset-types?limit=500"),
-        api<AssetRecord[]>("/api/v1/assets?limit=1000"),
+        api<AssetRecord[]>("/api/v1/assets?limit=500"),
         api<TeamMember[]>("/api/v1/team?active_only=true"),
         api<VisitPlan[]>("/api/v1/visit-plans?active_only=false"),
         api<ChecklistTemplateSummary[]>("/api/v1/checklist-templates"),
