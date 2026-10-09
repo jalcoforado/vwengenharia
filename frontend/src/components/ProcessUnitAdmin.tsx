@@ -374,6 +374,9 @@ export default function ProcessUnitAdmin({
                     >
                       <Wrench size={16} />
                     </button>
+                    <button className="icon-action icon-action-edit" disabled={busy} title="Editar" aria-label={"Editar: " + item.name} onClick={() => startEdit(item)}>
+                      <Pencil size={16} />
+                    </button>
                     <button
                       className="icon-action row-menu-trigger"
                       disabled={busy}

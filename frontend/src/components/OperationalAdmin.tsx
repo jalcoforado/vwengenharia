@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Boxes, Briefcase, Building2, EllipsisVertical, Layers, LocateFixed, Pencil, Search, Settings, User, UserPlus, Users, type LucideIcon } from "lucide-react";
+import { Boxes, Briefcase, Building2, EllipsisVertical, Eye, Layers, LocateFixed, Pencil, Plus, Search, Settings, User, UserPlus, Users, type LucideIcon } from "lucide-react";
 
 import { api } from "../lib/api";
 import { Avatar, RowMenu, TableHead, useFormPanel, useRowMenu, useSort, type RowMenuItem } from "./AdminTable";
@@ -1205,6 +1205,35 @@ function DevelopmentAdmin({
   );
 }
 
+type StationSortKey = "name" | "type" | "frequency" | "status";
+
+const STATION_COLUMNS: [StationSortKey, string, string][] = [
+  ["name", "Nome", "collab-col-name"],
+  ["type", "Tipo", "collab-col-category"],
+  ["frequency", "Frequência", "collab-col-contact"],
+  ["status", "Status", "collab-col-status"],
+];
+
+const STATION_TYPES: [string, string][] = [
+  ["ETE", "ETE"],
+  ["ETA", "ETA"],
+  ["EEE", "EEE"],
+  ["ELEVATORIA", "Elevatória"],
+  ["OUTRA", "Outra"],
+];
+
+const VISIT_FREQUENCIES: [string, string][] = [
+  ["1", "Diária"],
+  ["7", "Semanal"],
+  ["14", "Quinzenal"],
+  ["30", "Mensal"],
+];
+
+function frequencyLabel(days: number | null): string {
+  if (!days) return "";
+  return VISIT_FREQUENCIES.find(([value]) => value === String(days))?.[1] ?? "A cada " + days + " dias";
+}
+
 function StationAdmin({
   developments,
   stations,
@@ -1216,14 +1245,72 @@ function StationAdmin({
   onChanged: () => Promise<void>;
   onOpenStation?: (stationId: string) => void;
 }) {
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [developmentId, setDevelopmentId] = useState("");
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [stationType, setStationType] = useState("ETE");
   const [frequencyDays, setFrequencyDays] = useState("7");
+  const [search, setSearch] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [rowFeedback, setRowFeedback] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const { sortKey, sortAsc, toggleSort, sortBy } = useSort<StationSortKey>("name");
+  const { menu, openMenu, closeMenu } = useRowMenu();
+  const panel = useFormPanel();
   const developmentMap = new Map(developments.map((item) => [item.id, item]));
+
+  function typeLabel(station: AdminStation): string {
+    return STATION_TYPES.find(([value]) => value === station.station_type)?.[1] ?? station.station_type ?? "";
+  }
+
+  function summary(station: AdminStation): string {
+    return [developmentMap.get(station.development_id)?.name ?? "Empreendimento", station.code]
+      .filter(Boolean)
+      .join(" · ");
+  }
+
+  const term = search.trim().toLowerCase();
+  const visible = stations.filter((station) => {
+    if (!term) return true;
+    return [station.name, station.code, typeLabel(station), developmentMap.get(station.development_id)?.name]
+      .some((value) => (value ?? "").toLowerCase().includes(term));
+  });
+
+  const sorted = sortBy(visible, (station, key) => {
+    if (key === "type") return typeLabel(station);
+    if (key === "frequency") return String(station.visit_frequency_days ?? 9999).padStart(4, "0");
+    if (key === "status") return station.is_active ? "0" : "1";
+    return station.name;
+  });
+
+  function resetForm() {
+    setEditingId(null);
+    setDevelopmentId(""); setName(""); setCode(""); setStationType("ETE"); setFrequencyDays("7");
+  }
+
+  function openNew() {
+    resetForm();
+    setFeedback(null);
+    panel.show();
+  }
+
+  function closeForm() {
+    resetForm();
+    setFeedback(null);
+    panel.hide();
+  }
+
+  function startEdit(station: AdminStation) {
+    setEditingId(station.id);
+    setDevelopmentId(station.development_id);
+    setName(station.name);
+    setCode(station.code ?? "");
+    setStationType(station.station_type ?? "OUTRA");
+    setFrequencyDays(station.visit_frequency_days ? String(station.visit_frequency_days) : "7");
+    setFeedback(null);
+    panel.show();
+  }
 
   async function toggle(station: AdminStation) {
     setBusy(true);
@@ -1232,65 +1319,191 @@ function StationAdmin({
         method: "PATCH",
         body: JSON.stringify({ is_active: !station.is_active }),
       });
-      setFeedback(station.is_active ? "Estação inativada." : "Estação reativada.");
+      setRowFeedback(station.is_active ? "Estação inativada." : "Estação reativada.");
       await onChanged();
     } catch {
-      setFeedback("Não foi possível alterar a estação.");
+      setRowFeedback("Não foi possível alterar a estação.");
     } finally {
       setBusy(false);
     }
   }
 
-  async function create() {
-    if (!developmentId || name.trim().length < 2) return setFeedback("Selecione o empreendimento e informe a estação.");
+  async function save() {
+    if (!developmentId) return setFeedback("Selecione o empreendimento.");
+    if (name.trim().length < 2) return setFeedback("Informe o nome da estação.");
     setBusy(true);
     try {
-      await api("/api/v1/stations", { method: "POST", body: JSON.stringify({
-        development_id: developmentId, name: name.trim(), code: code.trim() || null,
-        station_type: stationType, visit_frequency_days: Number(frequencyDays) || null,
-      }) });
-      setName(""); setCode(""); setFeedback("Estação cadastrada."); await onChanged();
-    } catch { setFeedback("Não foi possível cadastrar a estação."); }
-    finally { setBusy(false); }
+      await api(editingId ? "/api/v1/stations/" + editingId : "/api/v1/stations", {
+        method: editingId ? "PATCH" : "POST",
+        body: JSON.stringify({
+          development_id: developmentId,
+          name: name.trim(),
+          code: code.trim() || null,
+          station_type: stationType,
+          visit_frequency_days: Number(frequencyDays) || null,
+        }),
+      });
+      if (editingId) {
+        setRowFeedback("Estação atualizada.");
+        closeForm();
+      } else {
+        // Mantem o empreendimento para cadastrar as proximas estacoes do mesmo local.
+        setName(""); setCode("");
+        setFeedback("Estação cadastrada. O formulário segue aberto para a próxima do mesmo empreendimento.");
+      }
+      await onChanged();
+    } catch {
+      setFeedback("Não foi possível salvar a estação. Confira se o código já é usado por outra estação.");
+    } finally {
+      setBusy(false);
+    }
   }
 
+  const menuItem = menu ? stations.find((item) => item.id === menu.id) : undefined;
+  const menuItems: RowMenuItem[] = menuItem
+    ? [
+        ...(onOpenStation ? [{ text: "Ver estação", run: () => onOpenStation(menuItem.id) }] : []),
+        { text: "Editar", run: () => startEdit(menuItem) },
+        { text: menuItem.is_active ? "Inativar" : "Reativar", run: () => void toggle(menuItem), danger: menuItem.is_active },
+      ]
+    : [];
+
   return (
-    <div className="admin-panel">
-      <div className="admin-list">
-        {stations.map((station) => (
-          <div className="admin-row" key={station.id}>
-            <div><strong>{station.name}</strong><span>{developmentMap.get(station.development_id)?.name ?? "Empreendimento"} · {station.code || station.station_type || "Estação"}</span></div>
-            <div className="admin-actions">
-              <span className={station.is_active ? "status status-revisada" : "status"}>
-                {station.is_active ? (station.visit_frequency_days ? station.visit_frequency_days + "d" : "Ativa") : "Inativa"}
-              </span>
-              {onOpenStation && (
-                <button className="text-button" onClick={() => onOpenStation(station.id)}>
-                  Ver estação
-                </button>
-              )}
-              <button className="text-button" disabled={busy} onClick={() => void toggle(station)}>
-                {station.is_active ? "Inativar" : "Reativar"}
-              </button>
-            </div>
+    <div className="admin-stack">
+      {panel.open && (
+        <div className="compact-form admin-create-form" ref={panel.ref}>
+          <h3 className="form-title">{editingId ? <Pencil size={17} /> : <Settings size={17} />}{editingId ? "Editar estação" : "Nova estação"}</h3>
+          <div className="compact-form-grid">
+            <label className="form-span-2"><span>Empreendimento <b className="required-mark">*</b></span>
+              <select required aria-required="true" value={developmentId} onChange={(e) => setDevelopmentId(e.target.value)}>
+                <option value="">Selecione</option>
+                {developments.filter((x) => x.is_active || x.id === developmentId).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+              </select>
+            </label>
+            <label className="form-span-2"><span>Nome <b className="required-mark">*</b></span><input required aria-required="true" placeholder="Como a equipe chama esta estação" value={name} onChange={(e) => setName(e.target.value)} /></label>
+            <label>Código<input placeholder="Opcional, ex.: ETE-LAGO-01" value={code} onChange={(e) => setCode(e.target.value)} /></label>
+            <label>Tipo
+              <select value={stationType} onChange={(e) => setStationType(e.target.value)}>
+                {STATION_TYPES.map(([value, text]) => <option key={value} value={value}>{text}</option>)}
+                {!STATION_TYPES.some(([value]) => value === stationType) && <option value={stationType}>{stationType} (cadastro antigo)</option>}
+              </select>
+            </label>
+            <label>Frequência de visita
+              <select value={frequencyDays} onChange={(e) => setFrequencyDays(e.target.value)}>
+                {VISIT_FREQUENCIES.map(([value, text]) => <option key={value} value={value}>{text}</option>)}
+                {!VISIT_FREQUENCIES.some(([value]) => value === frequencyDays) && <option value={frequencyDays}>A cada {frequencyDays} dias</option>}
+              </select>
+            </label>
           </div>
-        ))}
-      </div>
-      <div className="compact-form admin-create-form">
-        <h3>Nova estação</h3>
-        <div className="compact-form-grid">
-          <label>Empreendimento<select value={developmentId} onChange={(e) => setDevelopmentId(e.target.value)}><option value="">Selecione</option>{developments.filter((x) => x.is_active).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
-          <label>Nome<input value={name} onChange={(e) => setName(e.target.value)} /></label>
-          <label>Código<input value={code} onChange={(e) => setCode(e.target.value)} /></label>
-          <label>Tipo<select value={stationType} onChange={(e) => setStationType(e.target.value)}><option value="ETE">ETE</option><option value="ETA">ETA</option><option value="EEE">EEE</option><option value="ELEVATORIA">Elevatória</option><option value="OUTRA">Outra</option></select></label>
-          <label>Frequência<select value={frequencyDays} onChange={(e) => setFrequencyDays(e.target.value)}><option value="1">Diária</option><option value="7">Semanal</option><option value="14">Quinzenal</option><option value="30">Mensal</option></select></label>
+          <p className="required-hint">
+            <b className="required-mark">*</b> Obrigatório. As unidades e os equipamentos da estação são cadastrados nas abas ao lado.
+          </p>
+          <div className="admin-actions form-submit">
+            <button className="primary-button" disabled={busy} onClick={() => void save()}>
+              {!editingId && <Settings size={17} />}
+              {busy ? "Salvando..." : editingId ? "Salvar alterações" : "Cadastrar estação"}
+            </button>
+            <button className="text-button" disabled={busy} onClick={closeForm}>{editingId ? "Cancelar" : "Fechar"}</button>
+          </div>
+          {feedback && <span className="inline-feedback">{feedback}</span>}
         </div>
-        <button className="small-button" disabled={busy} onClick={() => void create()}>{busy ? "Salvando..." : "Cadastrar estação"}</button>
-        {feedback && <span className="inline-feedback">{feedback}</span>}
+      )}
+      <div className="client-list-column">
+        <div className="admin-toolbar">
+          <label className="search-field">
+            <Search size={16} />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar estação, código, tipo ou empreendimento"
+              aria-label="Buscar estação"
+            />
+          </label>
+          {!panel.open && (
+            <button className="primary-button" disabled={busy} onClick={openNew}><Settings size={17} /> Nova estação</button>
+          )}
+        </div>
+        {rowFeedback && <span className="inline-feedback" role="status">{rowFeedback}</span>}
+        <div className="admin-list collab-table" role="table" aria-label="Estações">
+          <TableHead columns={STATION_COLUMNS} sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} />
+          {sorted.map((station) => (
+            <div className="client-entry" key={station.id}>
+              <div className={station.is_active ? "collab-row" : "collab-row collab-row-inactive"} role="row">
+                <div className="collab-person" role="cell">
+                  <Avatar name={station.name} />
+                  <div>
+                    <strong>{station.name}</strong>
+                    <span title={summary(station)}>{summary(station)}</span>
+                  </div>
+                </div>
+                <div className="collab-col-category" role="cell">
+                  {typeLabel(station) ? <span className="collab-chip">{typeLabel(station)}</span> : "—"}
+                </div>
+                <div className="collab-col-contact" role="cell">{frequencyLabel(station.visit_frequency_days) || "—"}</div>
+                <div className="collab-col-status" role="cell">
+                  <span className={station.is_active ? "collab-status active" : "collab-status"}>{station.is_active ? "Ativa" : "Inativa"}</span>
+                </div>
+                <div className="collab-actions" role="cell">
+                  {onOpenStation && (
+                    <button className="icon-action" title="Ver estação" aria-label={"Ver estação: " + station.name} onClick={() => onOpenStation(station.id)}>
+                      <Eye size={16} />
+                    </button>
+                  )}
+                  <button className="icon-action icon-action-edit" disabled={busy} title="Editar" aria-label={"Editar: " + station.name} onClick={() => startEdit(station)}>
+                    <Pencil size={16} />
+                  </button>
+                  <button
+                    className="icon-action row-menu-trigger"
+                    disabled={busy}
+                    title="Mais ações"
+                    aria-label={"Mais ações: " + station.name}
+                    aria-haspopup="menu"
+                    aria-expanded={menu?.id === station.id}
+                    onClick={(event) => openMenu(station.id, event.currentTarget)}
+                  >
+                    <EllipsisVertical size={16} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+          {stations.length === 0 && (
+            <div className="empty-state">
+              Nenhuma estação cadastrada. Cadastre primeiro o empreendimento, na aba ao lado.
+            </div>
+          )}
+          {stations.length > 0 && visible.length === 0 && (
+            <div className="empty-state">
+              Nenhuma estação encontrada para "{search.trim()}". Confira a grafia ou limpe a busca.
+            </div>
+          )}
+        </div>
+        {menu && menuItem && <RowMenu menu={menu} items={menuItems} busy={busy} onClose={closeMenu} />}
       </div>
     </div>
   );
 }
+
+type AssetSortKey = "name" | "type" | "situation" | "status";
+
+const ASSET_COLUMNS: [AssetSortKey, string, string][] = [
+  ["name", "Nome", "collab-col-name"],
+  ["type", "Tipo", "collab-col-category"],
+  ["situation", "Situação", "collab-col-contact"],
+  ["status", "Status", "collab-col-status"],
+];
+
+const ASSET_STATUSES: [string, string][] = [
+  ["OPERANDO", "Operando"],
+  ["DESLIGADO", "Desligado"],
+  ["NECESSITA_VERIFICACAO", "Necessita verificação"],
+  ["AGUARDANDO_MANUTENCAO", "Aguardando manutenção"],
+  ["FORA_DA_ESTACAO", "Fora da estação"],
+  ["EM_MANUTENCAO", "Em manutenção"],
+  ["AGUARDANDO_INSTALACAO", "Aguardando instalação"],
+  ["NAO_POSSUI", "Não possui"],
+  ["NAO_APLICAVEL", "Não aplicável"],
+];
 
 function AssetAdmin({
   stations,
@@ -1305,34 +1518,112 @@ function AssetAdmin({
   units: ProcessUnitRecord[];
   onChanged: () => Promise<void>;
 }) {
+  const [formMode, setFormMode] = useState<"ASSET" | "TYPE">("ASSET");
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [stationId, setStationId] = useState("");
-  const [assetTypeId, setAssetTypeId] = useState("");
   const [unitId, setUnitId] = useState("");
-  const [assetTypeName, setAssetTypeName] = useState("");
-  const [assetTypeCode, setAssetTypeCode] = useState("");
+  const [assetTypeId, setAssetTypeId] = useState("");
   const [name, setName] = useState("");
   const [manufacturer, setManufacturer] = useState("");
   const [model, setModel] = useState("");
   const [serialNumber, setSerialNumber] = useState("");
   const [statusValue, setStatusValue] = useState("OPERANDO");
+  const [assetTypeName, setAssetTypeName] = useState("");
+  const [assetTypeCode, setAssetTypeCode] = useState("");
+  const [search, setSearch] = useState("");
+  const [stationFilter, setStationFilter] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [rowFeedback, setRowFeedback] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const { sortKey, sortAsc, toggleSort, sortBy } = useSort<AssetSortKey>("name");
+  const { menu, openMenu, closeMenu } = useRowMenu();
+  const panel = useFormPanel();
   const stationMap = new Map(stations.map((item) => [item.id, item]));
   const typeMap = new Map(assetTypes.map((item) => [item.id, item]));
   const unitMap = new Map(units.map((item) => [item.id, item]));
-  const stationUnits = units.filter((item) => item.station_id === stationId && item.is_active);
+  const stationUnits = units.filter((item) => item.station_id === stationId && (item.is_active || item.id === unitId));
 
-  async function updateAsset(asset: AssetRecord, patch: Record<string, unknown>) {
+  function situationLabel(asset: AssetRecord): string {
+    return ASSET_STATUSES.find(([value]) => value === asset.status)?.[1] ?? asset.status;
+  }
+
+  function summary(asset: AssetRecord): string {
+    return [
+      stationMap.get(asset.station_id)?.name ?? "Estação",
+      (asset.process_unit_id && unitMap.get(asset.process_unit_id)?.name) || "Sem unidade",
+      [asset.manufacturer, asset.model].filter(Boolean).join(" "),
+    ].filter(Boolean).join(" · ");
+  }
+
+  const term = search.trim().toLowerCase();
+  const visible = assets.filter((asset) => {
+    if (stationFilter && asset.station_id !== stationFilter) return false;
+    if (!term) return true;
+    return [
+      asset.name,
+      asset.manufacturer,
+      asset.model,
+      asset.serial_number,
+      stationMap.get(asset.station_id)?.name,
+      asset.process_unit_id ? unitMap.get(asset.process_unit_id)?.name : null,
+      typeMap.get(asset.asset_type_id)?.name,
+      situationLabel(asset),
+    ].some((value) => (value ?? "").toLowerCase().includes(term));
+  });
+
+  const sorted = sortBy(visible, (asset, key) => {
+    if (key === "type") return typeMap.get(asset.asset_type_id)?.name ?? "";
+    if (key === "situation") return situationLabel(asset);
+    if (key === "status") return asset.is_active ? "0" : "1";
+    return asset.name;
+  });
+
+  function resetForm() {
+    setEditingId(null);
+    setStationId(stationFilter); setUnitId(""); setAssetTypeId(""); setName("");
+    setManufacturer(""); setModel(""); setSerialNumber(""); setStatusValue("OPERANDO");
+    setAssetTypeName(""); setAssetTypeCode("");
+  }
+
+  function openNew(mode: "ASSET" | "TYPE") {
+    resetForm();
+    setFormMode(mode);
+    setFeedback(null);
+    panel.show();
+  }
+
+  function closeForm() {
+    resetForm();
+    setFeedback(null);
+    panel.hide();
+  }
+
+  function startEdit(asset: AssetRecord) {
+    setFormMode("ASSET");
+    setEditingId(asset.id);
+    setStationId(asset.station_id);
+    setUnitId(asset.process_unit_id ?? "");
+    setAssetTypeId(asset.asset_type_id);
+    setName(asset.name);
+    setManufacturer(asset.manufacturer ?? "");
+    setModel(asset.model ?? "");
+    setSerialNumber(asset.serial_number ?? "");
+    setStatusValue(asset.status);
+    setFeedback(null);
+    panel.show();
+  }
+
+  async function toggle(asset: AssetRecord) {
     setBusy(true);
     try {
       await api("/api/v1/assets/" + asset.id, {
         method: "PATCH",
-        body: JSON.stringify(patch),
+        body: JSON.stringify({ is_active: !asset.is_active }),
       });
-      setFeedback("Ativo atualizado.");
+      setRowFeedback(asset.is_active ? "Ativo inativado." : "Ativo reativado.");
       await onChanged();
     } catch {
-      setFeedback("Não foi possível atualizar o ativo.");
+      setRowFeedback("Não foi possível alterar o ativo.");
     } finally {
       setBusy(false);
     }
@@ -1345,102 +1636,227 @@ function AssetAdmin({
         method: "PATCH",
         body: JSON.stringify({ is_active: !item.is_active }),
       });
-      setFeedback("Tipo de ativo atualizado.");
+      setFeedback(item.is_active ? "Tipo de ativo inativado." : "Tipo de ativo reativado.");
       await onChanged();
     } catch {
-      setFeedback("Não foi possível atualizar o tipo.");
+      setFeedback("Não foi possível alterar o tipo de ativo.");
     } finally {
       setBusy(false);
     }
   }
 
-  async function createAssetType() {
+  async function saveType() {
     if (assetTypeName.trim().length < 2) return setFeedback("Informe o nome do tipo de ativo.");
     setBusy(true);
     try {
-      await api("/api/v1/asset-types", { method: "POST", body: JSON.stringify({ name: assetTypeName.trim(), code: assetTypeCode.trim() || null }) });
-      setAssetTypeName(""); setAssetTypeCode(""); setFeedback("Tipo de ativo cadastrado."); await onChanged();
-    } catch { setFeedback("Não foi possível cadastrar o tipo de ativo."); }
-    finally { setBusy(false); }
+      await api("/api/v1/asset-types", {
+        method: "POST",
+        body: JSON.stringify({ name: assetTypeName.trim(), code: assetTypeCode.trim() || null }),
+      });
+      setAssetTypeName(""); setAssetTypeCode("");
+      setFeedback("Tipo de ativo cadastrado. O formulário segue aberto para o próximo.");
+      await onChanged();
+    } catch {
+      setFeedback("Não foi possível cadastrar o tipo de ativo. Confira se o nome ou o código já existe.");
+    } finally {
+      setBusy(false);
+    }
   }
 
-  async function createAsset() {
-    if (!stationId || !assetTypeId || name.trim().length < 2) return setFeedback("Selecione estação/tipo e informe o ativo.");
+  async function saveAsset() {
+    if (!stationId) return setFeedback("Selecione a estação.");
+    if (!assetTypeId) return setFeedback("Selecione o tipo do ativo.");
+    if (name.trim().length < 2) return setFeedback("Informe o nome do ativo.");
     setBusy(true);
     try {
-      await api("/api/v1/assets", { method: "POST", body: JSON.stringify({
-        station_id: stationId, asset_type_id: assetTypeId, process_unit_id: unitId || null, name: name.trim(),
-        manufacturer: manufacturer.trim() || null, model: model.trim() || null,
-        serial_number: serialNumber.trim() || null, status: statusValue,
-      }) });
-      setName(""); setManufacturer(""); setModel(""); setSerialNumber(""); setFeedback("Ativo cadastrado."); await onChanged();
-    } catch { setFeedback("Não foi possível cadastrar o ativo."); }
-    finally { setBusy(false); }
+      await api(editingId ? "/api/v1/assets/" + editingId : "/api/v1/assets", {
+        method: editingId ? "PATCH" : "POST",
+        body: JSON.stringify({
+          station_id: stationId,
+          process_unit_id: unitId || null,
+          asset_type_id: assetTypeId,
+          name: name.trim(),
+          manufacturer: manufacturer.trim() || null,
+          model: model.trim() || null,
+          serial_number: serialNumber.trim() || null,
+          status: statusValue,
+        }),
+      });
+      if (editingId) {
+        setRowFeedback("Ativo atualizado.");
+        closeForm();
+      } else {
+        // Mantem estacao, unidade e tipo para cadastrar equipamentos parecidos em sequencia.
+        setName(""); setSerialNumber("");
+        setFeedback("Ativo cadastrado. O formulário segue aberto para o próximo da mesma estação.");
+      }
+      await onChanged();
+    } catch {
+      setFeedback("Não foi possível salvar o ativo. Confira se o número de série já é usado por outro ativo.");
+    } finally {
+      setBusy(false);
+    }
   }
 
+  const menuItem = menu ? assets.find((item) => item.id === menu.id) : undefined;
+  const menuItems: RowMenuItem[] = menuItem
+    ? [
+        { text: "Editar", run: () => startEdit(menuItem) },
+        { text: menuItem.is_active ? "Inativar" : "Reativar", run: () => void toggle(menuItem), danger: menuItem.is_active },
+      ]
+    : [];
+
   return (
-    <div className="admin-panel">
-      <div className="admin-list">
-        {assets.map((asset) => (
-          <div className="admin-row" key={asset.id}>
-            <div><strong>{asset.name}</strong><span>{stationMap.get(asset.station_id)?.name ?? "Estação"} · {(asset.process_unit_id && unitMap.get(asset.process_unit_id)?.name) || "Sem unidade"} · {typeMap.get(asset.asset_type_id)?.name ?? "Tipo"} · {asset.manufacturer || asset.model || "Sem fabricante"}</span></div>
-            <div className="admin-actions asset-actions">
-              <select
-                value={asset.status}
-                disabled={busy}
-                onChange={(event) => void updateAsset(asset, { status: event.target.value })}
-              >
-                <option value="OPERANDO">Operando</option>
-                <option value="DESLIGADO">Desligado</option>
-                <option value="EM_MANUTENCAO">Em manutenção</option>
-                <option value="AGUARDANDO_MANUTENCAO">Aguardando manutenção</option>
-                <option value="FORA_DA_ESTACAO">Fora da estação</option><option value="AGUARDANDO_INSTALACAO">Aguardando instalação</option>
-                <option value="NECESSITA_VERIFICACAO">Necessita verificação</option>
-                <option value="NAO_POSSUI">Não possui</option>
-                <option value="NAO_APLICAVEL">Não aplicável</option>
+    <div className="admin-stack">
+      {panel.open && formMode === "ASSET" && (
+        <div className="compact-form admin-create-form" ref={panel.ref}>
+          <h3 className="form-title">{editingId ? <Pencil size={17} /> : <Layers size={17} />}{editingId ? "Editar ativo" : "Novo ativo"}</h3>
+          <div className="compact-form-grid">
+            <label><span>Estação <b className="required-mark">*</b></span>
+              <select required aria-required="true" value={stationId} onChange={(e) => { setStationId(e.target.value); setUnitId(""); }}>
+                <option value="">Selecione</option>
+                {stations.filter((x) => x.is_active || x.id === stationId).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
               </select>
-              <button className="text-button" disabled={busy} onClick={() => void updateAsset(asset, { is_active: !asset.is_active })}>
-                {asset.is_active ? "Inativar" : "Reativar"}
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="admin-double-form">
-        <div className="compact-form admin-create-form">
-          <h3>Novo tipo de ativo</h3>
-          <div className="compact-form-grid">
-            <label>Nome<input value={assetTypeName} onChange={(e) => setAssetTypeName(e.target.value)} /></label>
-            <label>Código<input value={assetTypeCode} onChange={(e) => setAssetTypeCode(e.target.value)} /></label>
-          </div>
-          <div className="type-list">
-            {assetTypes.map((item) => (
-              <div className="type-chip" key={item.id}>
-                <span>{item.name}</span>
-                <button className="text-button" disabled={busy} onClick={() => void toggleAssetType(item)}>
-                  {item.is_active ? "Inativar" : "Reativar"}
-                </button>
-              </div>
-            ))}
-          </div>
-          <button className="small-button" disabled={busy} onClick={() => void createAssetType()}>{busy ? "Salvando..." : "Cadastrar tipo"}</button>
-        </div>
-        <div className="compact-form admin-create-form">
-          <h3>Novo ativo</h3>
-          <div className="compact-form-grid">
-            <label>Estação<select value={stationId} onChange={(e) => { setStationId(e.target.value); setUnitId(""); }}><option value="">Selecione</option>{stations.filter((x) => x.is_active).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
-            <label>Tipo<select value={assetTypeId} onChange={(e) => setAssetTypeId(e.target.value)}><option value="">Selecione</option>{assetTypes.filter((x) => x.is_active).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
-            <label>Unidade<select value={unitId} onChange={(e) => setUnitId(e.target.value)}><option value="">Sem unidade (área geral)</option>{stationUnits.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
-            <label>Nome<input value={name} onChange={(e) => setName(e.target.value)} /></label>
+            </label>
+            <label>Unidade
+              <select value={unitId} onChange={(e) => setUnitId(e.target.value)}>
+                <option value="">Sem unidade (área geral)</option>
+                {stationUnits.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+              </select>
+            </label>
+            <label><span>Tipo <b className="required-mark">*</b></span>
+              <select required aria-required="true" value={assetTypeId} onChange={(e) => setAssetTypeId(e.target.value)}>
+                <option value="">Selecione</option>
+                {assetTypes.filter((x) => x.is_active || x.id === assetTypeId).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+              </select>
+            </label>
+            <label><span>Nome <b className="required-mark">*</b></span><input required aria-required="true" placeholder="Como o técnico reconhece, ex.: Aerador I" value={name} onChange={(e) => setName(e.target.value)} /></label>
             <label>Fabricante<input value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} /></label>
             <label>Modelo<input value={model} onChange={(e) => setModel(e.target.value)} /></label>
             <label>Número de série<input value={serialNumber} onChange={(e) => setSerialNumber(e.target.value)} /></label>
-            <label>Status<select value={statusValue} onChange={(e) => setStatusValue(e.target.value)}><option value="OPERANDO">Operando</option><option value="DESLIGADO">Desligado</option><option value="EM_MANUTENCAO">Em manutenção</option><option value="AGUARDANDO_MANUTENCAO">Aguardando manutenção</option><option value="FORA_DA_ESTACAO">Fora da estação</option><option value="AGUARDANDO_INSTALACAO">Aguardando instalação</option><option value="NECESSITA_VERIFICACAO">Necessita verificação</option><option value="NAO_POSSUI">Não possui</option><option value="NAO_APLICAVEL">Não aplicável</option></select></label>
+            <label>Situação
+              <select value={statusValue} onChange={(e) => setStatusValue(e.target.value)}>
+                {ASSET_STATUSES.map(([value, text]) => <option key={value} value={value}>{text}</option>)}
+                {!ASSET_STATUSES.some(([value]) => value === statusValue) && <option value={statusValue}>{statusValue}</option>}
+              </select>
+            </label>
           </div>
-          <button className="small-button" disabled={busy} onClick={() => void createAsset()}>{busy ? "Salvando..." : "Cadastrar ativo"}</button>
+          <p className="required-hint">
+            <b className="required-mark">*</b> Obrigatório. {assetTypes.length === 0 ? "Ainda não há tipos de ativo: feche e use \"Novo tipo\" primeiro." : "A situação também é atualizada pelo técnico a cada visita."}
+          </p>
+          <div className="admin-actions form-submit">
+            <button className="primary-button" disabled={busy} onClick={() => void saveAsset()}>
+              {!editingId && <Layers size={17} />}
+              {busy ? "Salvando..." : editingId ? "Salvar alterações" : "Cadastrar ativo"}
+            </button>
+            <button className="text-button" disabled={busy} onClick={closeForm}>{editingId ? "Cancelar" : "Fechar"}</button>
+          </div>
+          {feedback && <span className="inline-feedback">{feedback}</span>}
         </div>
+      )}
+      {panel.open && formMode === "TYPE" && (
+        <div className="compact-form admin-create-form" ref={panel.ref}>
+          <h3 className="form-title"><Plus size={17} />Novo tipo de ativo</h3>
+          <div className="compact-form-grid">
+            <label className="form-span-2"><span>Nome <b className="required-mark">*</b></span><input required aria-required="true" placeholder="Ex.: Bomba submersível, Soprador" value={assetTypeName} onChange={(e) => setAssetTypeName(e.target.value)} /></label>
+            <label>Código<input placeholder="Opcional, ex.: EQ01" value={assetTypeCode} onChange={(e) => setAssetTypeCode(e.target.value)} /></label>
+          </div>
+          {assetTypes.length > 0 && (
+            <div className="type-list">
+              {assetTypes.map((item) => (
+                <div className="type-chip" key={item.id}>
+                  <span>{item.name}{item.is_active ? "" : " (inativo)"}</span>
+                  <button className="text-button" disabled={busy} onClick={() => void toggleAssetType(item)}>
+                    {item.is_active ? "Inativar" : "Reativar"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="required-hint"><b className="required-mark">*</b> Obrigatório. O tipo é um catálogo: cadastre uma vez e use em todas as estações.</p>
+          <div className="admin-actions form-submit">
+            <button className="primary-button" disabled={busy} onClick={() => void saveType()}>
+              <Plus size={17} />{busy ? "Salvando..." : "Cadastrar tipo"}
+            </button>
+            <button className="text-button" disabled={busy} onClick={closeForm}>Fechar</button>
+          </div>
+          {feedback && <span className="inline-feedback">{feedback}</span>}
+        </div>
+      )}
+      <div className="client-list-column">
+        <div className="admin-toolbar">
+          <label className="search-field">
+            <Search size={16} />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar ativo, estação, unidade, tipo ou número de série"
+              aria-label="Buscar ativo"
+            />
+          </label>
+          <select className="admin-toolbar-select" aria-label="Filtrar por estação" value={stationFilter} onChange={(e) => setStationFilter(e.target.value)}>
+            <option value="">Todas as estações</option>
+            {stations.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+          </select>
+          {!panel.open && (
+            <>
+              <button className="secondary-button" disabled={busy} onClick={() => openNew("TYPE")}><Plus size={17} /> Novo tipo</button>
+              <button className="primary-button" disabled={busy} onClick={() => openNew("ASSET")}><Layers size={17} /> Novo ativo</button>
+            </>
+          )}
+        </div>
+        {rowFeedback && <span className="inline-feedback" role="status">{rowFeedback}</span>}
+        <div className="admin-list collab-table collab-table-wide" role="table" aria-label="Ativos">
+          <TableHead columns={ASSET_COLUMNS} sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} />
+          {sorted.map((asset) => (
+            <div className="client-entry" key={asset.id}>
+              <div className={asset.is_active ? "collab-row" : "collab-row collab-row-inactive"} role="row">
+                <div className="collab-person" role="cell">
+                  <Avatar name={asset.name} />
+                  <div>
+                    <strong>{asset.name}</strong>
+                    <span title={summary(asset)}>{summary(asset)}</span>
+                  </div>
+                </div>
+                <div className="collab-col-category" role="cell">
+                  <span className="collab-chip" title={typeMap.get(asset.asset_type_id)?.name}>{typeMap.get(asset.asset_type_id)?.name ?? "—"}</span>
+                </div>
+                <div className="collab-col-contact" role="cell">{situationLabel(asset)}</div>
+                <div className="collab-col-status" role="cell">
+                  <span className={asset.is_active ? "collab-status active" : "collab-status"}>{asset.is_active ? "Ativo" : "Inativo"}</span>
+                </div>
+                <div className="collab-actions" role="cell">
+                  <button className="icon-action icon-action-edit" disabled={busy} title="Editar" aria-label={"Editar: " + asset.name} onClick={() => startEdit(asset)}>
+                    <Pencil size={16} />
+                  </button>
+                  <button
+                    className="icon-action row-menu-trigger"
+                    disabled={busy}
+                    title="Mais ações"
+                    aria-label={"Mais ações: " + asset.name}
+                    aria-haspopup="menu"
+                    aria-expanded={menu?.id === asset.id}
+                    onClick={(event) => openMenu(asset.id, event.currentTarget)}
+                  >
+                    <EllipsisVertical size={16} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+          {assets.length === 0 && (
+            <div className="empty-state">
+              Nenhum ativo cadastrado. Cadastre os tipos em "Novo tipo" e depois os equipamentos de cada estação.
+            </div>
+          )}
+          {assets.length > 0 && visible.length === 0 && (
+            <div className="empty-state">
+              Nenhum ativo encontrado com esse filtro. Limpe a busca ou escolha outra estação.
+            </div>
+          )}
+        </div>
+        {menu && menuItem && <RowMenu menu={menu} items={menuItems} busy={busy} onClose={closeMenu} />}
       </div>
-      {feedback && <span className="inline-feedback">{feedback}</span>}
     </div>
   );
 }
