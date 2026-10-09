@@ -249,9 +249,55 @@ class AssetTypeRead(ORMModel):
     updated_at: datetime
 
 
+class ProcessUnitTypeCreate(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    code: str | None = Field(default=None, max_length=60)
+    stage: str | None = Field(default=None, max_length=60)
+
+
+class ProcessUnitTypeUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=120)
+    code: str | None = Field(default=None, max_length=60)
+    stage: str | None = Field(default=None, max_length=60)
+    is_active: bool | None = None
+
+
+class ProcessUnitTypeRead(ORMModel):
+    id: UUID
+    name: str
+    code: str | None
+    stage: str | None
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class ProcessUnitCreate(BaseModel):
+    station_id: UUID
+    unit_type_id: UUID
+    name: str = Field(min_length=2, max_length=160)
+
+
+class ProcessUnitUpdate(BaseModel):
+    unit_type_id: UUID | None = None
+    name: str | None = Field(default=None, min_length=2, max_length=160)
+    is_active: bool | None = None
+
+
+class ProcessUnitRead(ORMModel):
+    id: UUID
+    station_id: UUID
+    unit_type_id: UUID
+    name: str
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+
 class AssetCreate(BaseModel):
     station_id: UUID
     asset_type_id: UUID
+    process_unit_id: UUID | None = None
     name: str = Field(min_length=2, max_length=160)
     manufacturer: str | None = Field(default=None, max_length=120)
     model: str | None = Field(default=None, max_length=120)
@@ -264,6 +310,7 @@ class AssetCreate(BaseModel):
 class AssetUpdate(BaseModel):
     station_id: UUID | None = None
     asset_type_id: UUID | None = None
+    process_unit_id: UUID | None = None
     name: str | None = Field(default=None, min_length=2, max_length=160)
     manufacturer: str | None = Field(default=None, max_length=120)
     model: str | None = Field(default=None, max_length=120)
@@ -278,6 +325,7 @@ class AssetRead(ORMModel):
     id: UUID
     station_id: UUID
     asset_type_id: UUID
+    process_unit_id: UUID | None
     name: str
     manufacturer: str | None
     model: str | None

@@ -2253,3 +2253,11 @@ button:not(:disabled):active { transform: translateY(1px); }
   .admin-stack .collab-table-wide .collab-row { grid-template-columns: minmax(0, 1fr) auto; }
   .admin-toolbar .primary-button { flex: 1 1 100%; justify-content: center; }
 }
+.admin-toolbar-select {
+  min-height: 44px; border: 1px solid var(--mw-border-strong); border-radius: 11px;
+  background: white; padding: 0 12px; color: var(--mw-text);
+}
+.admin-toolbar .secondary-button { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; }
+@media (max-width: 650px) {
+  .admin-toolbar-select, .admin-toolbar .secondary-button { flex: 1 1 100%; justify-content: center; }
+}

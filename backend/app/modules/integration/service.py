@@ -21,6 +21,8 @@ from app.models.operations import (
     ClientDevelopmentContact,
     ContractingParty,
     Development,
+    ProcessUnit,
+    ProcessUnitType,
     Station,
 )
 from app.modules.auth.dependencies import AuthContext
@@ -186,11 +188,30 @@ def _serialize(resource: IntegrationResource, row) -> dict:
                 "is_active": row.is_active,
             }
         )
+    elif resource == IntegrationResource.PROCESS_UNIT_TYPES:
+        payload.update(
+            {
+                "name": row.name,
+                "code": row.code,
+                "stage": row.stage,
+                "is_active": row.is_active,
+            }
+        )
+    elif resource == IntegrationResource.PROCESS_UNITS:
+        payload.update(
+            {
+                "station_id": row.station_id,
+                "unit_type_id": row.unit_type_id,
+                "name": row.name,
+                "is_active": row.is_active,
+            }
+        )
     elif resource == IntegrationResource.ASSETS:
         payload.update(
             {
                 "station_id": row.station_id,
                 "asset_type_id": row.asset_type_id,
+                "process_unit_id": row.process_unit_id,
                 "name": row.name,
                 "manufacturer": row.manufacturer,
                 "model": row.model,
@@ -304,6 +325,8 @@ _RESOURCE_CONFIG = {
     ),
     IntegrationResource.DEVELOPMENTS: (Development, Development.updated_at),
     IntegrationResource.STATIONS: (Station, Station.updated_at),
+    IntegrationResource.PROCESS_UNIT_TYPES: (ProcessUnitType, ProcessUnitType.updated_at),
+    IntegrationResource.PROCESS_UNITS: (ProcessUnit, ProcessUnit.updated_at),
     IntegrationResource.ASSETS: (Asset, Asset.updated_at),
     IntegrationResource.VISIT_PLANS: (VisitPlan, VisitPlan.updated_at),
     IntegrationResource.VISITS: (Visit, Visit.updated_at),

@@ -167,6 +167,8 @@ Entidades principais:
 - developments
 - client_development_contacts
 - stations
+- process_unit_types
+- process_units
 - asset_types
 - assets
 - checklist_templates

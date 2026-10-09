@@ -29,6 +29,8 @@ class IntegrationResource(StrEnum):
     CONTRACTING_PARTIES = "contracting-parties"
     DEVELOPMENTS = "developments"
     STATIONS = "stations"
+    PROCESS_UNIT_TYPES = "process-unit-types"
+    PROCESS_UNITS = "process-units"
     ASSETS = "assets"
     VISIT_PLANS = "visit-plans"
     VISITS = "visits"

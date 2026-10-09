@@ -39,6 +39,8 @@ Recursos:
 - contracting-parties
 - developments
 - stations
+- process-unit-types
+- process-units
 - assets
 - visit-plans
 - visits
@@ -60,6 +62,10 @@ Datas de watermark devem incluir timezone.
 ### contracting-parties
 
 Quem contrata a MW (pessoa física ou jurídica): `person_type`, `name` (razão social ou nome), `trade_name`, `document` (CPF/CNPJ), `contact_email`, `contact_phone`, `is_active`. Um contratante pode ter vários empreendimentos; a ligação está em `developments.contracting_party_id`.
+
+### process-unit-types e process-units
+
+A estação é dividida em unidades de processo (gradeamento, reator UASB, tanque de contato...). `process-unit-types` é o catálogo (`name`, `code`, `stage`); `process-units` são as unidades instaladas (`station_id`, `unit_type_id`, `name`). O recurso `assets` traz `process_unit_id`; vazio significa equipamento na área geral da estação.
 
 ### client-contacts
 

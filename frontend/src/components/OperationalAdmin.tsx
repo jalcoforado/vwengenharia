@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { Briefcase, Building2, EllipsisVertical, Layers, LocateFixed, Pencil, Search, Settings, User, UserPlus, Users, type LucideIcon } from "lucide-react";
+import { Boxes, Briefcase, Building2, EllipsisVertical, Layers, LocateFixed, Pencil, Search, Settings, User, UserPlus, Users, type LucideIcon } from "lucide-react";
 
 import { api } from "../lib/api";
 import { Avatar, RowMenu, TableHead, useFormPanel, useRowMenu, useSort, type RowMenuItem } from "./AdminTable";
 import CollaboratorAdmin from "./CollaboratorAdmin";
 import ContractingPartyAdmin, { contractingPartyLabel, type ContractingPartyRecord } from "./ContractingPartyAdmin";
+import ProcessUnitAdmin, { type ProcessUnitRecord } from "./ProcessUnitAdmin";
 import { formatDocument, isValidCpfCnpj, normalizeDocument } from "../lib/document";
 import { optimizeEvidenceImage } from "../lib/media";
 import { formatPhone, isCompletePhone } from "../lib/phone";
@@ -119,6 +120,7 @@ export type AssetRecord = {
   id: string;
   station_id: string;
   asset_type_id: string;
+  process_unit_id: string | null;
   name: string;
   manufacturer: string | null;
   model: string | null;
@@ -148,7 +150,7 @@ export default function OperationalAdmin({
   onChanged,
   onOpenStation,
 }: Props) {
-  const [tab, setTab] = useState<"COLABORADORES" | "CONTRATANTES" | "CLIENTES" | "EMPREENDIMENTOS" | "ESTACOES" | "ATIVOS">("COLABORADORES");
+  const [tab, setTab] = useState<"COLABORADORES" | "CONTRATANTES" | "CLIENTES" | "EMPREENDIMENTOS" | "ESTACOES" | "UNIDADES" | "ATIVOS">("COLABORADORES");
   const [collaboratorCount, setCollaboratorCount] = useState<number | null>(null);
   const [parties, setParties] = useState<ContractingPartyRecord[]>([]);
 
@@ -161,8 +163,20 @@ export default function OperationalAdmin({
     }
   }
 
+  // As unidades de processo sao usadas pela aba propria e pelo cadastro de ativos.
+  const [units, setUnits] = useState<ProcessUnitRecord[]>([]);
+
+  async function loadUnits() {
+    try {
+      setUnits(await api<ProcessUnitRecord[]>("/api/v1/process-units?limit=500"));
+    } catch {
+      // Mantem a lista anterior.
+    }
+  }
+
   useEffect(() => {
     void loadParties();
+    void loadUnits();
   }, []);
 
   // Os colaboradores sao carregados pela propria aba; aqui so buscamos o total para o resumo.
@@ -179,7 +193,7 @@ export default function OperationalAdmin({
           <span className="eyebrow">Administração operacional</span>
           <h2>Estrutura da operação</h2>
           <p className="section-copy">
-            Colaboradores são a equipe da MW. Cadastre o contratante (quem assina com a MW) e o responsável, depois o empreendimento (o local atendido), suas estações e ativos.
+            Colaboradores são a equipe da MW. Cadastre o contratante (quem assina com a MW) e o responsável, depois o empreendimento (o local atendido), suas estações, as unidades de cada estação e os ativos.
           </p>
         </div>
         <div className="admin-summary">
@@ -199,6 +213,7 @@ export default function OperationalAdmin({
           ["CLIENTES", "Responsáveis", User],
           ["EMPREENDIMENTOS", "Empreendimentos", Building2],
           ["ESTACOES", "Estações", Settings],
+          ["UNIDADES", "Unidades", Boxes],
           ["ATIVOS", "Ativos", Layers],
         ] as [string, string, LucideIcon][]).map(([value, label, Icon]) => (
           <button
@@ -240,8 +255,17 @@ export default function OperationalAdmin({
           onOpenStation={onOpenStation}
         />
       )}
+      {tab === "UNIDADES" && (
+        <ProcessUnitAdmin
+          stations={stations}
+          assets={assets}
+          units={units}
+          onUnitsChanged={loadUnits}
+          onAssetsChanged={onChanged}
+        />
+      )}
       {tab === "ATIVOS" && (
-        <AssetAdmin stations={stations} assetTypes={assetTypes} assets={assets} onChanged={onChanged} />
+        <AssetAdmin stations={stations} assetTypes={assetTypes} assets={assets} units={units} onChanged={onChanged} />
       )}
     </section>
   );
@@ -1268,9 +1292,22 @@ function StationAdmin({
   );
 }
 
-function AssetAdmin({ stations, assetTypes, assets, onChanged }: { stations: AdminStation[]; assetTypes: AssetTypeRecord[]; assets: AssetRecord[]; onChanged: () => Promise<void> }) {
+function AssetAdmin({
+  stations,
+  assetTypes,
+  assets,
+  units,
+  onChanged,
+}: {
+  stations: AdminStation[];
+  assetTypes: AssetTypeRecord[];
+  assets: AssetRecord[];
+  units: ProcessUnitRecord[];
+  onChanged: () => Promise<void>;
+}) {
   const [stationId, setStationId] = useState("");
   const [assetTypeId, setAssetTypeId] = useState("");
+  const [unitId, setUnitId] = useState("");
   const [assetTypeName, setAssetTypeName] = useState("");
   const [assetTypeCode, setAssetTypeCode] = useState("");
   const [name, setName] = useState("");
@@ -1282,6 +1319,8 @@ function AssetAdmin({ stations, assetTypes, assets, onChanged }: { stations: Adm
   const [busy, setBusy] = useState(false);
   const stationMap = new Map(stations.map((item) => [item.id, item]));
   const typeMap = new Map(assetTypes.map((item) => [item.id, item]));
+  const unitMap = new Map(units.map((item) => [item.id, item]));
+  const stationUnits = units.filter((item) => item.station_id === stationId && item.is_active);
 
   async function updateAsset(asset: AssetRecord, patch: Record<string, unknown>) {
     setBusy(true);
@@ -1330,7 +1369,7 @@ function AssetAdmin({ stations, assetTypes, assets, onChanged }: { stations: Adm
     setBusy(true);
     try {
       await api("/api/v1/assets", { method: "POST", body: JSON.stringify({
-        station_id: stationId, asset_type_id: assetTypeId, name: name.trim(),
+        station_id: stationId, asset_type_id: assetTypeId, process_unit_id: unitId || null, name: name.trim(),
         manufacturer: manufacturer.trim() || null, model: model.trim() || null,
         serial_number: serialNumber.trim() || null, status: statusValue,
       }) });
@@ -1344,7 +1383,7 @@ function AssetAdmin({ stations, assetTypes, assets, onChanged }: { stations: Adm
       <div className="admin-list">
         {assets.map((asset) => (
           <div className="admin-row" key={asset.id}>
-            <div><strong>{asset.name}</strong><span>{stationMap.get(asset.station_id)?.name ?? "Estação"} · {typeMap.get(asset.asset_type_id)?.name ?? "Tipo"} · {asset.manufacturer || asset.model || "Sem fabricante"}</span></div>
+            <div><strong>{asset.name}</strong><span>{stationMap.get(asset.station_id)?.name ?? "Estação"} · {(asset.process_unit_id && unitMap.get(asset.process_unit_id)?.name) || "Sem unidade"} · {typeMap.get(asset.asset_type_id)?.name ?? "Tipo"} · {asset.manufacturer || asset.model || "Sem fabricante"}</span></div>
             <div className="admin-actions asset-actions">
               <select
                 value={asset.status}
@@ -1389,8 +1428,9 @@ function AssetAdmin({ stations, assetTypes, assets, onChanged }: { stations: Adm
         <div className="compact-form admin-create-form">
           <h3>Novo ativo</h3>
           <div className="compact-form-grid">
-            <label>Estação<select value={stationId} onChange={(e) => setStationId(e.target.value)}><option value="">Selecione</option>{stations.filter((x) => x.is_active).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+            <label>Estação<select value={stationId} onChange={(e) => { setStationId(e.target.value); setUnitId(""); }}><option value="">Selecione</option>{stations.filter((x) => x.is_active).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
             <label>Tipo<select value={assetTypeId} onChange={(e) => setAssetTypeId(e.target.value)}><option value="">Selecione</option>{assetTypes.filter((x) => x.is_active).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+            <label>Unidade<select value={unitId} onChange={(e) => setUnitId(e.target.value)}><option value="">Sem unidade (área geral)</option>{stationUnits.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
             <label>Nome<input value={name} onChange={(e) => setName(e.target.value)} /></label>
             <label>Fabricante<input value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} /></label>
             <label>Modelo<input value={model} onChange={(e) => setModel(e.target.value)} /></label>

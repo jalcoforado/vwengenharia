@@ -18,6 +18,8 @@ from app.models.operations import (
     ContactScope,
     ContractingParty,
     Development,
+    ProcessUnit,
+    ProcessUnitType,
     Station,
 )
 from app.modules.auth.dependencies import AuthContext
@@ -581,6 +583,12 @@ async def create_asset_type(session: AsyncSession, context: AuthContext, payload
 async def create_asset(session: AsyncSession, context: AuthContext, payload) -> Asset:
     await tenant_get_or_404(session, Station, context.tenant.id, payload.station_id)
     await tenant_get_or_404(session, AssetType, context.tenant.id, payload.asset_type_id)
+    await ensure_unit_belongs_to_station(
+        session,
+        context.tenant.id,
+        station_id=payload.station_id,
+        process_unit_id=payload.process_unit_id,
+    )
     data = payload.model_dump()
     data["status"] = payload.status.value
     asset = Asset(tenant_id=context.tenant.id, **data)
@@ -618,6 +626,194 @@ async def update_object[ModelT: Base](
         await session.commit()
         await session.refresh(obj)
     return obj
+
+
+async def _ensure_unique_name(
+    session: AsyncSession,
+    model,
+    *filters,
+    detail: str,
+    ignore_id: UUID | None = None,
+) -> None:
+    stmt = select(model.id).where(*filters)
+    if ignore_id is not None:
+        stmt = stmt.where(model.id != ignore_id)
+    if (await session.execute(stmt)).first() is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
+
+
+async def _ensure_unit_type_is_unique(
+    session: AsyncSession,
+    tenant_id: UUID,
+    *,
+    name: str | None,
+    code: str | None,
+    ignore_id: UUID | None = None,
+) -> None:
+    if name:
+        await _ensure_unique_name(
+            session,
+            ProcessUnitType,
+            ProcessUnitType.tenant_id == tenant_id,
+            ProcessUnitType.name == name,
+            detail="process_unit_type_name_already_exists",
+            ignore_id=ignore_id,
+        )
+    if code:
+        await _ensure_unique_name(
+            session,
+            ProcessUnitType,
+            ProcessUnitType.tenant_id == tenant_id,
+            ProcessUnitType.code == code,
+            detail="process_unit_type_code_already_exists",
+            ignore_id=ignore_id,
+        )
+
+
+async def create_process_unit_type(
+    session: AsyncSession, context: AuthContext, payload
+) -> ProcessUnitType:
+    await _ensure_unit_type_is_unique(
+        session, context.tenant.id, name=payload.name, code=payload.code
+    )
+    unit_type = ProcessUnitType(tenant_id=context.tenant.id, **payload.model_dump())
+    session.add(unit_type)
+    await session.flush()
+    add_audit(
+        session,
+        context,
+        action="PROCESS_UNIT_TYPE_CREATE",
+        entity_type="process_unit_type",
+        entity_id=unit_type.id,
+    )
+    await session.commit()
+    await session.refresh(unit_type)
+    return unit_type
+
+
+async def update_process_unit_type(
+    session: AsyncSession,
+    context: AuthContext,
+    unit_type: ProcessUnitType,
+    payload: BaseModel,
+) -> ProcessUnitType:
+    changes = payload.model_dump(exclude_unset=True)
+    await _ensure_unit_type_is_unique(
+        session,
+        context.tenant.id,
+        name=changes.get("name"),
+        code=changes.get("code"),
+        ignore_id=unit_type.id,
+    )
+    return await update_object(
+        session,
+        context,
+        unit_type,
+        payload,
+        action="PROCESS_UNIT_TYPE_UPDATE",
+        entity_type="process_unit_type",
+    )
+
+
+async def create_process_unit(
+    session: AsyncSession, context: AuthContext, payload
+) -> ProcessUnit:
+    await tenant_get_or_404(session, Station, context.tenant.id, payload.station_id)
+    await tenant_get_or_404(session, ProcessUnitType, context.tenant.id, payload.unit_type_id)
+    await _ensure_unique_name(
+        session,
+        ProcessUnit,
+        ProcessUnit.tenant_id == context.tenant.id,
+        ProcessUnit.station_id == payload.station_id,
+        ProcessUnit.name == payload.name,
+        detail="process_unit_name_already_exists",
+    )
+    unit = ProcessUnit(tenant_id=context.tenant.id, **payload.model_dump())
+    session.add(unit)
+    await session.flush()
+    add_audit(
+        session,
+        context,
+        action="PROCESS_UNIT_CREATE",
+        entity_type="process_unit",
+        entity_id=unit.id,
+    )
+    await session.commit()
+    await session.refresh(unit)
+    return unit
+
+
+async def update_process_unit(
+    session: AsyncSession,
+    context: AuthContext,
+    unit: ProcessUnit,
+    payload: BaseModel,
+) -> ProcessUnit:
+    changes = payload.model_dump(exclude_unset=True)
+    if changes.get("unit_type_id") is not None:
+        await tenant_get_or_404(
+            session, ProcessUnitType, context.tenant.id, changes["unit_type_id"]
+        )
+    if changes.get("name"):
+        await _ensure_unique_name(
+            session,
+            ProcessUnit,
+            ProcessUnit.tenant_id == context.tenant.id,
+            ProcessUnit.station_id == unit.station_id,
+            ProcessUnit.name == changes["name"],
+            detail="process_unit_name_already_exists",
+            ignore_id=unit.id,
+        )
+    return await update_object(
+        session,
+        context,
+        unit,
+        payload,
+        action="PROCESS_UNIT_UPDATE",
+        entity_type="process_unit",
+    )
+
+
+async def ensure_unit_belongs_to_station(
+    session: AsyncSession,
+    tenant_id: UUID,
+    *,
+    station_id: UUID,
+    process_unit_id: UUID | None,
+) -> None:
+    """O equipamento so pode ficar numa unidade da propria estacao."""
+    if process_unit_id is None:
+        return
+    unit = await tenant_get_or_404(session, ProcessUnit, tenant_id, process_unit_id)
+    if unit.station_id != station_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="process_unit_not_in_station",
+        )
+
+
+async def update_asset(
+    session: AsyncSession,
+    context: AuthContext,
+    asset: Asset,
+    payload: BaseModel,
+) -> Asset:
+    changes = payload.model_dump(exclude_unset=True)
+    if "station_id" in changes or "process_unit_id" in changes:
+        await ensure_unit_belongs_to_station(
+            session,
+            context.tenant.id,
+            station_id=changes.get("station_id") or asset.station_id,
+            process_unit_id=changes.get("process_unit_id", asset.process_unit_id),
+        )
+    return await update_object(
+        session,
+        context,
+        asset,
+        payload,
+        action="ASSET_UPDATE",
+        entity_type="asset",
+    )
 
 
 async def validate_update_parents(

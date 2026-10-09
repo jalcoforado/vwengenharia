@@ -55,6 +55,8 @@ from app.models.operations import (
     ContractingParty,
     Development,
     PersonType,
+    ProcessUnit,
+    ProcessUnitType,
     Station,
 )
 
@@ -91,6 +93,8 @@ __all__ = [
     "OccurrenceSeverity",
     "OccurrenceStatus",
     "PersonType",
+    "ProcessUnit",
+    "ProcessUnitType",
     "RefreshToken",
     "RequestCategory",
     "RequestPriority",

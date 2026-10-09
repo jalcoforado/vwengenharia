@@ -174,6 +174,54 @@ class AssetType(TimestampMixin, Base):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
 
+class ProcessUnitType(TimestampMixin, Base):
+    """Catalogo de tipos de unidade (gradeamento, reator UASB, tanque de contato...)."""
+
+    __tablename__ = "process_unit_types"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "name", name="uq_process_unit_types_tenant_name"),
+        UniqueConstraint("tenant_id", "code", name="uq_process_unit_types_tenant_code"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    code: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    # Etapa do tratamento (preliminar, secundario, desinfeccao...), para agrupar nas telas.
+    stage: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
+class ProcessUnit(TimestampMixin, Base):
+    """Unidade de processo instalada numa estacao. Os equipamentos ficam dentro dela."""
+
+    __tablename__ = "process_units"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "station_id", "name", name="uq_process_units_station_name"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    station_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("stations.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    unit_type_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("process_unit_types.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
 class Asset(TimestampMixin, Base):
     __tablename__ = "assets"
     __table_args__ = (
@@ -194,6 +242,13 @@ class Asset(TimestampMixin, Base):
         Uuid(as_uuid=True),
         ForeignKey("asset_types.id", ondelete="RESTRICT"),
         nullable=False,
+        index=True,
+    )
+    # Unidade onde o equipamento esta instalado; vazio = area geral da estacao.
+    process_unit_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("process_units.id", ondelete="RESTRICT"),
+        nullable=True,
         index=True,
     )
     name: Mapped[str] = mapped_column(String(160), nullable=False)

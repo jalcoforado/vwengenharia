@@ -11,6 +11,8 @@ from app.models.operations import (
     ClientDevelopmentContact,
     ContractingParty,
     Development,
+    ProcessUnit,
+    ProcessUnitType,
     Station,
 )
 from app.modules.auth.dependencies import AuthContext, SessionDep, require_roles
@@ -37,6 +39,12 @@ from app.modules.core_registers.schemas import (
     FacadePhotoPresign,
     FacadePhotoUpload,
     FacadePhotoUrl,
+    ProcessUnitCreate,
+    ProcessUnitRead,
+    ProcessUnitTypeCreate,
+    ProcessUnitTypeRead,
+    ProcessUnitTypeUpdate,
+    ProcessUnitUpdate,
     StationCreate,
     StationRead,
     StationUpdate,
@@ -49,6 +57,8 @@ from app.modules.core_registers.service import (
     create_client_contact,
     create_contracting_party,
     create_development,
+    create_process_unit,
+    create_process_unit_type,
     create_station,
     ensure_client_document_is_unique,
     facade_photo_url,
@@ -57,10 +67,13 @@ from app.modules.core_registers.service import (
     presign_facade_photo,
     remove_facade_photo,
     tenant_get_or_404,
+    update_asset,
     update_client_contact,
     update_contracting_party,
     update_development,
     update_object,
+    update_process_unit,
+    update_process_unit_type,
     validate_update_parents,
 )
 
@@ -351,6 +364,76 @@ async def patch_station(
     )
 
 
+@router.get("/process-unit-types", response_model=list[ProcessUnitTypeRead])
+async def list_process_unit_types(
+    context: ReadContextDep,
+    session: SessionDep,
+    limit: PageLimit = 100,
+    offset: PageOffset = 0,
+) -> list[ProcessUnitType]:
+    return await list_tenant_objects(
+        session, ProcessUnitType, context.tenant.id, limit=limit, offset=offset
+    )
+
+
+@router.post(
+    "/process-unit-types",
+    response_model=ProcessUnitTypeRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def post_process_unit_type(
+    payload: ProcessUnitTypeCreate, context: WriteContextDep, session: SessionDep
+) -> ProcessUnitType:
+    return await create_process_unit_type(session, context, payload)
+
+
+@router.patch("/process-unit-types/{unit_type_id}", response_model=ProcessUnitTypeRead)
+async def patch_process_unit_type(
+    unit_type_id: UUID,
+    payload: ProcessUnitTypeUpdate,
+    context: WriteContextDep,
+    session: SessionDep,
+) -> ProcessUnitType:
+    unit_type = await tenant_get_or_404(
+        session, ProcessUnitType, context.tenant.id, unit_type_id
+    )
+    return await update_process_unit_type(session, context, unit_type, payload)
+
+
+@router.get("/process-units", response_model=list[ProcessUnitRead])
+async def list_process_units(
+    context: ReadContextDep,
+    session: SessionDep,
+    limit: PageLimit = 100,
+    offset: PageOffset = 0,
+    station_id: UUID | None = None,
+) -> list[ProcessUnit]:
+    filters = [] if station_id is None else [ProcessUnit.station_id == station_id]
+    return await list_tenant_objects(
+        session, ProcessUnit, context.tenant.id, *filters, limit=limit, offset=offset
+    )
+
+
+@router.post(
+    "/process-units", response_model=ProcessUnitRead, status_code=status.HTTP_201_CREATED
+)
+async def post_process_unit(
+    payload: ProcessUnitCreate, context: WriteContextDep, session: SessionDep
+) -> ProcessUnit:
+    return await create_process_unit(session, context, payload)
+
+
+@router.patch("/process-units/{unit_id}", response_model=ProcessUnitRead)
+async def patch_process_unit(
+    unit_id: UUID,
+    payload: ProcessUnitUpdate,
+    context: WriteContextDep,
+    session: SessionDep,
+) -> ProcessUnit:
+    unit = await tenant_get_or_404(session, ProcessUnit, context.tenant.id, unit_id)
+    return await update_process_unit(session, context, unit, payload)
+
+
 @router.get("/asset-types", response_model=list[AssetTypeRead])
 async def list_asset_types(
     context: ReadContextDep,
@@ -446,11 +529,4 @@ async def patch_asset(
 ) -> Asset:
     asset = await tenant_get_or_404(session, Asset, context.tenant.id, asset_id)
     await validate_update_parents(session, context, payload)
-    return await update_object(
-        session,
-        context,
-        asset,
-        payload,
-        action="ASSET_UPDATE",
-        entity_type="asset",
-    )
+    return await update_asset(session, context, asset, payload)
