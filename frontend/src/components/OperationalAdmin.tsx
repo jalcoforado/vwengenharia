@@ -1394,7 +1394,7 @@ function AssetAdmin({
                 <option value="DESLIGADO">Desligado</option>
                 <option value="EM_MANUTENCAO">Em manutenção</option>
                 <option value="AGUARDANDO_MANUTENCAO">Aguardando manutenção</option>
-                <option value="AGUARDANDO_INSTALACAO">Aguardando instalação</option>
+                <option value="FORA_DA_ESTACAO">Fora da estação</option><option value="AGUARDANDO_INSTALACAO">Aguardando instalação</option>
                 <option value="NECESSITA_VERIFICACAO">Necessita verificação</option>
                 <option value="NAO_POSSUI">Não possui</option>
                 <option value="NAO_APLICAVEL">Não aplicável</option>
@@ -1435,7 +1435,7 @@ function AssetAdmin({
             <label>Fabricante<input value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} /></label>
             <label>Modelo<input value={model} onChange={(e) => setModel(e.target.value)} /></label>
             <label>Número de série<input value={serialNumber} onChange={(e) => setSerialNumber(e.target.value)} /></label>
-            <label>Status<select value={statusValue} onChange={(e) => setStatusValue(e.target.value)}><option value="OPERANDO">Operando</option><option value="DESLIGADO">Desligado</option><option value="EM_MANUTENCAO">Em manutenção</option><option value="AGUARDANDO_MANUTENCAO">Aguardando manutenção</option><option value="AGUARDANDO_INSTALACAO">Aguardando instalação</option><option value="NECESSITA_VERIFICACAO">Necessita verificação</option><option value="NAO_POSSUI">Não possui</option><option value="NAO_APLICAVEL">Não aplicável</option></select></label>
+            <label>Status<select value={statusValue} onChange={(e) => setStatusValue(e.target.value)}><option value="OPERANDO">Operando</option><option value="DESLIGADO">Desligado</option><option value="EM_MANUTENCAO">Em manutenção</option><option value="AGUARDANDO_MANUTENCAO">Aguardando manutenção</option><option value="FORA_DA_ESTACAO">Fora da estação</option><option value="AGUARDANDO_INSTALACAO">Aguardando instalação</option><option value="NECESSITA_VERIFICACAO">Necessita verificação</option><option value="NAO_POSSUI">Não possui</option><option value="NAO_APLICAVEL">Não aplicável</option></select></label>
           </div>
           <button className="small-button" disabled={busy} onClick={() => void createAsset()}>{busy ? "Salvando..." : "Cadastrar ativo"}</button>
         </div>

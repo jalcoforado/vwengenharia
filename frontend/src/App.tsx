@@ -55,6 +55,7 @@ import { cacheValue, outboxCount, queueUpload, readCache, type SyncQueueSummary 
 import { runOrQueue, syncOutbox } from "./lib/sync";
 import { SyncControl, SyncHealthCard } from "./components/SyncStatus";
 import Toast from "./components/Toast";
+import AssetSituationStep, { type AssetSituationRecord } from "./components/AssetSituationStep";
 import mwLogo from "./assets/mw-logo.png";
 import mwSymbol from "./assets/mw-symbol.png";
 
@@ -113,9 +114,13 @@ type Bootstrap = {
     id: string;
     station_id: string;
     asset_type_id: string;
+    process_unit_id?: string | null;
     name: string;
     status: string;
   }>;
+  // Ausentes em dados salvos no aparelho por uma versao anterior do app.
+  units?: Array<{ id: string; station_id: string; name: string }>;
+  asset_situations?: AssetSituationRecord[];
   templates: Array<{
     id: string;
     name: string;
@@ -439,6 +444,62 @@ export default function App() {
     }
   }
 
+  function upsertCachedSituation(visitId: string, assetId: string, situation: string, comment: string | null) {
+    setBootstrap((current) => {
+      if (!current) return current;
+      const list = current.asset_situations ?? [];
+      const existing = list.find((item) => item.visit_id === visitId && item.asset_id === assetId);
+      const nextItem: AssetSituationRecord = existing
+        ? { ...existing, situation, comment }
+        : { id: `local-${uuid()}`, visit_id: visitId, asset_id: assetId, situation, comment };
+      const next = {
+        ...current,
+        asset_situations: existing
+          ? list.map((item) => (item.id === existing.id ? nextItem : item))
+          : [...list, nextItem],
+      };
+      void cacheValue(CACHE_KEY, next);
+      return next;
+    });
+  }
+
+  async function saveAssetSituation(
+    visitId: string,
+    assetId: string,
+    situation: string,
+    comment: string | null,
+  ) {
+    const operationId = uuid();
+    const body = {
+      asset_id: assetId,
+      situation,
+      comment,
+      client_operation_id: operationId,
+    };
+    upsertCachedSituation(visitId, assetId, situation, comment);
+
+    try {
+      const result = await runOrQueue<AssetSituationRecord>(
+        {
+          id: operationId,
+          method: "PUT",
+          path: `/api/v1/visits/${visitId}/asset-situations`,
+          body,
+          createdAt: new Date().toISOString(),
+        },
+        () =>
+          api<AssetSituationRecord>(`/api/v1/visits/${visitId}/asset-situations`, {
+            method: "PUT",
+            body: JSON.stringify(body),
+          }),
+      );
+      if (result.queued) setMessage("Situação do equipamento salva offline.");
+      await refreshPending();
+    } catch {
+      setMessage("Não foi possível salvar a situação do equipamento.");
+    }
+  }
+
   async function saveMeasurement(
     visitId: string,
     type: string,
@@ -627,6 +688,7 @@ export default function App() {
           onBack={() => setSelectedVisitId(null)}
           onCommand={commandVisit}
           onAnswer={saveAnswer}
+          onAssetSituation={saveAssetSituation}
           onMeasurement={saveMeasurement}
           onEvidence={saveEvidence}
           busy={busy}
@@ -901,6 +963,7 @@ function VisitScreen({
   onBack,
   onCommand,
   onAnswer,
+  onAssetSituation,
   onMeasurement,
   onEvidence,
   busy,
@@ -910,6 +973,7 @@ function VisitScreen({
   onBack: () => void;
   onCommand: (visit: Visit, action: "start" | "finish") => Promise<void>;
   onAnswer: (visitId: string, itemId: string, value: unknown) => Promise<void>;
+  onAssetSituation: (visitId: string, assetId: string, situation: string, comment: string | null) => Promise<void>;
   onMeasurement: (visitId: string, type: string, value: string, unit: string) => Promise<void>;
   onEvidence: (visitId: string, file: File) => Promise<void>;
   busy: boolean;
@@ -930,6 +994,9 @@ function VisitScreen({
     ? Math.round((checklistAnswered / items.length) * 100)
     : 100;
   const canFinish = requiredAnswered === requiredItems.length;
+  const stationAssets = bootstrap.assets.filter((asset) => asset.station_id === visit.station_id);
+  const stationUnits = (bootstrap.units ?? []).filter((unit) => unit.station_id === visit.station_id);
+  const visitSituations = (bootstrap.asset_situations ?? []).filter((item) => item.visit_id === visit.id);
 
   return (
     <main className="content visit-screen">
@@ -974,11 +1041,12 @@ function VisitScreen({
       {visit.status === "EM_EXECUCAO" && (
         <nav className="visit-step-nav" aria-label="Etapas da visita">
           {[
-            ["visit-measurements", "1", "Medições"],
-            ["visit-evidence", "2", "Evidências"],
-            ["visit-checklist", "3", "Checklist"],
-            ["visit-occurrence", "4", "Ocorrência"],
-            ["visit-materials", "5", "Materiais"],
+            ["visit-assets", "1", "Equipamentos"],
+            ["visit-measurements", "2", "Medições"],
+            ["visit-evidence", "3", "Evidências"],
+            ["visit-checklist", "4", "Checklist"],
+            ["visit-occurrence", "5", "Ocorrência"],
+            ["visit-materials", "6", "Materiais"],
           ].map(([target, number, label]) => (
             <button
               key={target}
@@ -1013,9 +1081,22 @@ function VisitScreen({
 
       {visit.status === "EM_EXECUCAO" && (
         <>
-          <section id="visit-measurements" className="section-card visit-step-card">
+          <section id="visit-assets" className="section-card visit-step-card">
             <div className="visit-step-heading">
               <span className="visit-step-number">1</span>
+              <div><span className="eyebrow">Equipamentos</span><h2>Situação de cada equipamento</h2></div>
+            </div>
+            <AssetSituationStep
+              assets={stationAssets}
+              units={stationUnits}
+              situations={visitSituations}
+              onSave={(assetId, situation, comment) => onAssetSituation(visit.id, assetId, situation, comment)}
+            />
+          </section>
+
+          <section id="visit-measurements" className="section-card visit-step-card">
+            <div className="visit-step-heading">
+              <span className="visit-step-number">2</span>
               <div><span className="eyebrow">Qualidade</span><h2>Medições</h2></div>
             </div>
             <div className="measurement-grid">
@@ -1034,7 +1115,7 @@ function VisitScreen({
 
           <section id="visit-evidence" className="section-card visit-step-card">
             <div className="visit-step-heading">
-              <span className="visit-step-number">2</span>
+              <span className="visit-step-number">3</span>
               <div><span className="eyebrow">Evidências</span><h2>Fotos e arquivos</h2></div>
             </div>
             <EvidenceCapture onFile={(file) => onEvidence(visit.id, file)} />
@@ -1042,7 +1123,7 @@ function VisitScreen({
 
           <section id="visit-checklist" className="section-card visit-step-card">
             <div className="visit-step-heading">
-              <span className="visit-step-number">3</span>
+              <span className="visit-step-number">4</span>
               <div><span className="eyebrow">Checklist</span><h2>Inspeção da estação</h2></div>
             </div>
             <div className="checklist">
@@ -1062,7 +1143,7 @@ function VisitScreen({
 
           <section id="visit-occurrence" className="section-card visit-step-card">
             <div className="visit-step-heading">
-              <span className="visit-step-number">4</span>
+              <span className="visit-step-number">5</span>
               <div><span className="eyebrow">Ocorrência</span><h2>Encontrou algum problema?</h2></div>
             </div>
             <OccurrenceForm visit={visit} />
@@ -1070,7 +1151,7 @@ function VisitScreen({
 
           <section id="visit-materials" className="section-card visit-step-card">
             <div className="visit-step-heading">
-              <span className="visit-step-number">5</span>
+              <span className="visit-step-number">6</span>
               <div><span className="eyebrow">Materiais e serviços</span><h2>Precisa solicitar algo?</h2></div>
             </div>
             <VisitMaterialRequestForm visit={visit} />

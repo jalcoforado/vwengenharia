@@ -8,6 +8,8 @@ from app.models.field import ChecklistTemplate, ChecklistTemplateItem, Visit
 from app.models.identity import Role
 from app.modules.auth.dependencies import AuthContext, SessionDep, require_roles
 from app.modules.field.schemas import (
+    AssetSituationRead,
+    AssetSituationUpsert,
     AttachmentPresignResponse,
     AttachmentRead,
     AttachmentRegisterCreate,
@@ -47,6 +49,7 @@ from app.modules.field.service import (
     transition_visit,
     update_visit_plan,
     upsert_answer,
+    upsert_asset_situation,
 )
 
 router = APIRouter(tags=["campo"])
@@ -254,6 +257,16 @@ async def put_visit_answer(
     session: SessionDep,
 ) -> VisitAnswerRead:
     return await upsert_answer(session, context, visit_id, payload)
+
+
+@router.put("/visits/{visit_id}/asset-situations", response_model=AssetSituationRead)
+async def put_asset_situation(
+    visit_id: UUID,
+    payload: AssetSituationUpsert,
+    context: FieldContextDep,
+    session: SessionDep,
+) -> AssetSituationRead:
+    return await upsert_asset_situation(session, context, visit_id, payload)
 
 
 @router.post(

@@ -44,6 +44,7 @@ Recursos:
 - assets
 - visit-plans
 - visits
+- visit-asset-situations
 - measurements
 - occurrences
 - work-orders
@@ -66,6 +67,10 @@ Quem contrata a MW (pessoa física ou jurídica): `person_type`, `name` (razão 
 ### process-unit-types e process-units
 
 A estação é dividida em unidades de processo (gradeamento, reator UASB, tanque de contato...). `process-unit-types` é o catálogo (`name`, `code`, `stage`); `process-units` são as unidades instaladas (`station_id`, `unit_type_id`, `name`). O recurso `assets` traz `process_unit_id`; vazio significa equipamento na área geral da estação.
+
+### visit-asset-situations
+
+Uma linha por visita e equipamento: como o técnico encontrou o equipamento (`visit_id`, `asset_id`, `situation`, `comment`). Valores de `situation`: FUNCIONANDO, DESLIGADO, NECESSARIO_VERIFICAR, AGUARDANDO_RETIRADA, RETIRADO_AGUARDANDO_MANUTENCAO, EM_MANUTENCAO, AGUARDANDO_INSTALACAO, NAO_POSSUI, OUTRO. Cada registro também atualiza `assets.status`, exceto OUTRO.
 
 ### client-contacts
 

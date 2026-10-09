@@ -2261,3 +2261,28 @@ button:not(:disabled):active { transform: translateY(1px); }
 @media (max-width: 650px) {
   .admin-toolbar-select, .admin-toolbar .secondary-button { flex: 1 1 100%; justify-content: center; }
 }
+
+/* Visita: situacao de cada equipamento */
+.asset-situations { display: grid; gap: 14px; }
+.asset-situation-group { display: grid; gap: 8px; }
+.asset-situation-group h3 {
+  margin: 0; color: var(--mw-text-secondary); font-size: 12px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .08em;
+}
+.asset-situation-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 8px 12px; align-items: center;
+  padding: 10px 12px; border: 1px solid var(--mw-border); border-radius: var(--mw-radius-md);
+  background: var(--mw-surface);
+}
+.asset-situation-row.done { border-color: #cfe4d6; background: #f8fcf9; }
+.asset-situation-row label { color: var(--mw-text); font-weight: 750; min-width: 0; overflow-wrap: anywhere; }
+.asset-situation-row select,
+.asset-situation-row input {
+  min-height: 44px; width: 100%; border: 1px solid var(--mw-border-strong); border-radius: 10px;
+  background: white; padding: 8px 10px; color: var(--mw-text);
+}
+.asset-situation-row input,
+.asset-situation-row .required-hint { grid-column: 1 / -1; }
+@media (max-width: 600px) {
+  .asset-situation-row { grid-template-columns: 1fr; }
+}

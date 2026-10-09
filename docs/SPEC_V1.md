@@ -176,6 +176,7 @@ Entidades principais:
 - visit_plans
 - visits
 - visit_answers
+- visit_asset_situations
 - measurements
 - occurrences
 - work_orders

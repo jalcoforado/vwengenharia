@@ -7,7 +7,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.field import Measurement, Visit, VisitPlan
+from app.models.field import Measurement, Visit, VisitAssetSituation, VisitPlan
 from app.models.integration import IntegrationCredential
 from app.models.maintenance import (
     Occurrence,
@@ -250,6 +250,15 @@ def _serialize(resource: IntegrationResource, row) -> dict:
                 "notes": row.notes,
             }
         )
+    elif resource == IntegrationResource.VISIT_ASSET_SITUATIONS:
+        payload.update(
+            {
+                "visit_id": row.visit_id,
+                "asset_id": row.asset_id,
+                "situation": row.situation,
+                "comment": row.comment,
+            }
+        )
     elif resource == IntegrationResource.MEASUREMENTS:
         payload.update(
             {
@@ -330,6 +339,10 @@ _RESOURCE_CONFIG = {
     IntegrationResource.ASSETS: (Asset, Asset.updated_at),
     IntegrationResource.VISIT_PLANS: (VisitPlan, VisitPlan.updated_at),
     IntegrationResource.VISITS: (Visit, Visit.updated_at),
+    IntegrationResource.VISIT_ASSET_SITUATIONS: (
+        VisitAssetSituation,
+        VisitAssetSituation.updated_at,
+    ),
     IntegrationResource.MEASUREMENTS: (Measurement, Measurement.updated_at),
     IntegrationResource.OCCURRENCES: (Occurrence, Occurrence.updated_at),
     IntegrationResource.WORK_ORDERS: (WorkOrder, WorkOrder.updated_at),

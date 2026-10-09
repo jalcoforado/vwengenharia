@@ -34,6 +34,7 @@ class IntegrationResource(StrEnum):
     ASSETS = "assets"
     VISIT_PLANS = "visit-plans"
     VISITS = "visits"
+    VISIT_ASSET_SITUATIONS = "visit-asset-situations"
     MEASUREMENTS = "measurements"
     OCCURRENCES = "occurrences"
     WORK_ORDERS = "work-orders"

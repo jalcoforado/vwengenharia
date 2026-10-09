@@ -2,6 +2,7 @@ from app.models.audit import AuditEvent
 from app.models.base import Base
 from app.models.field import (
     AnswerType,
+    AssetSituation,
     Attachment,
     ChecklistTemplate,
     ChecklistTemplateItem,
@@ -10,6 +11,7 @@ from app.models.field import (
     SyncOperation,
     Visit,
     VisitAnswer,
+    VisitAssetSituation,
     VisitPlan,
     VisitStatus,
 )
@@ -63,6 +65,7 @@ from app.models.operations import (
 __all__ = [
     "AnswerType",
     "Asset",
+    "AssetSituation",
     "AssetStatus",
     "AssetType",
     "Attachment",
@@ -107,6 +110,7 @@ __all__ = [
     "User",
     "Visit",
     "VisitAnswer",
+    "VisitAssetSituation",
     "VisitPlan",
     "VisitReview",
     "VisitStatus",
