@@ -29,7 +29,7 @@ async def test_v1_complete_operational_journey() -> None:
 
     session_factory = get_session_factory()
     async with session_factory() as session:
-        tenant = Tenant(name=f"VW Acceptance {suffix}", slug=f"vw-accept-{suffix}")
+        tenant = Tenant(name=f"MW Acceptance {suffix}", slug=f"mw-accept-{suffix}")
         admin = User(
             email=admin_email,
             name="Gestor Acceptance",

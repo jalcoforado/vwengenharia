@@ -91,10 +91,10 @@ async def main() -> None:
     if len(password) < 12:
         raise RuntimeError("HOMOLOGATION_PASSWORD must contain at least 12 characters")
 
-    tenant_slug = os.getenv("HOMOLOGATION_TENANT_SLUG", "vw-homologacao").strip()
+    tenant_slug = os.getenv("HOMOLOGATION_TENANT_SLUG", "mw-homologacao").strip()
     tenant_name = os.getenv(
         "HOMOLOGATION_TENANT_NAME",
-        "VW Engenharia - Homologacao",
+        "MW Engenharia - Homologacao",
     ).strip()
 
     admin_email = os.getenv(

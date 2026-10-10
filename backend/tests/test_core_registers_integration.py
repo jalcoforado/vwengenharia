@@ -70,7 +70,7 @@ async def test_core_registers_are_tenant_scoped_and_audited() -> None:
         client = await http.post(
             "/api/v1/clients",
             headers=headers,
-            json={"name": f"Cliente VW {suffix}", "document": f"DOC-{suffix}"},
+            json={"name": f"Cliente MW {suffix}", "document": f"DOC-{suffix}"},
         )
         assert client.status_code == 201
         client_id = client.json()["id"]

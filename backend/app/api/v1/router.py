@@ -34,4 +34,4 @@ api_router.include_router(team_router)
 
 @api_router.get("/status", tags=["system"])
 async def status() -> dict[str, str]:
-    return {"status": "ok", "service": "vwengenharia-api"}
+    return {"status": "ok", "service": "mwengenharia-api"}

@@ -1,8 +1,8 @@
-# Integração ERP VW Engenharia -> iAnalisys
+# Integração ERP MW Engenharia -> iAnalisys
 
 ## Objetivo
 
-O ERP VW Engenharia é a fonte transacional. O iAnalisys consome dados operacionais por uma API somente leitura.
+O ERP MW Engenharia é a fonte transacional. O iAnalisys consome dados operacionais por uma API somente leitura.
 
 O iAnalisys não acessa diretamente o PostgreSQL do ERP e não reutiliza login de usuário.
 
@@ -19,7 +19,7 @@ O segredo completo é retornado somente na criação. O ERP armazena apenas SHA-
 Nas chamadas de integração:
 
 ```text
-X-Integration-Key: vwk_<segredo>
+X-Integration-Key: mwk_<segredo>
 ```
 
 O tenant é derivado da credencial. Não existe parâmetro tenant_id na API externa.

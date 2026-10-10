@@ -1,4 +1,4 @@
-# Matriz de Permissoes - VW Engenharia ERP V1
+# Matriz de Permissoes - MW Engenharia ERP V1
 
 ## Principio
 
@@ -33,7 +33,7 @@ Pode:
 - administrar configuracoes operacionais.
 
 Uso:
-- administrador principal da VW Engenharia.
+- administrador principal da MW Engenharia.
 
 ### GESTOR
 Pode:
