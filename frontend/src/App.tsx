@@ -1345,6 +1345,11 @@ function SupervisorHome({ me }: { me: Me }) {
   const [managementView, setManagementView] = useState<
     "OVERVIEW" | "OPERATIONS" | "REGISTERS" | "CONFIG" | "GOVERNANCE"
   >("OVERVIEW");
+
+  // A visao da estacao nao acompanha o usuario para outra secao do cockpit.
+  useEffect(() => {
+    setSelectedStationId(null);
+  }, [managementView]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -1828,6 +1833,7 @@ function SupervisorHome({ me }: { me: Me }) {
         canManageAccess={["ADMIN", "SUPERADMIN"].includes(me.role)}
         onChanged={load}
         onOpenStation={setSelectedStationId}
+        onCloseStation={() => setSelectedStationId(null)}
       />
 
       {selectedStationId && (

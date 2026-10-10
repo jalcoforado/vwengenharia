@@ -140,6 +140,7 @@ type Props = {
   canManageAccess: boolean;
   onChanged: () => Promise<void>;
   onOpenStation?: (stationId: string) => void;
+  onCloseStation?: () => void;
 };
 
 export default function OperationalAdmin({
@@ -151,6 +152,7 @@ export default function OperationalAdmin({
   canManageAccess,
   onChanged,
   onOpenStation,
+  onCloseStation,
 }: Props) {
   const [tab, setTab] = useState<"COLABORADORES" | "CONTRATANTES" | "CLIENTES" | "EMPREENDIMENTOS" | "ESTACOES" | "UNIDADES" | "ATIVOS">("COLABORADORES");
   const [collaboratorCount, setCollaboratorCount] = useState<number | null>(null);
@@ -221,7 +223,11 @@ export default function OperationalAdmin({
           <button
             key={value}
             className={tab === value ? "admin-tab active" : "admin-tab"}
-            onClick={() => setTab(value as typeof tab)}
+            onClick={() => {
+              // A visao da estacao pertence a aba Estacoes: fecha ao sair dela.
+              onCloseStation?.();
+              setTab(value as typeof tab);
+            }}
           >
             <Icon size={17} /> {label}
           </button>

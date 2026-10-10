@@ -83,15 +83,20 @@ export default function StationOverview({
     <section className="section-card station-overview">
       <div className="section-heading station-overview-heading">
         <div>
-          <span className="eyebrow">Visão 360</span>
+          <span className="eyebrow">Visão 360 · somente consulta</span>
           <h2>{data?.station.name ?? "Estação"}</h2>
           <p className="section-copy">
             {[data?.station.code, data?.station.station_type].filter(Boolean).join(" · ")}
           </p>
         </div>
         <div className="station-overview-actions">
-          <button className="secondary-button" disabled={busy} onClick={() => void load()}>
-            Atualizar
+          <button
+            className="secondary-button"
+            disabled={busy}
+            title="Busca de novo as informações desta estação no servidor"
+            onClick={() => void load()}
+          >
+            Recarregar dados
           </button>
           <button className="text-button" onClick={onClose}>
             Fechar
