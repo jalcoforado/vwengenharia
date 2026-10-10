@@ -95,6 +95,15 @@ export function ContractingPartyDetails({
   );
 }
 
+// "Responsável principal de 2 empreendimentos · responsável adicional em 1."
+export function responsibilityCountLabel(primaryCount: number, additionalCount: number): string {
+  const plural = (count: number) => (count === 1 ? "1 empreendimento" : count + " empreendimentos");
+  return [
+    primaryCount ? "Responsável principal de " + plural(primaryCount) : null,
+    additionalCount ? (primaryCount ? "responsável adicional em " : "Responsável adicional em ") + plural(additionalCount) : null,
+  ].filter(Boolean).join(" · ");
+}
+
 type ResponsibleClient = {
   id: string;
   name: string;
@@ -173,9 +182,8 @@ export function ResponsibleDetails({
         id: developmentId,
         name: development?.name ?? "Empreendimento não encontrado",
         place: development ? place(development) : "",
-        role: [isPrimary ? "Responsável principal" : null, areas.length ? "Área: " + areas.join(", ") : null]
-          .filter(Boolean)
-          .join(" · "),
+        isPrimary,
+        role: areas.length ? (isPrimary ? "Também responde por: " : "Área: ") + areas.join(", ") : "",
         contract: party
           ? "Contratante: " + contractingPartyLabel(party)
           : isPrimary
@@ -185,7 +193,10 @@ export function ResponsibleDetails({
         portal: active.some((row) => row.portal_access),
       };
     })
-    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+    // Principal primeiro; dentro de cada grupo, por nome.
+    .sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary) || a.name.localeCompare(b.name, "pt-BR"));
+  const primaryCount = responsibilities.filter((item) => item.isPrimary).length;
+  const additionalCount = responsibilities.length - primaryCount;
 
   return (
     <div className="client-contacts development-details">
@@ -214,7 +225,12 @@ export function ResponsibleDetails({
         {!failed && contacts === null && <p className="detail-note">Carregando...</p>}
         {!failed && contacts !== null && responsibilities.length === 0 && (
           <p className="detail-note">
-            Este responsável ainda não responde por nenhum empreendimento. Use o botão Empreendimentos, ao lado, para vincular.
+            Este responsável ainda não responde por nenhum empreendimento. Ele passa a responder ao ser escolhido como responsável principal no cadastro de um empreendimento, ou ao ser vinculado pelo botão Gerenciar empreendimentos.
+          </p>
+        )}
+        {!failed && contacts !== null && responsibilities.length > 0 && (
+          <p className="detail-note">
+            {responsibilityCountLabel(primaryCount, additionalCount)}
           </p>
         )}
         {!failed && contacts !== null && responsibilities.map((item) => (
@@ -224,6 +240,9 @@ export function ResponsibleDetails({
               <span>{[item.role, item.place, item.contract].filter(Boolean).join(" · ")}</span>
             </div>
             <div className="admin-actions">
+              <span className={item.isPrimary ? "role-chip role-chip-primary" : "role-chip"}>
+                {item.isPrimary ? "Responsável principal" : "Responsável adicional"}
+              </span>
               <span className="status">{item.portal ? "Portal liberado" : "Portal bloqueado"}</span>
               <span className={item.active ? "status status-revisada" : "status"}>{item.active ? "Ativo" : "Inativo"}</span>
             </div>

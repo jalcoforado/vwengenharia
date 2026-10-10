@@ -6,7 +6,7 @@ import { Avatar, RowMenu, TableHead, useFormPanel, useRowMenu, useSort, type Row
 import CollaboratorAdmin from "./CollaboratorAdmin";
 import ContractingPartyAdmin, { contractingPartyLabel, type ContractingPartyRecord } from "./ContractingPartyAdmin";
 import DevelopmentDetails from "./DevelopmentDetails";
-import { ResponsibleDetails } from "./PartyDetails";
+import { ResponsibleDetails, responsibilityCountLabel } from "./PartyDetails";
 import ProcessUnitAdmin, { type ProcessUnitRecord } from "./ProcessUnitAdmin";
 import { formatDocument, isValidCpfCnpj, normalizeDocument } from "../lib/document";
 import { optimizeEvidenceImage } from "../lib/media";
@@ -304,6 +304,7 @@ function ClientAdmin({
   const [contactWhatsapp, setContactWhatsapp] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [consultId, setConsultId] = useState<string | null>(null);
+  const [allContacts, setAllContacts] = useState<ClientContactRecord[]>([]);
   const [contacts, setContacts] = useState<ClientContactRecord[]>([]);
   const [linkDevelopmentId, setLinkDevelopmentId] = useState("");
   const [linkScope, setLinkScope] = useState<ContactScope>("TECNICO");
@@ -349,6 +350,33 @@ function ClientAdmin({
     if (key === "status") return client.is_active ? "0" : "1";
     return client.name;
   });
+
+  // Todas as responsabilidades, para a lista dizer de quantos empreendimentos cada pessoa cuida.
+  async function loadAllContacts() {
+    try {
+      setAllContacts(await api<ClientContactRecord[]>("/api/v1/client-contacts?limit=500"));
+    } catch {
+      setAllContacts([]);
+    }
+  }
+
+  // Recarrega quando um empreendimento e criado ou troca de responsavel principal.
+  useEffect(() => {
+    void loadAllContacts();
+  }, [developments]);
+
+  function responsibilitySummary(client: ClientRecord): string {
+    const primaryIds = new Set(developments.filter((item) => item.client_id === client.id).map((item) => item.id));
+    // Com a lista no limite da consulta, o total de adicionais pode estar incompleto: mostra so o principal.
+    const additionalIds = allContacts.length >= 500
+      ? new Set<string>()
+      : new Set(
+          allContacts
+            .filter((row) => row.client_id === client.id && row.is_active && !primaryIds.has(row.development_id))
+            .map((row) => row.development_id),
+        );
+    return responsibilityCountLabel(primaryIds.size, additionalIds.size);
+  }
 
   function resetForm() {
     setEditingId(null);
@@ -541,6 +569,7 @@ function ClientAdmin({
       setLinkDevelopmentId("");
       setLinkFeedback("Responsabilidade registrada.");
       await loadContacts(client.id);
+      void loadAllContacts();
     } catch (error) {
       const duplicated =
         typeof error === "object" && error !== null && "status" in error && error.status === 409;
@@ -563,6 +592,7 @@ function ClientAdmin({
       });
       setLinkFeedback(contact.is_active ? "Responsabilidade inativada." : "Responsabilidade reativada.");
       await loadContacts(contact.client_id);
+      void loadAllContacts();
     } catch {
       setLinkFeedback("Não foi possível alterar a responsabilidade.");
     } finally {
@@ -583,6 +613,7 @@ function ClientAdmin({
           : "Portal liberado. O responsável vê este empreendimento quando tiver login de portal.",
       );
       await loadContacts(contact.client_id);
+      void loadAllContacts();
     } catch (error) {
       const forbidden =
         typeof error === "object" && error !== null && "status" in error && error.status === 403;
@@ -658,7 +689,10 @@ function ClientAdmin({
       <div className="admin-list collab-table collab-table-actions-4" role="table" aria-label="Responsáveis">
         <TableHead columns={CLIENT_COLUMNS} sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} />
         {sortedClients.map((client) => {
-          const detail = client.contact_email || formatDocument(client.document) || "Sem email informado";
+          const detail = [
+            client.contact_email || formatDocument(client.document) || "Sem email informado",
+            responsibilitySummary(client) || "Sem empreendimento vinculado",
+          ].join(" · ");
           const expandText = expandedId === client.id ? "Fechar empreendimentos" : "Gerenciar empreendimentos";
           const consultText = consultId === client.id ? "Fechar consulta" : "Consultar";
           return (
