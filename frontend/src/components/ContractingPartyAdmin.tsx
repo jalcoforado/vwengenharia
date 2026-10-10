@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Briefcase, EllipsisVertical, Pencil, Search } from "lucide-react";
+import { Briefcase, EllipsisVertical, Eye, Pencil, Search } from "lucide-react";
 
 import { api } from "../lib/api";
 import { Avatar, RowMenu, TableHead, useFormPanel, useRowMenu, useSort, type RowMenuItem } from "./AdminTable";
+import { ContractingPartyDetails } from "./PartyDetails";
 import { formatDocument, isValidCpfCnpj, normalizeDocument } from "../lib/document";
 import { formatPhone, isCompletePhone } from "../lib/phone";
 
@@ -16,6 +17,18 @@ export type ContractingPartyRecord = {
   document: string | null;
   contact_email: string | null;
   contact_phone: string | null;
+  is_active: boolean;
+};
+
+// O que a consulta precisa saber de cada empreendimento contratado.
+type PartyDevelopment = {
+  id: string;
+  client_id: string;
+  contracting_party_id: string | null;
+  name: string;
+  development_type: string | null;
+  city: string | null;
+  state: string | null;
   is_active: boolean;
 };
 
@@ -40,11 +53,13 @@ export function contractingPartyLabel(party: ContractingPartyRecord): string {
 
 export default function ContractingPartyAdmin({
   parties,
-  developmentCount,
+  developments,
+  clients,
   onChanged,
 }: {
   parties: ContractingPartyRecord[];
-  developmentCount: (partyId: string) => number;
+  developments: PartyDevelopment[];
+  clients: { id: string; name: string }[];
   onChanged: () => Promise<void>;
 }) {
   const [search, setSearch] = useState("");
@@ -58,6 +73,7 @@ export default function ContractingPartyAdmin({
   const [feedback, setFeedback] = useState<string | null>(null);
   const [rowFeedback, setRowFeedback] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const { sortKey, sortAsc, toggleSort, sortBy } = useSort<SortKey>("name");
   const { menu, openMenu, closeMenu } = useRowMenu();
   const panel = useFormPanel();
@@ -178,7 +194,7 @@ export default function ContractingPartyAdmin({
   }
 
   function summary(item: ContractingPartyRecord): string {
-    const count = developmentCount(item.id);
+    const count = developments.filter((development) => development.contracting_party_id === item.id).length;
     return [
       formatDocument(item.document) || "Sem CPF/CNPJ informado",
       item.trade_name ? item.name : null,
@@ -189,6 +205,7 @@ export default function ContractingPartyAdmin({
   const menuItem = menu ? parties.find((item) => item.id === menu.id) : undefined;
   const menuItems: RowMenuItem[] = menuItem
     ? [
+        { text: expandedId === menuItem.id ? "Fechar consulta" : "Consultar", run: () => setExpandedId(expandedId === menuItem.id ? null : menuItem.id) },
         { text: "Editar", run: () => startEdit(menuItem) },
         { text: menuItem.is_active ? "Inativar" : "Reativar", run: () => void toggle(menuItem), danger: menuItem.is_active },
       ]
@@ -262,6 +279,15 @@ export default function ContractingPartyAdmin({
                   <span className={item.is_active ? "collab-status active" : "collab-status"}>{item.is_active ? "Ativo" : "Inativo"}</span>
                 </div>
                 <div className="collab-actions" role="cell">
+                  <button
+                    className={expandedId === item.id ? "icon-action icon-action-on" : "icon-action"}
+                    title={expandedId === item.id ? "Fechar consulta" : "Consultar"}
+                    aria-label={(expandedId === item.id ? "Fechar consulta: " : "Consultar: ") + contractingPartyLabel(item)}
+                    aria-expanded={expandedId === item.id}
+                    onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
+                  >
+                    <Eye size={16} />
+                  </button>
                   <button className="icon-action icon-action-edit" disabled={busy} title="Editar" aria-label={"Editar: " + contractingPartyLabel(item)} onClick={() => startEdit(item)}>
                     <Pencil size={16} />
                   </button>
@@ -278,6 +304,9 @@ export default function ContractingPartyAdmin({
                   </button>
                 </div>
               </div>
+              {expandedId === item.id && (
+                <ContractingPartyDetails party={item} developments={developments} clients={clients} />
+              )}
             </div>
           ))}
           {parties.length === 0 && (

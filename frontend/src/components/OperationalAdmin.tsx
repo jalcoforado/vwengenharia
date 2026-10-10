@@ -6,6 +6,7 @@ import { Avatar, RowMenu, TableHead, useFormPanel, useRowMenu, useSort, type Row
 import CollaboratorAdmin from "./CollaboratorAdmin";
 import ContractingPartyAdmin, { contractingPartyLabel, type ContractingPartyRecord } from "./ContractingPartyAdmin";
 import DevelopmentDetails from "./DevelopmentDetails";
+import { ResponsibleDetails } from "./PartyDetails";
 import ProcessUnitAdmin, { type ProcessUnitRecord } from "./ProcessUnitAdmin";
 import { formatDocument, isValidCpfCnpj, normalizeDocument } from "../lib/document";
 import { optimizeEvidenceImage } from "../lib/media";
@@ -233,7 +234,8 @@ export default function OperationalAdmin({
       {tab === "CONTRATANTES" && (
         <ContractingPartyAdmin
           parties={parties}
-          developmentCount={(partyId) => developments.filter((item) => item.contracting_party_id === partyId).length}
+          developments={developments}
+          clients={clients}
           onChanged={loadParties}
         />
       )}
@@ -241,6 +243,7 @@ export default function OperationalAdmin({
         <ClientAdmin
           clients={clients}
           developments={developments}
+          parties={parties}
           canManageAccess={canManageAccess}
           onChanged={onChanged}
         />
@@ -281,11 +284,13 @@ export default function OperationalAdmin({
 function ClientAdmin({
   clients,
   developments,
+  parties,
   canManageAccess,
   onChanged,
 }: {
   clients: ClientRecord[];
   developments: DevelopmentRecord[];
+  parties: ContractingPartyRecord[];
   canManageAccess: boolean;
   onChanged: () => Promise<void>;
 }) {
@@ -298,6 +303,7 @@ function ClientAdmin({
   const [contactPhone, setContactPhone] = useState("");
   const [contactWhatsapp, setContactWhatsapp] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [consultId, setConsultId] = useState<string | null>(null);
   const [contacts, setContacts] = useState<ClientContactRecord[]>([]);
   const [linkDevelopmentId, setLinkDevelopmentId] = useState("");
   const [linkScope, setLinkScope] = useState<ContactScope>("TECNICO");
@@ -504,12 +510,20 @@ function ClientAdmin({
     setLinkFeedback(null);
     setLinkDevelopmentId("");
     if (expandedId === client.id) return setExpandedId(null);
+    setConsultId(null);
     setContacts([]);
     setPortalLogin(null);
     setPortalEmail(client.contact_email ?? "");
     setPortalPassword("");
     setExpandedId(client.id);
     await Promise.all([loadContacts(client.id), loadPortalLogin(client.id)]);
+  }
+
+  // Consulta e gestao dos empreendimentos nao ficam abertas ao mesmo tempo na mesma lista.
+  function toggleConsult(client: ClientRecord) {
+    if (consultId === client.id) return setConsultId(null);
+    setExpandedId(null);
+    setConsultId(client.id);
   }
 
   async function addLink(client: ClientRecord) {
@@ -585,7 +599,8 @@ function ClientAdmin({
   const menuClient = menu ? clients.find((client) => client.id === menu.id) : undefined;
   const menuItems: RowMenuItem[] = menuClient
     ? [
-        { text: expandedId === menuClient.id ? "Fechar empreendimentos" : "Empreendimentos", run: () => void toggleExpanded(menuClient) },
+        { text: consultId === menuClient.id ? "Fechar consulta" : "Consultar", run: () => toggleConsult(menuClient) },
+        { text: expandedId === menuClient.id ? "Fechar empreendimentos" : "Gerenciar empreendimentos", run: () => void toggleExpanded(menuClient) },
         { text: "Editar", run: () => startEdit(menuClient) },
         { text: menuClient.is_active ? "Inativar" : "Reativar", run: () => void toggle(menuClient), danger: menuClient.is_active },
       ]
@@ -640,11 +655,12 @@ function ClientAdmin({
 )}
 </div>
 {listFeedback && <span className="inline-feedback" role="status">{listFeedback}</span>}
-      <div className="admin-list collab-table" role="table" aria-label="Responsáveis">
+      <div className="admin-list collab-table collab-table-actions-4" role="table" aria-label="Responsáveis">
         <TableHead columns={CLIENT_COLUMNS} sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} />
         {sortedClients.map((client) => {
           const detail = client.contact_email || formatDocument(client.document) || "Sem email informado";
-          const expandText = expandedId === client.id ? "Fechar empreendimentos" : "Empreendimentos";
+          const expandText = expandedId === client.id ? "Fechar empreendimentos" : "Gerenciar empreendimentos";
+          const consultText = consultId === client.id ? "Fechar consulta" : "Consultar";
           return (
           <div className="client-entry" key={client.id}>
             <div className={client.is_active ? "collab-row" : "collab-row collab-row-inactive"} role="row">
@@ -665,6 +681,15 @@ function ClientAdmin({
                 <span className={client.is_active ? "collab-status active" : "collab-status"}>{client.is_active ? "Ativo" : "Inativo"}</span>
               </div>
               <div className="collab-actions" role="cell">
+                <button
+                  className={consultId === client.id ? "icon-action icon-action-on" : "icon-action"}
+                  title={consultText}
+                  aria-label={consultText + ": " + client.name}
+                  aria-expanded={consultId === client.id}
+                  onClick={() => toggleConsult(client)}
+                >
+                  <Eye size={16} />
+                </button>
                 <button
                   className={expandedId === client.id ? "icon-action icon-action-on" : "icon-action"}
                   disabled={busy}
@@ -691,6 +716,9 @@ function ClientAdmin({
                 </button>
               </div>
             </div>
+            {consultId === client.id && (
+              <ResponsibleDetails client={client} developments={developments} parties={parties} showPortalLogin={canManageAccess} />
+            )}
             {expandedId === client.id && (
               <div className="client-contacts">
                 {canManageAccess && (

@@ -55,7 +55,7 @@ const SCOPE_LABELS: Record<string, string> = {
   ADMINISTRATIVO: "Administrativo",
 };
 
-function Field({ label, value }: { label: string; value: string | null | undefined }) {
+export function Field({ label, value }: { label: string; value: string | null | undefined }) {
   return (
     <div className="detail-field">
       <dt>{label}</dt>
