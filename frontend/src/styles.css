@@ -2319,4 +2319,7 @@ button:not(:disabled):active { transform: translateY(1px); }
   border: 1px solid var(--mw-border-strong); background: var(--mw-surface);
   color: var(--mw-text-secondary); font-size: 12px; font-weight: 750;
 }
-.role-chip-primary { border-color: var(--mw-primary); background: var(--mw-primary); color: #ffffff; }
+/* O seletor repete .client-contact-row para vencer a cor padrao dos textos dessa lista. */
+.client-contact-row span.role-chip { color: var(--mw-text-secondary); }
+.role-chip-primary,
+.client-contact-row span.role-chip-primary { border-color: var(--mw-primary); background: var(--mw-primary); color: #ffffff; }
