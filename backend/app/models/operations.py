@@ -85,6 +85,7 @@ class ContractingParty(TimestampMixin, Base):
     document: Mapped[str | None] = mapped_column(String(32), nullable=True)
     contact_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
     contact_phone: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    contact_whatsapp: Mapped[str | None] = mapped_column(String(40), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
 

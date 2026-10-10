@@ -62,6 +62,7 @@ export function ContractingPartyDetails({
           <Field label={party.person_type === "PJ" ? "Razão social" : "Nome completo"} value={party.name} />
           <Field label={party.person_type === "PJ" ? "Nome fantasia" : "Nome de exibição"} value={party.trade_name} />
           <Field label={party.person_type === "PJ" ? "CNPJ" : "CPF"} value={formatDocument(party.document)} />
+          <Field label="WhatsApp" value={formatPhone(party.contact_whatsapp)} />
           <Field label="Telefone" value={formatPhone(party.contact_phone)} />
           <Field label="Email" value={party.contact_email} />
         </dl>

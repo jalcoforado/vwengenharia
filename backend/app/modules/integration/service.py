@@ -156,6 +156,7 @@ def _serialize(resource: IntegrationResource, row) -> dict:
                 "document": row.document,
                 "contact_email": row.contact_email,
                 "contact_phone": row.contact_phone,
+                "contact_whatsapp": row.contact_whatsapp,
                 "is_active": row.is_active,
             }
         )

@@ -62,7 +62,7 @@ Datas de watermark devem incluir timezone.
 
 ### contracting-parties
 
-Quem contrata a MW (pessoa física ou jurídica): `person_type`, `name` (razão social ou nome), `trade_name`, `document` (CPF/CNPJ), `contact_email`, `contact_phone`, `is_active`. Um contratante pode ter vários empreendimentos; a ligação está em `developments.contracting_party_id`.
+Quem contrata a MW (pessoa física ou jurídica): `person_type`, `name` (razão social ou nome), `trade_name`, `document` (CPF/CNPJ), `contact_email`, `contact_phone`, `contact_whatsapp`, `is_active`. Um contratante pode ter vários empreendimentos; a ligação está em `developments.contracting_party_id`.
 
 ### process-unit-types e process-units
 

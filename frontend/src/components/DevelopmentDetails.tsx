@@ -174,6 +174,7 @@ export default function DevelopmentDetails({
             <Field label="Contratante" value={contractingPartyLabel(party)} />
             <Field label={party.person_type === "PJ" ? "Razão social" : "Nome completo"} value={party.name} />
             <Field label={party.person_type === "PJ" ? "CNPJ" : "CPF"} value={formatDocument(party.document)} />
+            <Field label="WhatsApp" value={formatPhone(party.contact_whatsapp)} />
             <Field label="Telefone" value={formatPhone(party.contact_phone)} />
             <Field label="Email" value={party.contact_email} />
           </dl>

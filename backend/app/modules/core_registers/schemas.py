@@ -78,6 +78,7 @@ class ContractingPartyCreate(BaseModel):
     document: str | None = Field(default=None, max_length=32)
     contact_email: EmailStr | None = None
     contact_phone: str | None = Field(default=None, max_length=40)
+    contact_whatsapp: str | None = Field(default=None, max_length=40)
 
 
 class ContractingPartyUpdate(BaseModel):
@@ -87,6 +88,7 @@ class ContractingPartyUpdate(BaseModel):
     document: str | None = Field(default=None, max_length=32)
     contact_email: EmailStr | None = None
     contact_phone: str | None = Field(default=None, max_length=40)
+    contact_whatsapp: str | None = Field(default=None, max_length=40)
     is_active: bool | None = None
 
 
@@ -98,6 +100,7 @@ class ContractingPartyRead(ORMModel):
     document: str | None
     contact_email: str | None
     contact_phone: str | None
+    contact_whatsapp: str | None
     is_active: bool
     created_at: datetime
     updated_at: datetime

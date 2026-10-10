@@ -17,6 +17,7 @@ export type ContractingPartyRecord = {
   document: string | null;
   contact_email: string | null;
   contact_phone: string | null;
+  contact_whatsapp: string | null;
   is_active: boolean;
 };
 
@@ -70,6 +71,7 @@ export default function ContractingPartyAdmin({
   const [document, setDocument] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
+  const [contactWhatsapp, setContactWhatsapp] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
   const [rowFeedback, setRowFeedback] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -82,19 +84,19 @@ export default function ContractingPartyAdmin({
   const termDigits = term.replace(/\D/g, "");
   const visible = parties.filter((item) => {
     if (!term) return true;
-    const fields = [item.name, item.trade_name, item.document, item.contact_email, item.contact_phone]
+    const fields = [item.name, item.trade_name, item.document, item.contact_email, item.contact_phone, item.contact_whatsapp]
       .map((value) => (value ?? "").toLowerCase());
     if (fields.some((value) => value.includes(term))) return true;
     // Permite achar CPF/CNPJ e telefone digitando so os numeros.
     return (
       termDigits.length >= 3 &&
-      [item.document, item.contact_phone].some((value) => (value ?? "").replace(/\D/g, "").includes(termDigits))
+      [item.document, item.contact_phone, item.contact_whatsapp].some((value) => (value ?? "").replace(/\D/g, "").includes(termDigits))
     );
   });
 
   const sorted = sortBy(visible, (item, key) => {
     if (key === "type") return item.person_type;
-    if (key === "contact") return (item.contact_phone ?? "").replace(/\D/g, "");
+    if (key === "contact") return (item.contact_whatsapp || item.contact_phone || "").replace(/\D/g, "");
     if (key === "status") return item.is_active ? "0" : "1";
     return contractingPartyLabel(item);
   });
@@ -102,7 +104,7 @@ export default function ContractingPartyAdmin({
   function resetForm() {
     setEditingId(null);
     setPersonType("PJ"); setName(""); setTradeName(""); setDocument("");
-    setContactEmail(""); setContactPhone("");
+    setContactEmail(""); setContactPhone(""); setContactWhatsapp("");
   }
 
   function openNew() {
@@ -125,6 +127,7 @@ export default function ContractingPartyAdmin({
     setDocument(formatDocument(item.document));
     setContactEmail(item.contact_email ?? "");
     setContactPhone(formatPhone(item.contact_phone));
+    setContactWhatsapp(formatPhone(item.contact_whatsapp));
     setFeedback(null);
     panel.show();
   }
@@ -137,6 +140,12 @@ export default function ContractingPartyAdmin({
     if (!document.trim()) return setFeedback("Informe o " + documentLabel + " do contratante.");
     if (normalizeDocument(document).length !== (personType === "PJ" ? 14 : 11) || !isValidCpfCnpj(document)) {
       return setFeedback(documentLabel + " inválido. Confira os números digitados.");
+    }
+    if (!contactWhatsapp.trim() && !contactPhone.trim()) {
+      return setFeedback("Informe o WhatsApp ou o telefone do contratante.");
+    }
+    if (contactWhatsapp.trim() && !isCompletePhone(contactWhatsapp)) {
+      return setFeedback("WhatsApp incompleto. Informe DDD e número.");
     }
     if (contactPhone.trim() && !isCompletePhone(contactPhone)) {
       return setFeedback("Telefone incompleto. Informe DDD e número.");
@@ -152,6 +161,7 @@ export default function ContractingPartyAdmin({
           document: normalizeDocument(document),
           contact_email: contactEmail.trim() || null,
           contact_phone: contactPhone.trim() || null,
+          contact_whatsapp: contactWhatsapp.trim() || null,
         }),
       });
       if (editingId) {
@@ -226,10 +236,11 @@ export default function ContractingPartyAdmin({
             <label><span>{personType === "PJ" ? "CNPJ" : "CPF"} <b className="required-mark">*</b></span><input required aria-required="true" inputMode="numeric" placeholder={personType === "PJ" ? "00.000.000/0000-00" : "000.000.000-00"} value={document} onChange={(e) => setDocument(e.target.value)} /></label>
             <label className="form-span-2">{personType === "PJ" ? "Nome fantasia" : "Nome de exibição"}<input placeholder="Como a equipe identifica este contratante" value={tradeName} onChange={(e) => setTradeName(e.target.value)} /></label>
             <label>Email<input type="email" placeholder="email@exemplo.com" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} /></label>
-            <label>Telefone<input type="tel" inputMode="numeric" placeholder="(85) 3333-3333" value={contactPhone} onChange={(e) => setContactPhone(formatPhone(e.target.value))} /></label>
+            <label><span>WhatsApp <b className="required-mark">**</b></span><input type="tel" inputMode="numeric" placeholder="(85) 99999-9999" value={contactWhatsapp} onChange={(e) => setContactWhatsapp(formatPhone(e.target.value))} /></label>
+            <label><span>Telefone <b className="required-mark">**</b></span><input type="tel" inputMode="numeric" placeholder="(85) 3333-3333" value={contactPhone} onChange={(e) => setContactPhone(formatPhone(e.target.value))} /></label>
           </div>
           <p className="required-hint">
-            <b className="required-mark">*</b> Obrigatório. O contratante é quem assina com a MW; os locais atendidos são cadastrados em Empreendimentos.
+            <b className="required-mark">*</b> Obrigatório. <b className="required-mark">**</b> Informe ao menos um: WhatsApp ou Telefone. O contratante é quem assina com a MW; os locais atendidos são cadastrados em Empreendimentos.
           </p>
           <div className="admin-actions form-submit">
             <button className="primary-button" disabled={busy} onClick={() => void save()}>
@@ -273,7 +284,7 @@ export default function ContractingPartyAdmin({
                   <span className="collab-chip">{item.person_type === "PJ" ? "Pessoa jurídica" : "Pessoa física"}</span>
                 </div>
                 <div className="collab-col-contact" role="cell">
-                  {formatPhone(item.contact_phone) || "—"}
+                  {formatPhone(item.contact_whatsapp || item.contact_phone) || "—"}
                 </div>
                 <div className="collab-col-status" role="cell">
                   <span className={item.is_active ? "collab-status active" : "collab-status"}>{item.is_active ? "Ativo" : "Inativo"}</span>

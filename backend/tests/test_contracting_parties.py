@@ -51,9 +51,11 @@ async def test_contracting_party_owns_many_developments() -> None:
                 "document": document,
                 "contact_email": f"contato-{suffix}@example.com",
                 "contact_phone": "(85) 3333-0000",
+                "contact_whatsapp": "(85) 99999-0000",
             },
         )
         assert party.status_code == 201
+        assert party.json()["contact_whatsapp"] == "(85) 99999-0000"
         party_id = party.json()["id"]
         assert party.json()["person_type"] == "PJ"
 
@@ -143,6 +145,7 @@ async def test_contracting_party_owns_many_developments() -> None:
         exported_party = next(item for item in exported.json()["items"] if item["id"] == party_id)
         assert exported_party["document"] == document
         assert exported_party["trade_name"] == "Novo Nome"
+        assert exported_party["contact_whatsapp"] == "(85) 99999-0000"
 
         developments = await http.get(
             "/api/v1/integration/v1/developments", headers=integration_headers
