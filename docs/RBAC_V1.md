@@ -20,6 +20,10 @@ Regras de credencial:
 - toda credencial interna pertence a um colaborador; o caminho normal e criar o acesso a partir do colaborador (`POST /collaborators/{id}/credential`). `POST /team` continua aceito e registra o colaborador da credencial;
 - inativar o colaborador bloqueia a credencial e encerra as sessoes; reativar o colaborador nao devolve o acesso sozinho;
 - o grupo do colaborador (diretoria, backoffice, tecnico) descreve quem ele e na MW e nao concede permissao; a permissao vem do perfil abaixo;
+- a senha definida por um administrador (ao criar o acesso ou ao redefinir) e provisoria: enquanto `users.must_change_password` estiver ligado, a API responde 403 `password_change_required` a tudo, exceto `/auth/me` e `/auth/change-password`; a troca desliga a marca;
+- o administrador redefine a senha de outra pessoa em `POST /team/{membership_id}/reset-password` (nunca a propria), o que encerra as sessoes abertas dela;
+- `GET /accesses` lista todos os logins do tenant, de equipe e de portal, so para ADMIN/SUPERADMIN;
+- o perfil CLIENTE nao e trocado por um perfil interno, nem o contrario;
 - login de portal (perfil CLIENTE) so nasce de um responsavel cadastrado (`POST /clients/{id}/portal-credential`); `POST /team` recusa o perfil CLIENTE.
 
 ## Perfis

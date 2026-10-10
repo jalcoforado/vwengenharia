@@ -2323,3 +2323,16 @@ button:not(:disabled):active { transform: translateY(1px); }
 .client-contact-row span.role-chip { color: var(--mw-text-secondary); }
 .role-chip-primary,
 .client-contact-row span.role-chip-primary { border-color: var(--mw-primary); background: var(--mw-primary); color: #ffffff; }
+
+/* Controle de acesso */
+.role-reference { border: 1px solid var(--mw-border); border-radius: var(--mw-radius-md); background: var(--mw-surface-muted); }
+.role-reference summary { padding: 12px 14px; font-weight: 750; color: var(--mw-text); cursor: pointer; }
+.role-reference summary:focus-visible { outline: 2px solid var(--mw-primary); outline-offset: 2px; }
+.role-reference dl { margin: 0; padding: 0 14px 14px; display: grid; gap: 10px; }
+.role-reference dl > div { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 4px 14px; }
+.role-reference dt { font-weight: 750; color: var(--mw-text); }
+.role-reference dd { margin: 0; color: var(--mw-text-secondary); font-size: 14px; }
+.login-card .text-button { justify-self: center; }
+@media (max-width: 650px) {
+  .role-reference dl > div { grid-template-columns: 1fr; }
+}

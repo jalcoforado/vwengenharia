@@ -15,9 +15,11 @@ from app.models.identity import (
     Role,
     User,
 )
+from app.models.operations import Client, ClientMembershipAccess
 from app.modules.auth.dependencies import AuthContext
 from app.modules.core_registers.service import add_audit
 from app.modules.team.schemas import (
+    AccessRead,
     CollaboratorCreate,
     CollaboratorCredentialCreate,
     CollaboratorRead,
@@ -107,6 +109,8 @@ async def create_team_member(
         name=payload.name.strip(),
         password_hash=hash_password(payload.password),
         is_active=True,
+        # A senha inicial e escolhida por quem cria o acesso: vale so ate o primeiro login.
+        must_change_password=True,
     )
     session.add(user)
     await session.flush()
@@ -180,6 +184,13 @@ async def update_team_member(
 
     if "role" in changes:
         role = changes["role"]
+        new_role = role.value if isinstance(role, Role) else role
+        # Portal e equipe sao mundos separados: o perfil CLIENTE nao e trocado por um interno.
+        if (new_role == Role.CLIENTE.value) != (membership.role == Role.CLIENTE.value):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="client_role_is_fixed",
+            )
         if isinstance(role, Role):
             role = role.value
         if not _can_manage_role(context.membership.role, role):
@@ -238,6 +249,7 @@ async def change_own_password(
         )
 
     context.user.password_hash = hash_password(new_password)
+    context.user.must_change_password = False
     now = datetime.now(UTC)
     await session.execute(
         update(RefreshToken)
@@ -482,3 +494,103 @@ async def create_collaborator_credential(
         ),
     )
     return await read_collaborator(session, context, collaborator.id)
+async def reset_member_password(
+    session: AsyncSession,
+    context: AuthContext,
+    membership_id: UUID,
+    new_password: str,
+) -> None:
+    """O administrador define uma senha provisoria; a pessoa troca no proximo acesso."""
+    membership = (
+        await session.execute(
+            select(Membership)
+            .options(selectinload(Membership.user))
+            .where(
+                Membership.id == membership_id,
+                Membership.tenant_id == context.tenant.id,
+            )
+        )
+    ).scalar_one_or_none()
+    if membership is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="member_not_found")
+    if membership.id == context.membership.id:
+        # A propria senha se troca informando a atual, em /auth/change-password.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="cannot_change_own_membership",
+        )
+    if membership.role == Role.SUPERADMIN.value and context.membership.role != Role.SUPERADMIN.value:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="cannot_manage_superadmin",
+        )
+
+    membership.user.password_hash = hash_password(new_password)
+    membership.user.must_change_password = True
+    await session.execute(
+        update(RefreshToken)
+        .where(
+            RefreshToken.user_id == membership.user_id,
+            RefreshToken.revoked_at.is_(None),
+        )
+        .values(revoked_at=datetime.now(UTC))
+    )
+    add_audit(
+        session,
+        context,
+        action="PASSWORD_RESET",
+        entity_type="user",
+        entity_id=membership.user_id,
+        fields=["password_hash"],
+    )
+    await session.commit()
+
+
+async def list_accesses(session: AsyncSession, context: AuthContext) -> list[AccessRead]:
+    """Todos os logins do tenant: equipe (colaboradores) e portal (responsaveis)."""
+    rows = (
+        await session.execute(
+            select(Membership, User, Collaborator)
+            .join(User, User.id == Membership.user_id)
+            .outerjoin(Collaborator, Collaborator.membership_id == Membership.id)
+            .where(Membership.tenant_id == context.tenant.id)
+            .order_by(User.name)
+        )
+    ).all()
+    portal_links = {
+        membership_id: client
+        for membership_id, client in (
+            await session.execute(
+                select(ClientMembershipAccess.membership_id, Client)
+                .join(Client, Client.id == ClientMembershipAccess.client_id)
+                .where(ClientMembershipAccess.tenant_id == context.tenant.id)
+                .order_by(ClientMembershipAccess.created_at.desc())
+            )
+        ).all()
+    }
+
+    accesses = []
+    for membership, user, collaborator in rows:
+        client = portal_links.get(membership.id)
+        if collaborator is not None:
+            kind, linked = "COLLABORATOR", collaborator
+        elif client is not None:
+            kind, linked = "RESPONSIBLE", client
+        else:
+            kind, linked = "UNLINKED", None
+        accesses.append(
+            AccessRead(
+                membership_id=membership.id,
+                user_id=user.id,
+                name=user.name,
+                email=user.email,
+                role=membership.role,
+                is_active=membership.is_active and user.is_active,
+                must_change_password=user.must_change_password,
+                kind=kind,
+                linked_id=linked.id if linked else None,
+                linked_name=linked.name if linked else None,
+                linked_active=linked.is_active if linked else None,
+            )
+        )
+    return accesses

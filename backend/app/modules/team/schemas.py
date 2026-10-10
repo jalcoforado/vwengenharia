@@ -70,3 +70,22 @@ class CollaboratorCredentialCreate(BaseModel):
     email: EmailStr
     password: str = Field(min_length=12, max_length=256)
     role: Role
+
+
+class PasswordResetRequest(BaseModel):
+    new_password: str = Field(min_length=12, max_length=256)
+
+
+class AccessRead(BaseModel):
+    membership_id: UUID
+    user_id: UUID
+    name: str
+    email: str
+    role: str
+    is_active: bool
+    must_change_password: bool
+    # COLLABORATOR = equipe; RESPONSIBLE = portal do cliente; UNLINKED = sem cadastro ligado.
+    kind: str
+    linked_id: UUID | None
+    linked_name: str | None
+    linked_active: bool | None

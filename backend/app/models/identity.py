@@ -42,6 +42,8 @@ class User(TimestampMixin, Base):
     email: Mapped[str] = mapped_column(String(320), nullable=False, unique=True, index=True)
     name: Mapped[str] = mapped_column(String(160), nullable=False)
     password_hash: Mapped[str] = mapped_column(String(512), nullable=False)
+    # Senha provisoria definida por um administrador: o usuario precisa troca-la para usar o app.
+    must_change_password: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     memberships: Mapped[list["Membership"]] = relationship(back_populates="user")

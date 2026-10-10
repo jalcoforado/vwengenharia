@@ -249,7 +249,23 @@ async def test_portal_credential_is_created_from_the_responsible() -> None:
         ]
 
         # O login existe, mas nada aparece ate o empreendimento ser liberado.
+        # A senha inicial e provisoria: o portal so abre depois da troca.
         portal = await login(http, portal_email)
+        pending = await http.get("/api/v1/client-portal", headers=portal)
+        assert pending.status_code == 403
+        assert pending.json()["detail"] == "password_change_required"
+        new_password = "senha-do-responsavel-1"
+        changed = await http.post(
+            "/api/v1/auth/change-password",
+            headers=portal,
+            json={"current_password": PASSWORD, "new_password": new_password},
+        )
+        assert changed.status_code == 204
+        relogin = await http.post(
+            "/api/v1/auth/login", json={"email": portal_email, "password": new_password}
+        )
+        assert relogin.status_code == 200
+        portal = {"Authorization": f"Bearer {relogin.json()['access_token']}"}
         empty = await http.get("/api/v1/client-portal", headers=portal)
         assert empty.status_code == 200
         assert [item["id"] for item in empty.json()["clients"]] == [client_id]

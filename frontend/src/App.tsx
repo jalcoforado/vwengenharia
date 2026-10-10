@@ -32,7 +32,8 @@ import InboxPanel from "./components/InboxPanel";
 import LegacyMigrationAdmin from "./components/LegacyMigrationAdmin";
 import ChecklistAdmin from "./components/ChecklistAdmin";
 import ClientPortal from "./components/ClientPortal";
-import ClientAccessAdmin from "./components/ClientAccessAdmin";
+import AccessAdmin from "./components/AccessAdmin";
+import ForcePasswordChange from "./components/ForcePasswordChange";
 import WorkOrdersAdmin from "./components/WorkOrdersAdmin";
 import StationOverview from "./components/StationOverview";
 import { AccountSettings, IntegrationSettings } from "./components/SettingsPanels";
@@ -137,6 +138,7 @@ type Me = {
   tenant: { id: string; name: string; slug: string };
   membership_id: string;
   role: string;
+  must_change_password?: boolean;
 };
 
 type DashboardOverview = {
@@ -277,7 +279,8 @@ export default function App() {
       if (navigator.onLine && authenticated) {
         const who = await api<Me>("/api/v1/auth/me");
         setMe(who);
-        if (who.role === "CLIENTE") {
+        // Portal do cliente e senha provisoria nao carregam os dados de campo.
+        if (who.role === "CLIENTE" || who.must_change_password) {
           setBootstrap(null);
           return;
         }
@@ -621,6 +624,20 @@ export default function App() {
     );
   }
 
+  if (me?.must_change_password) {
+    return (
+      <ForcePasswordChange
+        email={me.user.email}
+        onDone={() => {
+          void logout();
+        }}
+        onCancel={() => {
+          void logout();
+        }}
+      />
+    );
+  }
+
   const selectedVisit = bootstrap?.visits.find((item) => item.id === selectedVisitId) ?? null;
   const isManagement = Boolean(me && MANAGEMENT_ROLES.has(me.role));
 
@@ -734,8 +751,17 @@ function Login({ onSuccess }: { onSuccess: () => void }) {
     try {
       await login(email, password);
       onSuccess();
-    } catch {
-      setError("Email ou senha inválidos.");
+    } catch (failure) {
+      const status =
+        typeof failure === "object" && failure !== null && "status" in failure ? Number(failure.status) : 0;
+      // Sem resposta do servidor nao e senha errada: dizer isso evita que a pessoa fique tentando.
+      setError(
+        status === 401
+          ? "Email ou senha inválidos."
+          : status === 403
+            ? "Seu acesso está bloqueado. Procure um administrador da MW."
+            : "Não foi possível falar com o servidor. Confira a conexão e tente de novo.",
+      );
     } finally {
       setBusy(false);
     }
@@ -1850,7 +1876,7 @@ function SupervisorHome({ me }: { me: Me }) {
         <>
           <ChecklistAdmin templates={templates} onChanged={load} />
           {["SUPERADMIN", "ADMIN"].includes(me.role) && (
-            <ClientAccessAdmin clients={clients} team={team} />
+            <AccessAdmin currentMembershipId={me.membership_id} responsibles={clients} onChanged={load} />
           )}
           <AccountSettings />
         </>
