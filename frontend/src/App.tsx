@@ -32,7 +32,8 @@ import InboxPanel from "./components/InboxPanel";
 import LegacyMigrationAdmin from "./components/LegacyMigrationAdmin";
 import ChecklistAdmin from "./components/ChecklistAdmin";
 import ClientPortal from "./components/ClientPortal";
-import ClientAccessAdmin from "./components/ClientAccessAdmin";
+import AccessAdmin from "./components/AccessAdmin";
+import ForcePasswordChange from "./components/ForcePasswordChange";
 import WorkOrdersAdmin from "./components/WorkOrdersAdmin";
 import StationOverview from "./components/StationOverview";
 import { AccountSettings, IntegrationSettings } from "./components/SettingsPanels";
@@ -55,6 +56,7 @@ import { cacheValue, outboxCount, queueUpload, readCache, type SyncQueueSummary 
 import { runOrQueue, syncOutbox } from "./lib/sync";
 import { SyncControl, SyncHealthCard } from "./components/SyncStatus";
 import Toast from "./components/Toast";
+import AssetSituationStep, { type AssetSituationRecord } from "./components/AssetSituationStep";
 import mwLogo from "./assets/mw-logo.png";
 import mwSymbol from "./assets/mw-symbol.png";
 
@@ -113,9 +115,13 @@ type Bootstrap = {
     id: string;
     station_id: string;
     asset_type_id: string;
+    process_unit_id?: string | null;
     name: string;
     status: string;
   }>;
+  // Ausentes em dados salvos no aparelho por uma versao anterior do app.
+  units?: Array<{ id: string; station_id: string; name: string }>;
+  asset_situations?: AssetSituationRecord[];
   templates: Array<{
     id: string;
     name: string;
@@ -132,6 +138,7 @@ type Me = {
   tenant: { id: string; name: string; slug: string };
   membership_id: string;
   role: string;
+  must_change_password?: boolean;
 };
 
 type DashboardOverview = {
@@ -237,8 +244,8 @@ function statusLabel(status: string) {
   return (
     {
       PROGRAMADA: "Programada",
-      EM_EXECUCAO: "Em execucao",
-      AGUARDANDO_REVISAO: "Aguardando revisao",
+      EM_EXECUCAO: "Em execução",
+      AGUARDANDO_REVISAO: "Aguardando revisão",
       REVISADA: "Revisada",
       DEVOLVIDA: "Devolvida",
     }[status] ?? status
@@ -272,7 +279,8 @@ export default function App() {
       if (navigator.onLine && authenticated) {
         const who = await api<Me>("/api/v1/auth/me");
         setMe(who);
-        if (who.role === "CLIENTE") {
+        // Portal do cliente e senha provisoria nao carregam os dados de campo.
+        if (who.role === "CLIENTE" || who.must_change_password) {
           setBootstrap(null);
           return;
         }
@@ -287,7 +295,7 @@ export default function App() {
       const cached = await readCache<Bootstrap>(CACHE_KEY);
       if (cached) {
         setBootstrap(cached);
-        setMessage("Sem conexao com o servidor. Exibindo dados salvos no aparelho.");
+        setMessage("Sem conexão com o servidor. Exibindo dados salvos no aparelho.");
       }
     } finally {
       setBusy(false);
@@ -301,12 +309,12 @@ export default function App() {
     const goOnline = async () => {
       setOnline(true);
       const count = await syncOutbox();
-      if (count > 0) setMessage(`${count} operacao(oes) sincronizada(s).`);
+      if (count > 0) setMessage(`${count} operação(ões) sincronizada(s).`);
       await loadFieldData();
     };
     const goOffline = () => {
       setOnline(false);
-      setMessage("Modo offline ativo. Seu trabalho sera salvo neste aparelho.");
+      setMessage("Modo offline ativo. Seu trabalho será salvo neste aparelho.");
     };
 
     window.addEventListener("online", goOnline);
@@ -367,7 +375,7 @@ export default function App() {
       );
       const missing = required.filter((item) => !answered.has(item.id));
       if (missing.length) {
-        setMessage(`Preencha os campos obrigatorios: ${missing.map((x) => x.label).join(", ")}.`);
+        setMessage(`Preencha os campos obrigatórios: ${missing.map((x) => x.label).join(", ")}.`);
         return;
       }
     }
@@ -398,11 +406,11 @@ export default function App() {
             ? { status: "EM_EXECUCAO", started_at: new Date().toISOString() }
             : { status: "AGUARDANDO_REVISAO", finished_at: new Date().toISOString() },
         );
-        setMessage("Operacao salva no aparelho e pendente de sincronizacao.");
+        setMessage("Operação salva no aparelho e pendente de sincronização.");
       }
       await refreshPending();
     } catch {
-      setMessage("Nao foi possivel concluir a operacao.");
+      setMessage("Não foi possível concluir a operação.");
     } finally {
       setBusy(false);
     }
@@ -435,7 +443,63 @@ export default function App() {
       if (result.queued) setMessage("Resposta salva offline.");
       await refreshPending();
     } catch {
-      setMessage("Nao foi possivel salvar a resposta.");
+      setMessage("Não foi possível salvar a resposta.");
+    }
+  }
+
+  function upsertCachedSituation(visitId: string, assetId: string, situation: string, comment: string | null) {
+    setBootstrap((current) => {
+      if (!current) return current;
+      const list = current.asset_situations ?? [];
+      const existing = list.find((item) => item.visit_id === visitId && item.asset_id === assetId);
+      const nextItem: AssetSituationRecord = existing
+        ? { ...existing, situation, comment }
+        : { id: `local-${uuid()}`, visit_id: visitId, asset_id: assetId, situation, comment };
+      const next = {
+        ...current,
+        asset_situations: existing
+          ? list.map((item) => (item.id === existing.id ? nextItem : item))
+          : [...list, nextItem],
+      };
+      void cacheValue(CACHE_KEY, next);
+      return next;
+    });
+  }
+
+  async function saveAssetSituation(
+    visitId: string,
+    assetId: string,
+    situation: string,
+    comment: string | null,
+  ) {
+    const operationId = uuid();
+    const body = {
+      asset_id: assetId,
+      situation,
+      comment,
+      client_operation_id: operationId,
+    };
+    upsertCachedSituation(visitId, assetId, situation, comment);
+
+    try {
+      const result = await runOrQueue<AssetSituationRecord>(
+        {
+          id: operationId,
+          method: "PUT",
+          path: `/api/v1/visits/${visitId}/asset-situations`,
+          body,
+          createdAt: new Date().toISOString(),
+        },
+        () =>
+          api<AssetSituationRecord>(`/api/v1/visits/${visitId}/asset-situations`, {
+            method: "PUT",
+            body: JSON.stringify(body),
+          }),
+      );
+      if (result.queued) setMessage("Situação do equipamento salva offline.");
+      await refreshPending();
+    } catch {
+      setMessage("Não foi possível salvar a situação do equipamento.");
     }
   }
 
@@ -477,10 +541,10 @@ export default function App() {
             : current,
         );
       }
-      if (result.queued) setMessage("Medicao salva offline.");
+      if (result.queued) setMessage("Medição salva offline.");
       await refreshPending();
     } catch {
-      setMessage("Nao foi possivel salvar a medicao.");
+      setMessage("Não foi possível salvar a medição.");
     }
   }
 
@@ -494,11 +558,11 @@ export default function App() {
       "application/pdf",
     ]);
     if (!allowed.has(file.type)) {
-      setMessage("Formato de arquivo nao suportado.");
+      setMessage("Formato de arquivo não suportado.");
       return;
     }
     if (file.size > 50_000_000) {
-      setMessage("A evidencia deve ter no maximo 50 MB.");
+      setMessage("A evidência deve ter no máximo 50 MB.");
       return;
     }
 
@@ -527,13 +591,13 @@ export default function App() {
       blob: preparedFile,
       createdAt: new Date().toISOString(),
     });
-    setMessage("Evidencia salva com seguranca no aparelho." + optimizationMessage);
+    setMessage("Evidência salva com segurança no aparelho." + optimizationMessage);
     await refreshPending();
 
     if (navigator.onLine) {
       const synced = await syncOutbox();
       if (synced > 0) {
-        setMessage("Evidencia enviada e confirmada." + optimizationMessage);
+        setMessage("Evidência enviada e confirmada." + optimizationMessage);
         await loadFieldData();
       }
       await refreshPending();
@@ -560,6 +624,20 @@ export default function App() {
     );
   }
 
+  if (me?.must_change_password) {
+    return (
+      <ForcePasswordChange
+        email={me.user.email}
+        onDone={() => {
+          void logout();
+        }}
+        onCancel={() => {
+          void logout();
+        }}
+      />
+    );
+  }
+
   const selectedVisit = bootstrap?.visits.find((item) => item.id === selectedVisitId) ?? null;
   const isManagement = Boolean(me && MANAGEMENT_ROLES.has(me.role));
 
@@ -576,10 +654,10 @@ export default function App() {
               {me?.role === "CLIENTE"
                 ? "Portal do cliente"
                 : selectedVisit
-                  ? "Visita tecnica"
+                  ? "Visita técnica"
                   : isManagement
                     ? "Cockpit operacional"
-                    : "Operacao de campo"}
+                    : "Operação de campo"}
             </strong>
           </div>
         </div>
@@ -627,6 +705,7 @@ export default function App() {
           onBack={() => setSelectedVisitId(null)}
           onCommand={commandVisit}
           onAnswer={saveAnswer}
+          onAssetSituation={saveAssetSituation}
           onMeasurement={saveMeasurement}
           onEvidence={saveEvidence}
           busy={busy}
@@ -672,8 +751,17 @@ function Login({ onSuccess }: { onSuccess: () => void }) {
     try {
       await login(email, password);
       onSuccess();
-    } catch {
-      setError("Email ou senha invalidos.");
+    } catch (failure) {
+      const status =
+        typeof failure === "object" && failure !== null && "status" in failure ? Number(failure.status) : 0;
+      // Sem resposta do servidor nao e senha errada: dizer isso evita que a pessoa fique tentando.
+      setError(
+        status === 401
+          ? "Email ou senha inválidos."
+          : status === 403
+            ? "Seu acesso está bloqueado. Procure um administrador da MW."
+            : "Não foi possível falar com o servidor. Confira a conexão e tente de novo.",
+      );
     } finally {
       setBusy(false);
     }
@@ -683,8 +771,8 @@ function Login({ onSuccess }: { onSuccess: () => void }) {
     <main className="login-page">
       <section className="login-card">
         <img className="login-logo" src={mwLogo} alt="MW Engenharia" />
-        <h1>Operacao em campo</h1>
-        <p>Visitas, checklist, medicoes e ocorrencias em um unico lugar.</p>
+        <h1>Operação em campo</h1>
+        <p>Visitas, checklist, medições e ocorrências em um único lugar.</p>
         <form onSubmit={submit}>
           <label>
             Email
@@ -772,7 +860,7 @@ function Home({
       <section className="welcome">
         <div>
           <span className="eyebrow">Hoje em campo</span>
-          <h1>{me ? `Ola, ${me.user.name.split(" ")[0]}` : "Suas visitas"}</h1>
+          <h1>{me ? `Olá, ${me.user.name.split(" ")[0]}` : "Suas visitas"}</h1>
           <p>{me?.tenant.name ?? "Dados sincronizados para trabalho em campo."}</p>
         </div>
         <button className="secondary-button" onClick={() => void onRefresh()} disabled={busy}>
@@ -790,12 +878,12 @@ function Home({
         <div className="metric-card">
           <Wrench />
           <strong>{visits.filter((v) => v.status === "EM_EXECUCAO").length}</strong>
-          <span>Em execucao</span>
+          <span>Em execução</span>
         </div>
         <div className="metric-card">
           <CheckCircle2 />
           <strong>{visits.filter((v) => v.status === "AGUARDANDO_REVISAO").length}</strong>
-          <span>Concluidas</span>
+          <span>Concluídas</span>
         </div>
         <div className="metric-card">
           <Cloud />
@@ -816,7 +904,7 @@ function Home({
         <div className="section-heading">
           <div>
             <span className="eyebrow">Agenda</span>
-            <h2>Visitas atribuidas</h2>
+            <h2>Visitas atribuídas</h2>
           </div>
         </div>
 
@@ -826,14 +914,14 @@ function Home({
             <input
               value={visitSearch}
               onChange={(event) => setVisitSearch(event.target.value)}
-              placeholder="Buscar estacao, codigo ou status"
+              placeholder="Buscar estação, código ou status"
             />
           </label>
           <select value={visitStatus} onChange={(event) => setVisitStatus(event.target.value)}>
             <option value="ALL">Todos os status</option>
             <option value="PROGRAMADA">Programadas</option>
-            <option value="EM_EXECUCAO">Em execucao</option>
-            <option value="AGUARDANDO_REVISAO">Concluidas</option>
+            <option value="EM_EXECUCAO">Em execução</option>
+            <option value="AGUARDANDO_REVISAO">Concluídas</option>
             <option value="DEVOLVIDA">Devolvidas</option>
             <option value="REVISADA">Revisadas</option>
           </select>
@@ -843,8 +931,8 @@ function Home({
           {visits.length === 0 && (
             <div className="empty-state empty-state-positive">
               <CheckCircle2 size={22} />
-              <strong>Nenhuma visita atribuida</strong>
-              <span>Sua agenda sincronizada esta livre neste momento.</span>
+              <strong>Nenhuma visita atribuída</strong>
+              <span>Sua agenda sincronizada está livre neste momento.</span>
             </div>
           )}
           {visits.length > 0 && filteredVisits.length === 0 && (
@@ -878,8 +966,8 @@ function Home({
                   }).format(new Date(visit.scheduled_for))}
                 </div>
                 <div className="visit-main">
-                  <strong>{station?.name ?? "Estacao"}</strong>
-                  <span>{station?.code ?? station?.station_type ?? "Visita tecnica"}</span>
+                  <strong>{station?.name ?? "Estação"}</strong>
+                  <span>{station?.code ?? station?.station_type ?? "Visita técnica"}</span>
                 </div>
                 <span className={`status status-${visit.status.toLowerCase()}`}>
                   {statusLabel(visit.status)}
@@ -901,6 +989,7 @@ function VisitScreen({
   onBack,
   onCommand,
   onAnswer,
+  onAssetSituation,
   onMeasurement,
   onEvidence,
   busy,
@@ -910,6 +999,7 @@ function VisitScreen({
   onBack: () => void;
   onCommand: (visit: Visit, action: "start" | "finish") => Promise<void>;
   onAnswer: (visitId: string, itemId: string, value: unknown) => Promise<void>;
+  onAssetSituation: (visitId: string, assetId: string, situation: string, comment: string | null) => Promise<void>;
   onMeasurement: (visitId: string, type: string, value: string, unit: string) => Promise<void>;
   onEvidence: (visitId: string, file: File) => Promise<void>;
   busy: boolean;
@@ -930,6 +1020,9 @@ function VisitScreen({
     ? Math.round((checklistAnswered / items.length) * 100)
     : 100;
   const canFinish = requiredAnswered === requiredItems.length;
+  const stationAssets = bootstrap.assets.filter((asset) => asset.station_id === visit.station_id);
+  const stationUnits = (bootstrap.units ?? []).filter((unit) => unit.station_id === visit.station_id);
+  const visitSituations = (bootstrap.asset_situations ?? []).filter((item) => item.visit_id === visit.id);
 
   return (
     <main className="content visit-screen">
@@ -940,8 +1033,8 @@ function VisitScreen({
 
       <section className="visit-hero">
         <div>
-          <span className="eyebrow">{station?.code ?? "Estacao"}</span>
-          <h1>{station?.name ?? "Visita tecnica"}</h1>
+          <span className="eyebrow">{station?.code ?? "Estação"}</span>
+          <h1>{station?.name ?? "Visita técnica"}</h1>
           <p>
             {new Intl.DateTimeFormat("pt-BR", {
               dateStyle: "medium",
@@ -962,7 +1055,7 @@ function VisitScreen({
               <strong>{checklistProgress}% do checklist</strong>
             </div>
             <span className={canFinish ? "progress-ready" : "progress-pending"}>
-              {canFinish ? "Obrigatorios preenchidos" : `${requiredAnswered}/${requiredItems.length} obrigatorios`}
+              {canFinish ? "Obrigatórios preenchidos" : `${requiredAnswered}/${requiredItems.length} obrigatorios`}
             </span>
           </div>
           <div className="progress-track" aria-hidden="true">
@@ -974,11 +1067,12 @@ function VisitScreen({
       {visit.status === "EM_EXECUCAO" && (
         <nav className="visit-step-nav" aria-label="Etapas da visita">
           {[
-            ["visit-measurements", "1", "Medicoes"],
-            ["visit-evidence", "2", "Evidencias"],
-            ["visit-checklist", "3", "Checklist"],
-            ["visit-occurrence", "4", "Ocorrencia"],
-            ["visit-materials", "5", "Materiais"],
+            ["visit-assets", "1", "Equipamentos"],
+            ["visit-measurements", "2", "Medições"],
+            ["visit-evidence", "3", "Evidências"],
+            ["visit-checklist", "4", "Checklist"],
+            ["visit-occurrence", "5", "Ocorrência"],
+            ["visit-materials", "6", "Materiais"],
           ].map(([target, number, label]) => (
             <button
               key={target}
@@ -1007,16 +1101,29 @@ function VisitScreen({
           disabled={busy}
           onClick={() => void openApiDocument(`/api/v1/reports/visits/${visit.id}.html`)}
         >
-          Relatorio da visita
+          Relatório da visita
         </button>
       )}
 
       {visit.status === "EM_EXECUCAO" && (
         <>
-          <section id="visit-measurements" className="section-card visit-step-card">
+          <section id="visit-assets" className="section-card visit-step-card">
             <div className="visit-step-heading">
               <span className="visit-step-number">1</span>
-              <div><span className="eyebrow">Qualidade</span><h2>Medicoes</h2></div>
+              <div><span className="eyebrow">Equipamentos</span><h2>Situação de cada equipamento</h2></div>
+            </div>
+            <AssetSituationStep
+              assets={stationAssets}
+              units={stationUnits}
+              situations={visitSituations}
+              onSave={(assetId, situation, comment) => onAssetSituation(visit.id, assetId, situation, comment)}
+            />
+          </section>
+
+          <section id="visit-measurements" className="section-card visit-step-card">
+            <div className="visit-step-heading">
+              <span className="visit-step-number">2</span>
+              <div><span className="eyebrow">Qualidade</span><h2>Medições</h2></div>
             </div>
             <div className="measurement-grid">
               <MeasurementInput
@@ -1034,16 +1141,16 @@ function VisitScreen({
 
           <section id="visit-evidence" className="section-card visit-step-card">
             <div className="visit-step-heading">
-              <span className="visit-step-number">2</span>
-              <div><span className="eyebrow">Evidencias</span><h2>Fotos e arquivos</h2></div>
+              <span className="visit-step-number">3</span>
+              <div><span className="eyebrow">Evidências</span><h2>Fotos e arquivos</h2></div>
             </div>
             <EvidenceCapture onFile={(file) => onEvidence(visit.id, file)} />
           </section>
 
           <section id="visit-checklist" className="section-card visit-step-card">
             <div className="visit-step-heading">
-              <span className="visit-step-number">3</span>
-              <div><span className="eyebrow">Checklist</span><h2>Inspecao da estacao</h2></div>
+              <span className="visit-step-number">4</span>
+              <div><span className="eyebrow">Checklist</span><h2>Inspeção da estação</h2></div>
             </div>
             <div className="checklist">
               {items.map((item) => (
@@ -1055,30 +1162,30 @@ function VisitScreen({
                 />
               ))}
               {items.length === 0 && (
-                <div className="empty-state">Esta visita nao possui checklist configurado.</div>
+                <div className="empty-state">Esta visita não possui checklist configurado.</div>
               )}
             </div>
           </section>
 
           <section id="visit-occurrence" className="section-card visit-step-card">
             <div className="visit-step-heading">
-              <span className="visit-step-number">4</span>
-              <div><span className="eyebrow">Ocorrencia</span><h2>Encontrou algum problema?</h2></div>
+              <span className="visit-step-number">5</span>
+              <div><span className="eyebrow">Ocorrência</span><h2>Encontrou algum problema?</h2></div>
             </div>
             <OccurrenceForm visit={visit} />
           </section>
 
           <section id="visit-materials" className="section-card visit-step-card">
             <div className="visit-step-heading">
-              <span className="visit-step-number">5</span>
-              <div><span className="eyebrow">Materiais e servicos</span><h2>Precisa solicitar algo?</h2></div>
+              <span className="visit-step-number">6</span>
+              <div><span className="eyebrow">Materiais e serviços</span><h2>Precisa solicitar algo?</h2></div>
             </div>
             <VisitMaterialRequestForm visit={visit} />
           </section>
 
           <div className="visit-finish-bar">
             <div className="visit-finish-status">
-              <strong>{canFinish ? "Pronto para finalizar" : "Complete os itens obrigatorios"}</strong>
+              <strong>{canFinish ? "Pronto para finalizar" : "Complete os itens obrigatórios"}</strong>
               <span>{checklistAnswered} de {items.length} item(ns) respondido(s)</span>
             </div>
             <button
@@ -1097,8 +1204,8 @@ function VisitScreen({
         <section className="completion-card">
           <CheckCircle2 size={28} />
           <div>
-            <strong>Visita concluida</strong>
-            <span>Os dados estao prontos para revisao da supervisao.</span>
+            <strong>Visita concluída</strong>
+            <span>Os dados estão prontos para revisão da supervisão.</span>
           </div>
         </section>
       )}
@@ -1156,7 +1263,7 @@ function ChecklistField({
       <div className="check-row">
         <div>
           <strong>{item.label}</strong>
-          {item.required && <span className="required">Obrigatorio</span>}
+          {item.required && <span className="required">Obrigatório</span>}
         </div>
         <div className="segmented">
           <button
@@ -1169,7 +1276,7 @@ function ChecklistField({
             className={value === false ? "selected danger" : ""}
             onClick={() => void onSave(false)}
           >
-            Nao
+            Não
           </button>
         </div>
       </div>
@@ -1264,6 +1371,11 @@ function SupervisorHome({ me }: { me: Me }) {
   const [managementView, setManagementView] = useState<
     "OVERVIEW" | "OPERATIONS" | "REGISTERS" | "CONFIG" | "GOVERNANCE"
   >("OVERVIEW");
+
+  // A visao da estacao nao acompanha o usuario para outra secao do cockpit.
+  useEffect(() => {
+    setSelectedStationId(null);
+  }, [managementView]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -1296,7 +1408,7 @@ function SupervisorHome({ me }: { me: Me }) {
         api<ClientRecord[]>("/api/v1/clients?limit=500"),
         api<DevelopmentRecord[]>("/api/v1/developments?limit=500"),
         api<AssetTypeRecord[]>("/api/v1/asset-types?limit=500"),
-        api<AssetRecord[]>("/api/v1/assets?limit=1000"),
+        api<AssetRecord[]>("/api/v1/assets?limit=500"),
         api<TeamMember[]>("/api/v1/team?active_only=true"),
         api<VisitPlan[]>("/api/v1/visit-plans?active_only=false"),
         api<ChecklistTemplateSummary[]>("/api/v1/checklist-templates"),
@@ -1331,7 +1443,7 @@ function SupervisorHome({ me }: { me: Me }) {
       setAlerts(alertList);
       setMaterialRequests(materialRequestList);
     } catch {
-      setNotice("Nao foi possivel atualizar o cockpit.");
+      setNotice("Não foi possível atualizar o cockpit.");
     } finally {
       setBusy(false);
     }
@@ -1349,13 +1461,13 @@ function SupervisorHome({ me }: { me: Me }) {
         method: "POST",
         body: JSON.stringify({
           decision,
-          notes: decision === "APROVAR" ? "Revisao operacional aprovada." : "Devolvida para ajuste.",
+          notes: decision === "APROVAR" ? "Revisão operacional aprovada." : "Devolvida para ajuste.",
         }),
       });
-      setNotice(decision === "APROVAR" ? "Visita aprovada." : "Visita devolvida ao tecnico.");
+      setNotice(decision === "APROVAR" ? "Visita aprovada." : "Visita devolvida ao técnico.");
       await load();
     } catch {
-      setNotice("Nao foi possivel registrar a revisao.");
+      setNotice("Não foi possível registrar a revisão.");
       setBusy(false);
     }
   }
@@ -1373,12 +1485,12 @@ function SupervisorHome({ me }: { me: Me }) {
       });
       setNotice(
         result.generated > 0
-          ? `${result.generated} visita(s) adicionada(s) aos proximos 30 dias.`
-          : "Agenda ja estava atualizada para os proximos 30 dias.",
+          ? `${result.generated} visita(s) adicionada(s) aos próximos 30 dias.`
+          : "Agenda já estava atualizada para os próximos 30 dias.",
       );
       await load();
     } catch {
-      setNotice("Nao foi possivel gerar a agenda.");
+      setNotice("Não foi possível gerar a agenda.");
       setBusy(false);
     }
   }
@@ -1421,9 +1533,9 @@ function SupervisorHome({ me }: { me: Me }) {
     <main className="content">
       <section className="welcome">
         <div>
-          <span className="eyebrow">Gestao operacional</span>
-          <h1>Ola, {me.user.name.split(" ")[0]}</h1>
-          <p>{me.tenant.name} · visao consolidada da operacao</p>
+          <span className="eyebrow">Gestão operacional</span>
+          <h1>Olá, {me.user.name.split(" ")[0]}</h1>
+          <p>{me.tenant.name} · visão consolidada da operação</p>
         </div>
         <button className="secondary-button" onClick={() => void load()} disabled={busy}>
           <RefreshCw size={17} className={busy ? "spin" : ""} />
@@ -1433,13 +1545,13 @@ function SupervisorHome({ me }: { me: Me }) {
 
       {notice && <div className="message" onClick={() => setNotice(null)}>{notice}</div>}
 
-      <nav className="management-nav" aria-label="Areas do ERP">
+      <nav className="management-nav" aria-label="Áreas do ERP">
         {[
-          { value: "OVERVIEW", label: "Visao geral", Icon: LayoutDashboard },
-          { value: "OPERATIONS", label: "Operacao", Icon: Activity },
+          { value: "OVERVIEW", label: "Visão geral", Icon: LayoutDashboard },
+          { value: "OPERATIONS", label: "Operação", Icon: Activity },
           { value: "REGISTERS", label: "Cadastros", Icon: Database },
-          { value: "CONFIG", label: "Configuracao", Icon: Settings2 },
-          { value: "GOVERNANCE", label: "Governanca", Icon: Shield },
+          { value: "CONFIG", label: "Configuração", Icon: Settings2 },
+          { value: "GOVERNANCE", label: "Governança", Icon: Shield },
         ].map(({ value, label, Icon }) => (
           <button
             key={value}
@@ -1464,17 +1576,17 @@ function SupervisorHome({ me }: { me: Me }) {
           </div>
           <div>
             <span className="eyebrow">Resumo executivo</span>
-            <h2>{operationHealthy ? "Operacao sob controle" : attentionCount + " ponto(s) pedem atencao"}</h2>
+            <h2>{operationHealthy ? "Operação sob controle" : attentionCount + " ponto(s) pedem atenção"}</h2>
             <p>
               {operationHealthy
-                ? "Sem excecoes criticas agora. Continue acompanhando a agenda e a manutencao preventiva."
-                : "Priorize SLA vencido, OS critica e visitas aguardando revisao antes das tarefas de rotina."}
+                ? "Sem exceções críticas agora. Continue acompanhando a agenda e a manutenção preventiva."
+                : "Priorize SLA vencido, OS crítica e visitas aguardando revisão antes das tarefas de rotina."}
             </p>
           </div>
         </div>
         <div className="command-hero-actions">
           <button className="primary-button" onClick={() => setManagementView("OPERATIONS")}>
-            Abrir operacao
+            Abrir operação
             <ArrowRight size={16} />
           </button>
           <button className="secondary-button" onClick={() => void load()} disabled={busy}>
@@ -1484,7 +1596,7 @@ function SupervisorHome({ me }: { me: Me }) {
         </div>
       </section>
 
-      <section className="attention-strip" aria-label="Resumo de pendencias">
+      <section className="attention-strip" aria-label="Resumo de pendências">
         <button className={overdueOrders > 0 ? "attention-item attention-danger" : "attention-item"} onClick={() => setManagementView("OPERATIONS")}>
           <AlertTriangle size={17} />
           <span><strong>{overdueOrders}</strong> SLA vencido(s)</span>
@@ -1492,7 +1604,7 @@ function SupervisorHome({ me }: { me: Me }) {
         </button>
         <button className={criticalOrders > 0 ? "attention-item attention-warning" : "attention-item"} onClick={() => setManagementView("OPERATIONS")}>
           <ShieldCheck size={17} />
-          <span><strong>{criticalOrders}</strong> OS critica(s)</span>
+          <span><strong>{criticalOrders}</strong> OS crítica(s)</span>
           <ArrowRight size={15} />
         </button>
         <button className={waitingReview > 0 ? "attention-item attention-info" : "attention-item"} onClick={() => setManagementView("OVERVIEW")}>
@@ -1521,7 +1633,7 @@ function SupervisorHome({ me }: { me: Me }) {
           className="secondary-button"
           onClick={() => void downloadApi("/api/v1/reports/maintenance.csv", "manutencao-preventiva.csv")}
         >
-          Exportar manutencao
+          Exportar manutenção
         </button>
       </section>
 
@@ -1529,7 +1641,7 @@ function SupervisorHome({ me }: { me: Me }) {
         <div className="metric-card">
           <Route />
           <strong>{overview?.active_stations ?? "—"}</strong>
-          <span>Estacoes ativas</span>
+          <span>Estações ativas</span>
         </div>
         <div className="metric-card">
           <Wrench />
@@ -1544,24 +1656,24 @@ function SupervisorHome({ me }: { me: Me }) {
         <div className="metric-card">
           <ClipboardCheck />
           <strong>{overview?.visits_waiting_review ?? "—"}</strong>
-          <span>Aguardando revisao</span>
+          <span>Aguardando revisão</span>
         </div>
         <div className="metric-card">
           <ShieldCheck />
           <strong>{overview?.critical_work_orders ?? "—"}</strong>
-          <span>OS criticas</span>
+          <span>OS críticas</span>
         </div>
         <div className="metric-card">
           <AlertTriangle />
           <strong>{overview?.open_occurrences ?? "—"}</strong>
-          <span>Ocorrencias abertas</span>
+          <span>Ocorrências abertas</span>
         </div>
       </section>
 
       <section className="section-card alert-center">
         <div className="section-heading">
           <div>
-            <span className="eyebrow">Atencao</span>
+            <span className="eyebrow">Atenção</span>
             <h2>Alertas operacionais</h2>
           </div>
           <span className="status">{alerts.length}</span>
@@ -1597,7 +1709,7 @@ function SupervisorHome({ me }: { me: Me }) {
           <div className="section-heading">
             <div>
               <span className="eyebrow">Prioridade</span>
-              <h2>Ordens de servico</h2>
+              <h2>Ordens de serviço</h2>
             </div>
           </div>
           <div className="ops-list">
@@ -1608,7 +1720,7 @@ function SupervisorHome({ me }: { me: Me }) {
               return (
                 <div className="ops-row" key={order.id}>
                   <div>
-                    <strong>{stationMap.get(order.station_id)?.name ?? "Estacao"}</strong>
+                    <strong>{stationMap.get(order.station_id)?.name ?? "Estação"}</strong>
                     <span>{order.description}</span>
                   </div>
                   <div className="ops-meta">
@@ -1633,7 +1745,7 @@ function SupervisorHome({ me }: { me: Me }) {
             {reviews.slice(0, 10).map((visit) => (
               <div className="review-row" key={visit.id}>
                 <div>
-                  <strong>{stationMap.get(visit.station_id)?.name ?? "Estacao"}</strong>
+                  <strong>{stationMap.get(visit.station_id)?.name ?? "Estação"}</strong>
                   <span>
                     {new Intl.DateTimeFormat("pt-BR", {
                       dateStyle: "short",
@@ -1659,7 +1771,7 @@ function SupervisorHome({ me }: { me: Me }) {
                 </div>
               </div>
             ))}
-            {reviews.length === 0 && <div className="empty-state">Fila de revisao em dia.</div>}
+            {reviews.length === 0 && <div className="empty-state">Fila de revisão em dia.</div>}
           </div>
         </section>
       </div>
@@ -1689,9 +1801,9 @@ function SupervisorHome({ me }: { me: Me }) {
             {visitPlans.slice(0, 12).map((plan) => (
               <div className="ops-row" key={plan.id}>
                 <div>
-                  <strong>{stationMap.get(plan.station_id)?.name ?? "Estacao"}</strong>
+                  <strong>{stationMap.get(plan.station_id)?.name ?? "Estação"}</strong>
                   <span>
-                    A cada {plan.frequency_days} dia(s) · {teamMap.get(plan.technician_membership_id)?.name ?? "Tecnico"}
+                    A cada {plan.frequency_days} dia(s) · {teamMap.get(plan.technician_membership_id)?.name ?? "Técnico"}
                   </span>
                 </div>
                 <span className={plan.is_active ? "status status-revisada" : "status"}>
@@ -1713,7 +1825,7 @@ function SupervisorHome({ me }: { me: Me }) {
 
         <section className="section-card">
           <span className="eyebrow">Equipe</span>
-          <h2>Tecnicos e manutencao</h2>
+          <h2>Técnicos e manutenção</h2>
           <div className="ops-list">
             {team
               .filter((member) => ["TECNICO", "MANUTENCAO"].includes(member.role))
@@ -1727,9 +1839,9 @@ function SupervisorHome({ me }: { me: Me }) {
                 </div>
               ))}
           </div>
-          {["ADMIN", "SUPERADMIN"].includes(me.role) && (
-            <TeamMemberForm onCreated={load} />
-          )}
+          <p className="section-copy">
+            Novos acessos são criados em Cadastros, na aba Colaboradores.
+          </p>
         </section>
       </div>
 
@@ -1744,8 +1856,10 @@ function SupervisorHome({ me }: { me: Me }) {
         stations={adminStations}
         assetTypes={assetTypes}
         assets={assets}
+        canManageAccess={["ADMIN", "SUPERADMIN"].includes(me.role)}
         onChanged={load}
         onOpenStation={setSelectedStationId}
+        onCloseStation={() => setSelectedStationId(null)}
       />
 
       {selectedStationId && (
@@ -1762,7 +1876,7 @@ function SupervisorHome({ me }: { me: Me }) {
         <>
           <ChecklistAdmin templates={templates} onChanged={load} />
           {["SUPERADMIN", "ADMIN"].includes(me.role) && (
-            <ClientAccessAdmin clients={clients} team={team} />
+            <AccessAdmin currentMembershipId={me.membership_id} responsibles={clients} onChanged={load} />
           )}
           <AccountSettings />
         </>
@@ -1774,8 +1888,8 @@ function SupervisorHome({ me }: { me: Me }) {
         <div className="section-heading">
           <div>
             <span className="eyebrow">Agenda operacional</span>
-            <h2>Proximas visitas</h2>
-            <p className="section-copy">Priorize atrasos e organize a equipe sem perder o contexto da operacao.</p>
+            <h2>Próximas visitas</h2>
+            <p className="section-copy">Priorize atrasos e organize a equipe sem perder o contexto da operação.</p>
           </div>
           <button className="secondary-button" onClick={() => setManagementView("CONFIG")}>
             <CalendarDays size={16} />
@@ -1794,7 +1908,7 @@ function SupervisorHome({ me }: { me: Me }) {
           </div>
           <div className="agenda-summary-item">
             <strong>{nextSevenDaysVisits.length}</strong>
-            <span>Proximos 7 dias</span>
+            <span>Próximos 7 dias</span>
           </div>
         </div>
 
@@ -1813,11 +1927,11 @@ function SupervisorHome({ me }: { me: Me }) {
                 </div>
                 <div className="agenda-main">
                   <div>
-                    <strong>{stationMap.get(visit.station_id)?.name ?? "Estacao"}</strong>
+                    <strong>{stationMap.get(visit.station_id)?.name ?? "Estação"}</strong>
                     <span>
                       {new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(scheduled)}
                       {" · "}
-                      {technician?.name ?? "Sem tecnico"}
+                      {technician?.name ?? "Sem técnico"}
                     </span>
                   </div>
                   <div className="agenda-meta">
@@ -1832,7 +1946,7 @@ function SupervisorHome({ me }: { me: Me }) {
           })}
           {scheduledVisits.length === 0 && (
             <div className="empty-state">
-              Agenda sem visitas pendentes. Gere o proximo ciclo em Configuracao.
+              Agenda sem visitas pendentes. Gere o próximo ciclo em Configuração.
             </div>
           )}
         </div>
@@ -1884,7 +1998,7 @@ function SupervisorHome({ me }: { me: Me }) {
               className="secondary-button"
               onClick={() => void downloadApi("/api/v1/reports/maintenance.csv", "manutencao-preventiva.csv")}
             >
-              Exportar manutencao
+              Exportar manutenção
             </button>
           </section>
           {["SUPERADMIN", "ADMIN", "GESTOR"].includes(me.role) && (
@@ -1899,8 +2013,8 @@ function SupervisorHome({ me }: { me: Me }) {
 
       {managementView === "OVERVIEW" && (
       <section className="section-card">
-        <span className="eyebrow">Ocorrencias</span>
-        <h2>Atencao operacional recente</h2>
+        <span className="eyebrow">Ocorrências</span>
+        <h2>Atenção operacional recente</h2>
         <div className="ops-list">
           {occurrences
             .filter((item) => !["RESOLVIDA", "CANCELADA"].includes(item.status))
@@ -1908,7 +2022,7 @@ function SupervisorHome({ me }: { me: Me }) {
             .map((item) => (
               <div className="ops-row" key={item.id}>
                 <div>
-                  <strong>{stationMap.get(item.station_id)?.name ?? "Estacao"} · {item.occurrence_type}</strong>
+                  <strong>{stationMap.get(item.station_id)?.name ?? "Estação"} · {item.occurrence_type}</strong>
                   <span>{item.description}</span>
                 </div>
                 <span className={`priority priority-${item.severity.toLowerCase()}`}>
@@ -1963,12 +2077,12 @@ function OccurrenceForm({ visit }: { visit: Visit }) {
       );
       setFeedback(
         result.queued
-          ? "Ocorrencia salva no aparelho. Sera enviada quando houver conexao."
-          : "Ocorrencia registrada para a supervisao.",
+          ? "Ocorrência salva no aparelho. Será enviada quando houver conexão."
+          : "Ocorrência registrada para a supervisão.",
       );
       setDescription("");
     } catch {
-      setFeedback("Nao foi possivel registrar a ocorrencia.");
+      setFeedback("Não foi possível registrar a ocorrência.");
     } finally {
       setBusy(false);
     }
@@ -1982,7 +2096,7 @@ function OccurrenceForm({ visit }: { visit: Visit }) {
           <select value={occurrenceType} onChange={(event) => setOccurrenceType(event.target.value)}>
             <option value="FALHA_EQUIPAMENTO">Falha de equipamento</option>
             <option value="LIMPEZA">Limpeza</option>
-            <option value="CLORACAO">Cloracao</option>
+            <option value="CLORACAO">Cloração</option>
             <option value="ESTRUTURA">Estrutura</option>
             <option value="OUTRO">Outro</option>
           </select>
@@ -1991,24 +2105,24 @@ function OccurrenceForm({ visit }: { visit: Visit }) {
           Criticidade
           <select value={severity} onChange={(event) => setSeverity(event.target.value)}>
             <option value="BAIXA">Baixa</option>
-            <option value="MEDIA">Media</option>
+            <option value="MEDIA">Média</option>
             <option value="ALTA">Alta</option>
-            <option value="CRITICA">Critica</option>
+            <option value="CRITICA">Crítica</option>
           </select>
         </label>
       </div>
       <label>
-        Descricao
+        Descrição
         <textarea
           value={description}
           onChange={(event) => setDescription(event.target.value)}
-          placeholder="Ex.: Aerador II parado e com ruido antes da parada."
+          placeholder="Ex.: Aerador II parado e com ruído antes da parada."
           rows={3}
         />
       </label>
       <button className="small-button" disabled={busy} onClick={() => void submit()}>
         <AlertTriangle size={15} />
-        {busy ? "Salvando..." : "Registrar ocorrencia"}
+        {busy ? "Salvando..." : "Registrar ocorrência"}
       </button>
       {feedback && <span className="inline-feedback">{feedback}</span>}
     </div>
@@ -2025,7 +2139,7 @@ function EvidenceCapture({ onFile }: { onFile: (file: File) => Promise<void> }) 
     setBusy(true);
     try {
       await onFile(file);
-      setLastName(file.name || "Evidencia capturada");
+      setLastName(file.name || "Evidência capturada");
     } finally {
       setBusy(false);
     }
@@ -2050,8 +2164,8 @@ function EvidenceCapture({ onFile }: { onFile: (file: File) => Promise<void> }) 
       </label>
       <p>
         {lastName
-          ? `${lastName} salvo. O envio sera retomado automaticamente se estiver offline.`
-          : "Fotos sao otimizadas automaticamente. Videos curtos ou PDF de ate 50 MB."}
+          ? `${lastName} salvo. O envio será retomado automaticamente se estiver offline.`
+          : "Fotos são otimizadas automaticamente. Vídeos curtos ou PDF de até 50 MB."}
       </p>
     </div>
   );
@@ -2082,7 +2196,7 @@ function VisitPlanForm({
 
   async function submit() {
     if (!stationId || !technicianId || !startAt) {
-      setFeedback("Selecione estacao, tecnico e inicio.");
+      setFeedback("Selecione estação, técnico e início.");
       return;
     }
     setBusy(true);
@@ -2104,7 +2218,7 @@ function VisitPlanForm({
       setStartAt("");
       await onCreated();
     } catch {
-      setFeedback("Nao foi possivel criar o plano.");
+      setFeedback("Não foi possível criar o plano.");
     } finally {
       setBusy(false);
     }
@@ -2115,7 +2229,7 @@ function VisitPlanForm({
       <h3>Novo plano</h3>
       <div className="compact-form-grid">
         <label>
-          Estacao
+          Estação
           <select value={stationId} onChange={(event) => setStationId(event.target.value)}>
             <option value="">Selecione</option>
             {stations.map((station) => (
@@ -2124,7 +2238,7 @@ function VisitPlanForm({
           </select>
         </label>
         <label>
-          Tecnico
+          Técnico
           <select value={technicianId} onChange={(event) => setTechnicianId(event.target.value)}>
             <option value="">Selecione</option>
             {fieldTeam.map((member) => (
@@ -2146,9 +2260,9 @@ function VisitPlanForm({
           </select>
         </label>
         <label>
-          Frequencia
+          Frequência
           <select value={frequencyDays} onChange={(event) => setFrequencyDays(event.target.value)}>
-            <option value="1">Diaria</option>
+            <option value="1">Diária</option>
             <option value="7">Semanal</option>
             <option value="14">Quinzenal</option>
             <option value="30">Mensal</option>
@@ -2165,86 +2279,6 @@ function VisitPlanForm({
       </div>
       <button className="small-button" disabled={busy} onClick={() => void submit()}>
         {busy ? "Criando..." : "Criar plano"}
-      </button>
-      {feedback && <span className="inline-feedback">{feedback}</span>}
-    </div>
-  );
-}
-
-
-function TeamMemberForm({ onCreated }: { onCreated: () => Promise<void> }) {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [role, setRole] = useState("TECNICO");
-  const [feedback, setFeedback] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  async function submit() {
-    if (!name.trim() || !email.trim() || password.length < 12) {
-      setFeedback("Informe nome, email e senha inicial com pelo menos 12 caracteres.");
-      return;
-    }
-    setBusy(true);
-    try {
-      await api("/api/v1/team", {
-        method: "POST",
-        body: JSON.stringify({
-          name: name.trim(),
-          email: email.trim(),
-          password,
-          role,
-        }),
-      });
-      setFeedback("Membro adicionado.");
-      setName("");
-      setEmail("");
-      setPassword("");
-      await onCreated();
-    } catch {
-      setFeedback("Nao foi possivel adicionar o membro.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="compact-form">
-      <h3>Adicionar membro</h3>
-      <div className="compact-form-grid">
-        <label>
-          Nome
-          <input value={name} onChange={(event) => setName(event.target.value)} />
-        </label>
-        <label>
-          Email
-          <input
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-        </label>
-        <label>
-          Perfil
-          <select value={role} onChange={(event) => setRole(event.target.value)}>
-            <option value="TECNICO">Tecnico</option>
-            <option value="MANUTENCAO">Manutencao</option>
-            <option value="SUPERVISOR">Supervisor</option>
-            <option value="GESTOR">Gestor</option>
-            <option value="CLIENTE">Cliente</option>
-          </select>
-        </label>
-        <label>
-          Senha inicial
-          <input
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-        </label>
-      </div>
-      <button className="small-button" disabled={busy} onClick={() => void submit()}>
-        {busy ? "Adicionando..." : "Adicionar membro"}
       </button>
       {feedback && <span className="inline-feedback">{feedback}</span>}
     </div>
@@ -2283,7 +2317,7 @@ function MaintenanceAdmin({
 
   async function createPlan() {
     if (!assetId || !nextDueAt) {
-      setFeedback("Selecione o ativo e informe a primeira manutencao.");
+      setFeedback("Selecione o ativo e informe a primeira manutenção.");
       return;
     }
     setBusy(true);
@@ -2306,7 +2340,7 @@ function MaintenanceAdmin({
       setFeedback("Plano preventivo criado.");
       await onChanged();
     } catch {
-      setFeedback("Nao foi possivel criar o plano de manutencao.");
+      setFeedback("Não foi possível criar o plano de manutenção.");
     } finally {
       setBusy(false);
     }
@@ -2316,13 +2350,13 @@ function MaintenanceAdmin({
     <section className="section-card">
       <div className="section-heading">
         <div>
-          <span className="eyebrow">Manutencao</span>
+          <span className="eyebrow">Manutenção</span>
           <h2>Preventivas e vencimentos</h2>
         </div>
         <div className="admin-summary">
           <span><strong>{summary?.active_plans ?? 0}</strong> planos</span>
           <span><strong>{summary?.overdue_plans ?? 0}</strong> vencidos</span>
-          <span><strong>{summary?.due_next_7_days ?? 0}</strong> proximos 7 dias</span>
+          <span><strong>{summary?.due_next_7_days ?? 0}</strong> próximos 7 dias</span>
         </div>
       </div>
 
@@ -2339,8 +2373,8 @@ function MaintenanceAdmin({
                   <div>
                     <strong>{asset?.name ?? "Ativo"}</strong>
                     <span>
-                      {(station?.name ?? "Estacao") + " · a cada " + plan.frequency_days + " dias · " +
-                        (memberMap.get(plan.assigned_membership_id ?? "")?.name ?? "Sem responsavel")}
+                      {(station?.name ?? "Estação") + " · a cada " + plan.frequency_days + " dias · " +
+                        (memberMap.get(plan.assigned_membership_id ?? "")?.name ?? "Sem responsável")}
                     </span>
                   </div>
                   <span className={overdue ? "sla overdue" : "sla"}>
@@ -2363,15 +2397,15 @@ function MaintenanceAdmin({
                 <option value="">Selecione</option>
                 {assets.filter((item) => item.is_active).map((item) => (
                   <option key={item.id} value={item.id}>
-                    {(stationMap.get(item.station_id)?.name ?? "Estacao") + " · " + item.name}
+                    {(stationMap.get(item.station_id)?.name ?? "Estação") + " · " + item.name}
                   </option>
                 ))}
               </select>
             </label>
             <label>
-              Responsavel
+              Responsável
               <select value={memberId} onChange={(event) => setMemberId(event.target.value)}>
-                <option value="">Sem responsavel fixo</option>
+                <option value="">Sem responsável fixo</option>
                 {fieldTeam.map((item) => (
                   <option key={item.membership_id} value={item.membership_id}>{item.name}</option>
                 ))}
@@ -2390,17 +2424,17 @@ function MaintenanceAdmin({
               </select>
             </label>
             <label>
-              Proxima manutencao
+              Próxima manutenção
               <input type="datetime-local" value={nextDueAt} onChange={(event) => setNextDueAt(event.target.value)} />
             </label>
           </div>
           <label className="full-field">
-            Instrucoes
+            Instruções
             <textarea
               rows={3}
               value={instructions}
               onChange={(event) => setInstructions(event.target.value)}
-              placeholder="Ex.: limpar, lubrificar, conferir rolamentos e registrar evidencia."
+              placeholder="Ex.: limpar, lubrificar, conferir rolamentos e registrar evidência."
             />
           </label>
           <button className="small-button" disabled={busy} onClick={() => void createPlan()}>

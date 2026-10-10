@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, Field
 
 
 class ClientPortalStation(BaseModel):
@@ -65,3 +65,10 @@ class ClientAccessRead(BaseModel):
     id: UUID
     membership_id: UUID
     client_id: UUID
+    user_name: str | None = None
+    user_email: str | None = None
+
+
+class ClientPortalCredentialCreate(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=12, max_length=256)

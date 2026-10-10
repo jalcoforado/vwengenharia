@@ -161,9 +161,14 @@ Entidades principais:
 - tenants
 - users
 - memberships
+- collaborators
 - clients
+- contracting_parties
 - developments
+- client_development_contacts
 - stations
+- process_unit_types
+- process_units
 - asset_types
 - assets
 - checklist_templates
@@ -171,6 +176,7 @@ Entidades principais:
 - visit_plans
 - visits
 - visit_answers
+- visit_asset_situations
 - measurements
 - occurrences
 - work_orders

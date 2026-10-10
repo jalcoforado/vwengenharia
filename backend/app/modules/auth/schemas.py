@@ -39,3 +39,4 @@ class MeResponse(BaseModel):
     tenant: MeTenant
     membership_id: UUID
     role: str
+    must_change_password: bool = False

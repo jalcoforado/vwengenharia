@@ -40,7 +40,7 @@ export function VisitMaterialRequestForm({ visit }: { visit: VisitRef }) {
 
   async function submit() {
     if (itemName.trim().length < 2) {
-      setFeedback("Informe o material ou servico necessario.");
+      setFeedback("Informe o material ou serviço necessário.");
       return;
     }
 
@@ -77,11 +77,11 @@ export function VisitMaterialRequestForm({ visit }: { visit: VisitRef }) {
       setNotes("");
       setFeedback(
         result.queued
-          ? "Solicitacao salva no aparelho e pendente de sincronizacao."
-          : "Solicitacao enviada para a gestao.",
+          ? "Solicitação salva no aparelho e pendente de sincronização."
+          : "Solicitação enviada para a gestão.",
       );
     } catch {
-      setFeedback("Nao foi possivel registrar a solicitacao.");
+      setFeedback("Não foi possível registrar a solicitação.");
     } finally {
       setBusy(false);
     }
@@ -94,7 +94,7 @@ export function VisitMaterialRequestForm({ visit }: { visit: VisitRef }) {
           Tipo
           <select value={category} onChange={(event) => setCategory(event.target.value)}>
             <option value="MATERIAL">Material</option>
-            <option value="SERVICO">Servico</option>
+            <option value="SERVICO">Serviço</option>
             <option value="TERCEIRO">Terceiro</option>
           </select>
         </label>
@@ -102,13 +102,13 @@ export function VisitMaterialRequestForm({ visit }: { visit: VisitRef }) {
           Prioridade
           <select value={priority} onChange={(event) => setPriority(event.target.value)}>
             <option value="BAIXA">Baixa</option>
-            <option value="MEDIA">Media</option>
+            <option value="MEDIA">Média</option>
             <option value="ALTA">Alta</option>
-            <option value="CRITICA">Critica</option>
+            <option value="CRITICA">Crítica</option>
           </select>
         </label>
         <label>
-          Item / servico
+          Item / serviço
           <input value={itemName} onChange={(event) => setItemName(event.target.value)} />
         </label>
         <label>
@@ -125,7 +125,7 @@ export function VisitMaterialRequestForm({ visit }: { visit: VisitRef }) {
         </label>
       </div>
       <label className="full-field">
-        Observacao
+        Observação
         <textarea rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} />
       </label>
       <button className="small-button" disabled={busy} onClick={() => void submit()}>
@@ -157,10 +157,10 @@ export function MaterialRequestsAdmin({
         method: "PATCH",
         body: JSON.stringify({ status }),
       });
-      setFeedback("Solicitacao atualizada.");
+      setFeedback("Solicitação atualizada.");
       await onChanged();
     } catch {
-      setFeedback("Nao foi possivel atualizar a solicitacao.");
+      setFeedback("Não foi possível atualizar a solicitação.");
     } finally {
       setBusyId(null);
     }
@@ -170,15 +170,15 @@ export function MaterialRequestsAdmin({
     <section className="section-card">
       <div className="section-heading">
         <div>
-          <span className="eyebrow">Suprimentos e servicos</span>
-          <h2>Solicitacoes operacionais</h2>
+          <span className="eyebrow">Suprimentos e serviços</span>
+          <h2>Solicitações operacionais</h2>
           <p className="section-copy">
-            Pedidos originados em campo, manutencoes e necessidades de terceiros.
+            Pedidos originados em campo, manutenções e necessidades de terceiros.
           </p>
         </div>
         <div className="admin-summary">
           <span><strong>{open.length}</strong> abertas</span>
-          <span><strong>{open.filter((item) => item.priority === "CRITICA").length}</strong> criticas</span>
+          <span><strong>{open.filter((item) => item.priority === "CRITICA").length}</strong> críticas</span>
         </div>
       </div>
 
@@ -188,7 +188,7 @@ export function MaterialRequestsAdmin({
             <div>
               <strong>{request.item_name}</strong>
               <span>
-                {(stationMap.get(request.station_id)?.name ?? "Estacao") +
+                {(stationMap.get(request.station_id)?.name ?? "Estação") +
                   " · " + request.category +
                   (request.quantity ? " · " + request.quantity + " " + (request.unit ?? "") : "")}
               </span>
@@ -213,7 +213,7 @@ export function MaterialRequestsAdmin({
             </div>
           </div>
         ))}
-        {open.length === 0 && <div className="empty-state">Nenhuma solicitacao pendente.</div>}
+        {open.length === 0 && <div className="empty-state">Nenhuma solicitação pendente.</div>}
       </div>
       {feedback && <span className="inline-feedback">{feedback}</span>}
     </section>

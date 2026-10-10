@@ -7,6 +7,7 @@ from sqlalchemy import select
 from app.core.security import hash_password
 from app.db.session import get_session_factory
 from app.models.identity import Membership, Role, Tenant, User
+from app.modules.team.service import ensure_collaborator_for_membership
 
 
 def required(name: str) -> str:
@@ -57,13 +58,14 @@ async def main() -> None:
             )
         ).scalar_one_or_none()
         if membership is None:
-            session.add(
-                Membership(
-                    tenant_id=tenant.id,
-                    user_id=user.id,
-                    role=Role.ADMIN.value,
-                )
+            membership = Membership(
+                tenant_id=tenant.id,
+                user_id=user.id,
+                role=Role.ADMIN.value,
             )
+            session.add(membership)
+            await session.flush()
+        await ensure_collaborator_for_membership(session, membership, user)
 
         await session.commit()
         print(f"Bootstrap complete for tenant={tenant.slug} admin={user.email}")

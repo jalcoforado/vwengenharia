@@ -1,16 +1,19 @@
 from typing import Annotated
+from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, status
 
 from app.models.identity import Role
 from app.modules.auth.dependencies import AuthContext, SessionDep, require_roles
 from app.modules.client_portal.schemas import (
     ClientAccessCreate,
     ClientAccessRead,
+    ClientPortalCredentialCreate,
     ClientPortalResponse,
 )
 from app.modules.client_portal.service import (
     build_client_portal,
+    create_portal_credential,
     grant_client_access,
     list_client_access,
 )
@@ -43,7 +46,7 @@ async def get_client_access(
     session: SessionDep,
 ) -> list[ClientAccessRead]:
     return [
-        ClientAccessRead.model_validate(item, from_attributes=True)
+        ClientAccessRead.model_validate(item)
         for item in await list_client_access(session, context)
     ]
 
@@ -61,3 +64,25 @@ async def post_client_access(
         client_id=payload.client_id,
     )
     return ClientAccessRead.model_validate(item, from_attributes=True)
+
+
+@router.post(
+    "/clients/{client_id}/portal-credential",
+    response_model=ClientAccessRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def post_portal_credential(
+    client_id: UUID,
+    payload: ClientPortalCredentialCreate,
+    context: AdminContextDep,
+    session: SessionDep,
+) -> ClientAccessRead:
+    return ClientAccessRead.model_validate(
+        await create_portal_credential(
+            session,
+            context,
+            client_id=client_id,
+            email=str(payload.email),
+            password=payload.password,
+        )
+    )

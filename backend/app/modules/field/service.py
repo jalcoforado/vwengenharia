@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models.field import (
+    AssetSituation,
     Attachment,
     ChecklistTemplate,
     ChecklistTemplateItem,
@@ -17,14 +18,16 @@ from app.models.field import (
     SyncOperation,
     Visit,
     VisitAnswer,
+    VisitAssetSituation,
     VisitPlan,
     VisitStatus,
 )
 from app.models.identity import Membership, Role
-from app.models.operations import Asset, AssetStatus, AssetType, Station
+from app.models.operations import Asset, AssetStatus, AssetType, ProcessUnit, Station
 from app.modules.auth.dependencies import AuthContext
 from app.modules.core_registers.service import add_audit, tenant_get_or_404
 from app.modules.field.schemas import (
+    AssetSituationUpsert,
     AttachmentRegisterCreate,
     ChecklistItemCreate,
     ChecklistTemplateCreate,
@@ -772,6 +775,110 @@ async def upsert_answer(
     return answer
 
 
+# Como a situacao encontrada na visita atualiza o status do equipamento no cadastro.
+SITUATION_TO_ASSET_STATUS = {
+    AssetSituation.FUNCIONANDO.value: AssetStatus.OPERANDO.value,
+    AssetSituation.DESLIGADO.value: AssetStatus.DESLIGADO.value,
+    AssetSituation.NECESSARIO_VERIFICAR.value: AssetStatus.NECESSITA_VERIFICACAO.value,
+    AssetSituation.AGUARDANDO_RETIRADA.value: AssetStatus.AGUARDANDO_MANUTENCAO.value,
+    AssetSituation.RETIRADO_AGUARDANDO_MANUTENCAO.value: AssetStatus.FORA_DA_ESTACAO.value,
+    AssetSituation.EM_MANUTENCAO.value: AssetStatus.EM_MANUTENCAO.value,
+    AssetSituation.AGUARDANDO_INSTALACAO.value: AssetStatus.AGUARDANDO_INSTALACAO.value,
+    AssetSituation.NAO_POSSUI.value: AssetStatus.NAO_POSSUI.value,
+}
+
+
+async def upsert_asset_situation(
+    session: AsyncSession,
+    context: AuthContext,
+    visit_id: UUID,
+    payload: AssetSituationUpsert,
+) -> VisitAssetSituation:
+    visit = await get_accessible_visit(session, context, visit_id)
+
+    replay = await _sync_replay_entity(
+        session,
+        tenant_id=context.tenant.id,
+        client_operation_id=payload.client_operation_id,
+        operation_type="VISIT_ASSET_SITUATION_UPSERT",
+        entity_type="visit_asset_situation",
+        model=VisitAssetSituation,
+    )
+    if replay is not None:
+        if replay.visit_id != visit.id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="client_operation_id_conflict",
+            )
+        return replay
+
+    if visit.status != VisitStatus.EM_EXECUCAO.value:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="visit_not_in_progress")
+
+    asset = (
+        await session.execute(
+            select(Asset).where(
+                Asset.id == payload.asset_id,
+                Asset.tenant_id == context.tenant.id,
+                Asset.station_id == visit.station_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if asset is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="asset_not_found")
+
+    situation = payload.situation.value
+    comment = (payload.comment or "").strip() or None
+    record = (
+        await session.execute(
+            select(VisitAssetSituation).where(
+                VisitAssetSituation.tenant_id == context.tenant.id,
+                VisitAssetSituation.visit_id == visit.id,
+                VisitAssetSituation.asset_id == asset.id,
+            )
+        )
+    ).scalar_one_or_none()
+    if record is None:
+        record = VisitAssetSituation(
+            tenant_id=context.tenant.id,
+            visit_id=visit.id,
+            asset_id=asset.id,
+            situation=situation,
+            comment=comment,
+            client_operation_id=payload.client_operation_id,
+        )
+        session.add(record)
+    else:
+        record.situation = situation
+        record.comment = comment
+
+    # "Outro" nao tem equivalente no cadastro: o status do equipamento fica como estava.
+    new_status = SITUATION_TO_ASSET_STATUS.get(situation)
+    if new_status is not None:
+        asset.status = new_status
+
+    await session.flush()
+    if payload.client_operation_id is not None:
+        _record_sync_operation(
+            session,
+            tenant_id=context.tenant.id,
+            client_operation_id=payload.client_operation_id,
+            operation_type="VISIT_ASSET_SITUATION_UPSERT",
+            entity_type="visit_asset_situation",
+            entity_id=record.id,
+        )
+    add_audit(
+        session,
+        context,
+        action="VISIT_ASSET_SITUATION_UPSERT",
+        entity_type="visit_asset_situation",
+        entity_id=record.id,
+    )
+    await session.commit()
+    await session.refresh(record)
+    return record
+
+
 async def add_measurement(
     session: AsyncSession,
     context: AuthContext,
@@ -928,7 +1035,9 @@ async def build_field_bootstrap(
     }
 
     stations = []
+    units = []
     assets = []
+    asset_situations = []
     templates = []
     items = []
     answers = []
@@ -967,6 +1076,16 @@ async def build_field_bootstrap(
                 )
             ).scalars()
         )
+        asset_situations = list(
+            (
+                await session.execute(
+                    select(VisitAssetSituation).where(
+                        VisitAssetSituation.tenant_id == context.tenant.id,
+                        VisitAssetSituation.visit_id.in_(visit_ids),
+                    )
+                )
+            ).scalars()
+        )
 
     if station_ids:
         stations = list(
@@ -976,6 +1095,19 @@ async def build_field_bootstrap(
                         Station.tenant_id == context.tenant.id,
                         Station.id.in_(station_ids),
                     )
+                )
+            ).scalars()
+        )
+        units = list(
+            (
+                await session.execute(
+                    select(ProcessUnit)
+                    .where(
+                        ProcessUnit.tenant_id == context.tenant.id,
+                        ProcessUnit.station_id.in_(station_ids),
+                        ProcessUnit.is_active.is_(True),
+                    )
+                    .order_by(ProcessUnit.name)
                 )
             ).scalars()
         )
@@ -1021,7 +1153,9 @@ async def build_field_bootstrap(
         "generated_at": now,
         "visits": visits,
         "stations": stations,
+        "units": units,
         "assets": assets,
+        "asset_situations": asset_situations,
         "templates": templates,
         "items": items,
         "answers": answers,

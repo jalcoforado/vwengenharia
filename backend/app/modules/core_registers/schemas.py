@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from app.models.operations import AssetStatus
+from app.models.operations import AssetStatus, ContactScope, PersonType
 
 
 class ORMModel(BaseModel):
@@ -17,6 +17,8 @@ class ClientCreate(BaseModel):
     contact_name: str | None = Field(default=None, max_length=160)
     contact_email: EmailStr | None = None
     contact_phone: str | None = Field(default=None, max_length=40)
+    contact_role: str | None = Field(default=None, max_length=120)
+    contact_whatsapp: str | None = Field(default=None, max_length=40)
 
 
 class ClientUpdate(BaseModel):
@@ -25,6 +27,8 @@ class ClientUpdate(BaseModel):
     contact_name: str | None = Field(default=None, max_length=160)
     contact_email: EmailStr | None = None
     contact_phone: str | None = Field(default=None, max_length=40)
+    contact_role: str | None = Field(default=None, max_length=120)
+    contact_whatsapp: str | None = Field(default=None, max_length=40)
     is_active: bool | None = None
 
 
@@ -35,6 +39,68 @@ class ClientRead(ORMModel):
     contact_name: str | None
     contact_email: str | None
     contact_phone: str | None
+    contact_role: str | None
+    contact_whatsapp: str | None
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class ClientContactCreate(BaseModel):
+    client_id: UUID
+    development_id: UUID
+    scope: ContactScope
+    portal_access: bool = False
+
+
+class ClientContactUpdate(BaseModel):
+    scope: ContactScope | None = None
+    portal_access: bool | None = None
+    is_active: bool | None = None
+
+
+class ClientContactRead(ORMModel):
+    id: UUID
+    client_id: UUID
+    development_id: UUID
+    scope: ContactScope
+    is_primary: bool
+    portal_access: bool
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class ContractingPartyCreate(BaseModel):
+    person_type: PersonType = PersonType.PJ
+    name: str = Field(min_length=2, max_length=200)
+    trade_name: str | None = Field(default=None, max_length=200)
+    document: str | None = Field(default=None, max_length=32)
+    contact_email: EmailStr | None = None
+    contact_phone: str | None = Field(default=None, max_length=40)
+    contact_whatsapp: str | None = Field(default=None, max_length=40)
+
+
+class ContractingPartyUpdate(BaseModel):
+    person_type: PersonType | None = None
+    name: str | None = Field(default=None, min_length=2, max_length=200)
+    trade_name: str | None = Field(default=None, max_length=200)
+    document: str | None = Field(default=None, max_length=32)
+    contact_email: EmailStr | None = None
+    contact_phone: str | None = Field(default=None, max_length=40)
+    contact_whatsapp: str | None = Field(default=None, max_length=40)
+    is_active: bool | None = None
+
+
+class ContractingPartyRead(ORMModel):
+    id: UUID
+    person_type: PersonType
+    name: str
+    trade_name: str | None
+    document: str | None
+    contact_email: str | None
+    contact_phone: str | None
+    contact_whatsapp: str | None
     is_active: bool
     created_at: datetime
     updated_at: datetime
@@ -42,34 +108,93 @@ class ClientRead(ORMModel):
 
 class DevelopmentCreate(BaseModel):
     client_id: UUID
+    contracting_party_id: UUID | None = None
     name: str = Field(min_length=2, max_length=200)
+    document: str | None = Field(default=None, max_length=32)
+    contact_phone: str | None = Field(default=None, max_length=40)
+    contact_email: EmailStr | None = None
     address_line: str | None = Field(default=None, max_length=255)
     city: str | None = Field(default=None, max_length=120)
     state: str | None = Field(default=None, min_length=2, max_length=2)
     postal_code: str | None = Field(default=None, max_length=12)
+    development_type: str | None = Field(default=None, max_length=60)
+    address_number: str | None = Field(default=None, max_length=20)
+    address_complement: str | None = Field(default=None, max_length=120)
+    address_district: str | None = Field(default=None, max_length=120)
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    units_count: int | None = Field(default=None, ge=0, le=1_000_000)
+    access_hours: str | None = Field(default=None, max_length=255)
 
 
 class DevelopmentUpdate(BaseModel):
     client_id: UUID | None = None
+    contracting_party_id: UUID | None = None
     name: str | None = Field(default=None, min_length=2, max_length=200)
+    document: str | None = Field(default=None, max_length=32)
+    contact_phone: str | None = Field(default=None, max_length=40)
+    contact_email: EmailStr | None = None
     address_line: str | None = Field(default=None, max_length=255)
     city: str | None = Field(default=None, max_length=120)
     state: str | None = Field(default=None, min_length=2, max_length=2)
     postal_code: str | None = Field(default=None, max_length=12)
+    development_type: str | None = Field(default=None, max_length=60)
+    address_number: str | None = Field(default=None, max_length=20)
+    address_complement: str | None = Field(default=None, max_length=120)
+    address_district: str | None = Field(default=None, max_length=120)
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    units_count: int | None = Field(default=None, ge=0, le=1_000_000)
+    access_hours: str | None = Field(default=None, max_length=255)
     is_active: bool | None = None
 
 
 class DevelopmentRead(ORMModel):
     id: UUID
     client_id: UUID
+    contracting_party_id: UUID | None
     name: str
+    document: str | None
+    contact_phone: str | None
+    contact_email: str | None
     address_line: str | None
     city: str | None
     state: str | None
     postal_code: str | None
+    development_type: str | None
+    address_number: str | None
+    address_complement: str | None
+    address_district: str | None
+    latitude: float | None
+    longitude: float | None
+    units_count: int | None
+    access_hours: str | None
+    has_facade_photo: bool
     is_active: bool
     created_at: datetime
     updated_at: datetime
+
+
+class FacadePhotoPresign(BaseModel):
+    filename: str = Field(min_length=1, max_length=255)
+    content_type: str = Field(min_length=3, max_length=100)
+    size_bytes: int = Field(gt=0)
+
+
+class FacadePhotoUpload(BaseModel):
+    upload_url: str
+    object_key: str
+    expires_in: int
+    required_headers: dict[str, str]
+
+
+class FacadePhotoComplete(BaseModel):
+    object_key: str = Field(min_length=1, max_length=512)
+
+
+class FacadePhotoUrl(BaseModel):
+    url: str
+    expires_in: int
 
 
 class StationCreate(BaseModel):
@@ -127,9 +252,55 @@ class AssetTypeRead(ORMModel):
     updated_at: datetime
 
 
+class ProcessUnitTypeCreate(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    code: str | None = Field(default=None, max_length=60)
+    stage: str | None = Field(default=None, max_length=60)
+
+
+class ProcessUnitTypeUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=120)
+    code: str | None = Field(default=None, max_length=60)
+    stage: str | None = Field(default=None, max_length=60)
+    is_active: bool | None = None
+
+
+class ProcessUnitTypeRead(ORMModel):
+    id: UUID
+    name: str
+    code: str | None
+    stage: str | None
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class ProcessUnitCreate(BaseModel):
+    station_id: UUID
+    unit_type_id: UUID
+    name: str = Field(min_length=2, max_length=160)
+
+
+class ProcessUnitUpdate(BaseModel):
+    unit_type_id: UUID | None = None
+    name: str | None = Field(default=None, min_length=2, max_length=160)
+    is_active: bool | None = None
+
+
+class ProcessUnitRead(ORMModel):
+    id: UUID
+    station_id: UUID
+    unit_type_id: UUID
+    name: str
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+
 class AssetCreate(BaseModel):
     station_id: UUID
     asset_type_id: UUID
+    process_unit_id: UUID | None = None
     name: str = Field(min_length=2, max_length=160)
     manufacturer: str | None = Field(default=None, max_length=120)
     model: str | None = Field(default=None, max_length=120)
@@ -142,6 +313,7 @@ class AssetCreate(BaseModel):
 class AssetUpdate(BaseModel):
     station_id: UUID | None = None
     asset_type_id: UUID | None = None
+    process_unit_id: UUID | None = None
     name: str | None = Field(default=None, min_length=2, max_length=160)
     manufacturer: str | None = Field(default=None, max_length=120)
     model: str | None = Field(default=None, max_length=120)
@@ -156,6 +328,7 @@ class AssetRead(ORMModel):
     id: UUID
     station_id: UUID
     asset_type_id: UUID
+    process_unit_id: UUID | None
     name: str
     manufacturer: str | None
     model: str | None

@@ -6,6 +6,26 @@ A autorizacao e aplicada no backend. A interface pode esconder acoes nao permiti
 
 Todo acesso operacional e limitado pelo tenant da membership autenticada.
 
+## Cadastros de pessoas e credenciais
+
+A MW trabalha com quatro cadastros:
+
+- **Contratantes**: quem assina com a MW (PF ou PJ, com CPF/CNPJ). Um contratante pode ter varios empreendimentos (tabela `contracting_parties`).
+- **Colaboradores**: quem trabalha na MW (diretoria, backoffice, tecnicos). A credencial de acesso e opcional.
+- **Responsaveis**: pessoas fisicas ou juridicas que respondem por um ou mais empreendimentos (tabela `clients`).
+- **Empreendimentos**: os locais atendidos, sempre com um responsavel principal ja cadastrado e, opcionalmente, outros responsaveis. O contratante e opcional: sem ele, o responsavel principal responde pelo contrato.
+
+Regras de credencial:
+
+- toda credencial interna pertence a um colaborador; o caminho normal e criar o acesso a partir do colaborador (`POST /collaborators/{id}/credential`). `POST /team` continua aceito e registra o colaborador da credencial;
+- inativar o colaborador bloqueia a credencial e encerra as sessoes; reativar o colaborador nao devolve o acesso sozinho;
+- o grupo do colaborador (diretoria, backoffice, tecnico) descreve quem ele e na MW e nao concede permissao; a permissao vem do perfil abaixo;
+- a senha definida por um administrador (ao criar o acesso ou ao redefinir) e provisoria: enquanto `users.must_change_password` estiver ligado, a API responde 403 `password_change_required` a tudo, exceto `/auth/me` e `/auth/change-password`; a troca desliga a marca;
+- o administrador redefine a senha de outra pessoa em `POST /team/{membership_id}/reset-password` (nunca a propria), o que encerra as sessoes abertas dela;
+- `GET /accesses` lista todos os logins do tenant, de equipe e de portal, so para ADMIN/SUPERADMIN;
+- o perfil CLIENTE nao e trocado por um perfil interno, nem o contrario;
+- login de portal (perfil CLIENTE) so nasce de um responsavel cadastrado (`POST /clients/{id}/portal-credential`); `POST /team` recusa o perfil CLIENTE.
+
 ## Perfis
 
 ### SUPERADMIN
@@ -111,6 +131,12 @@ Antes de liberar qualquer endpoint ao perfil CLIENTE:
 - impedir acesso a dados internos de equipe, auditoria e configuracao.
 
 Por seguranca, nenhuma permissao ampla deve ser inferida apenas pela existencia desse papel.
+
+Regra de visibilidade do portal:
+- o login CLIENTE e ligado a um responsavel (client_membership_access);
+- o responsavel, principal ou adicional, so ve um empreendimento quando a responsabilidade dele naquele empreendimento tem o portal liberado explicitamente (client_development_contacts.portal_access);
+- somente ADMIN/SUPERADMIN concedem a liberacao; quem cadastra pode revoga-la;
+- inativar a responsabilidade ou trocar o responsavel principal revoga a liberacao.
 
 ## Matriz resumida
 

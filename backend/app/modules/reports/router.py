@@ -9,11 +9,19 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import Response
 from sqlalchemy import select
 
-from app.models.field import Attachment, ChecklistTemplateItem, Measurement, Visit, VisitAnswer
+from app.models.field import (
+    Attachment,
+    ChecklistTemplateItem,
+    Measurement,
+    Visit,
+    VisitAnswer,
+    VisitAssetSituation,
+)
 from app.models.identity import Membership, Role, User
 from app.models.maintenance import MaintenancePlan, Occurrence, VisitReview, WorkOrder
-from app.models.operations import Client, ClientMembershipAccess, Development, Station
+from app.models.operations import Asset, Client, Development, Station
 from app.modules.auth.dependencies import AuthContext, SessionDep, require_roles
+from app.modules.client_portal.service import client_can_view_development
 
 router = APIRouter(prefix="/reports", tags=["relatorios"])
 
@@ -179,6 +187,18 @@ async def maintenance_csv(
     )
 
 
+SITUATION_LABELS = {
+    "FUNCIONANDO": "Funcionando adequadamente",
+    "DESLIGADO": "Desligado (equipamento ok)",
+    "NECESSARIO_VERIFICAR": "Necessário verificar",
+    "AGUARDANDO_RETIRADA": "Aguardando ser retirado",
+    "RETIRADO_AGUARDANDO_MANUTENCAO": "Retirado e aguardando manutenção",
+    "EM_MANUTENCAO": "Em manutenção",
+    "AGUARDANDO_INSTALACAO": "Aguardando ser instalado",
+    "NAO_POSSUI": "Não possui",
+    "OUTRO": "Outro",
+}
+
 REPORT_ROLES = MANAGEMENT_ROLES + (Role.TECNICO.value, Role.CLIENTE.value)
 ReportContextDep = Annotated[AuthContext, Depends(require_roles(*REPORT_ROLES))]
 
@@ -193,7 +213,7 @@ def _format_answer(value: object) -> str:
     if value is True:
         return "Sim"
     if value is False:
-        return "Nao"
+        return "Não"
     if value is None:
         return "-"
     return str(value)
@@ -250,16 +270,7 @@ async def visit_report_html(
     if context.membership.role == Role.CLIENTE.value:
         if visit.status != "REVISADA":
             return Response(status_code=404)
-        allowed = (
-            await session.execute(
-                select(ClientMembershipAccess.id).where(
-                    ClientMembershipAccess.tenant_id == context.tenant.id,
-                    ClientMembershipAccess.membership_id == context.membership.id,
-                    ClientMembershipAccess.client_id == client.id,
-                )
-            )
-        ).scalar_one_or_none()
-        if allowed is None:
+        if not await client_can_view_development(session, context, development.id):
             return Response(status_code=404)
     technician = (
         await session.execute(
@@ -350,7 +361,7 @@ async def visit_report_html(
         f"<td>{escape(item.reason or '-')}</td>"
         "</tr>"
         for item in measurements
-    ) or '<tr><td colspan="5">Sem medicoes registradas.</td></tr>'
+    ) or '<tr><td colspan="5">Sem medições registradas.</td></tr>'
 
     occurrence_rows = "".join(
         "<tr>"
@@ -360,18 +371,46 @@ async def visit_report_html(
         f"<td>{escape(item.description)}</td>"
         "</tr>"
         for item in occurrences
-    ) or '<tr><td colspan="4">Sem ocorrencias registradas.</td></tr>'
+    ) or '<tr><td colspan="4">Sem ocorrências registradas.</td></tr>'
+
+    # Situacao dos equipamentos e informacao interna: nao vai no relatorio visto pelo cliente.
+    asset_section = ""
+    if context.membership.role != Role.CLIENTE.value:
+        situations = (
+            await session.execute(
+                select(VisitAssetSituation, Asset)
+                .join(Asset, Asset.id == VisitAssetSituation.asset_id)
+                .where(
+                    VisitAssetSituation.visit_id == visit.id,
+                    VisitAssetSituation.tenant_id == context.tenant.id,
+                )
+                .order_by(Asset.name)
+            )
+        ).all()
+        situation_rows = "".join(
+            "<tr>"
+            f"<td>{escape(asset.name)}</td>"
+            f"<td>{escape(SITUATION_LABELS.get(record.situation, record.situation))}</td>"
+            f"<td>{escape(record.comment or '-')}</td>"
+            "</tr>"
+            for record, asset in situations
+        ) or '<tr><td colspan="3">Sem situação de equipamento registrada.</td></tr>'
+        asset_section = (
+            "  <h2>Situação dos equipamentos</h2>\n"
+            "  <table><thead><tr><th>Equipamento</th><th>Situação</th><th>Observação</th></tr>"
+            f"</thead><tbody>{situation_rows}</tbody></table>\n"
+        )
 
     evidence_rows = "".join(
         "<tr>"
-        f"<td>{escape(item.caption or 'Evidencia')}</td>"
+        f"<td>{escape(item.caption or 'Evidência')}</td>"
         f"<td>{escape(item.content_type)}</td>"
         f"<td>{escape(item.storage_status)}</td>"
         "</tr>"
         for item in attachments
-    ) or '<tr><td colspan="3">Sem evidencias registradas.</td></tr>'
+    ) or '<tr><td colspan="3">Sem evidências registradas.</td></tr>'
 
-    review_text = "Aguardando revisao"
+    review_text = "Aguardando revisão"
     if review is not None:
         review_text = f"{review.decision} em {_format_datetime(review.reviewed_at)}"
         if review.notes:
@@ -382,7 +421,7 @@ async def visit_report_html(
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Relatorio de visita - {escape(station.name)}</title>
+<title>Relatório de visita - {escape(station.name)}</title>
 <style>
   :root {{ font-family: Inter, Arial, sans-serif; color: #172033; }}
   body {{ margin: 0; background: #eef2f6; }}
@@ -402,36 +441,37 @@ async def visit_report_html(
 <body>
 <main>
   <header>
-    <div><div class="muted">MW Engenharia</div><h1>Relatorio de visita tecnica</h1></div>
+    <div><div class="muted">MW Engenharia</div><h1>Relatório de visita técnica</h1></div>
     <div class="muted">ID {escape(str(visit.id))}</div>
   </header>
   <div class="grid">
     <div class="item"><span>Cliente</span><strong>{escape(client.name)}</strong></div>
     <div class="item"><span>Empreendimento</span><strong>{escape(development.name)}</strong></div>
-    <div class="item"><span>Estacao</span><strong>{escape(station.name)}</strong></div>
-    <div class="item"><span>Codigo</span><strong>{escape(station.code or "-")}</strong></div>
-    <div class="item"><span>Tecnico</span><strong>{escape(technician.name)}</strong></div>
+    <div class="item"><span>Estação</span><strong>{escape(station.name)}</strong></div>
+    <div class="item"><span>Código</span><strong>{escape(station.code or "-")}</strong></div>
+    <div class="item"><span>Técnico</span><strong>{escape(technician.name)}</strong></div>
     <div class="item"><span>Status</span><strong>{escape(visit.status)}</strong></div>
     <div class="item"><span>Agendada</span><strong>{_format_datetime(visit.scheduled_for)}</strong></div>
-    <div class="item"><span>Inicio / fim</span><strong>{_format_datetime(visit.started_at)} / {_format_datetime(visit.finished_at)}</strong></div>
+    <div class="item"><span>Início / fim</span><strong>{_format_datetime(visit.started_at)} / {_format_datetime(visit.finished_at)}</strong></div>
   </div>
 
+{asset_section}
   <h2>Checklist</h2>
   <table><thead><tr><th>Item</th><th>Resposta</th></tr></thead><tbody>{checklist_rows}</tbody></table>
 
-  <h2>Medicoes</h2>
-  <table><thead><tr><th>Tipo</th><th>Valor</th><th>Unidade</th><th>Status</th><th>Observacao</th></tr></thead><tbody>{measurement_rows}</tbody></table>
+  <h2>Medições</h2>
+  <table><thead><tr><th>Tipo</th><th>Valor</th><th>Unidade</th><th>Status</th><th>Observação</th></tr></thead><tbody>{measurement_rows}</tbody></table>
 
-  <h2>Ocorrencias</h2>
-  <table><thead><tr><th>Tipo</th><th>Criticidade</th><th>Status</th><th>Descricao</th></tr></thead><tbody>{occurrence_rows}</tbody></table>
+  <h2>Ocorrências</h2>
+  <table><thead><tr><th>Tipo</th><th>Criticidade</th><th>Status</th><th>Descrição</th></tr></thead><tbody>{occurrence_rows}</tbody></table>
 
-  <h2>Evidencias</h2>
-  <table><thead><tr><th>Descricao</th><th>Tipo</th><th>Status</th></tr></thead><tbody>{evidence_rows}</tbody></table>
+  <h2>Evidências</h2>
+  <table><thead><tr><th>Descrição</th><th>Tipo</th><th>Status</th></tr></thead><tbody>{evidence_rows}</tbody></table>
 
-  <h2>Observacoes da visita</h2>
-  <p>{escape(visit.notes or "Sem observacoes.")}</p>
+  <h2>Observações da visita</h2>
+  <p>{escape(visit.notes or "Sem observações.")}</p>
 
-  <div class="validation"><strong>Validacao:</strong> {escape(review_text)}</div>
+  <div class="validation"><strong>Validação:</strong> {escape(review_text)}</div>
 </main>
 <button class="print" onclick="window.print()">Imprimir / Salvar PDF</button>
 </body>

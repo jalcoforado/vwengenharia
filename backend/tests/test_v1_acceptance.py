@@ -352,7 +352,7 @@ async def test_v1_complete_operational_journey() -> None:
         )
         assert report.status_code == 200
         assert report.headers["content-type"].startswith("text/html")
-        assert "Relatorio de visita tecnica" in report.text
+        assert "Relatório de visita técnica" in report.text
         assert f"ETE Acceptance {suffix}" in report.text
         assert "Grade limpa?" in report.text
         assert "FALHA_EQUIPAMENTO" in report.text

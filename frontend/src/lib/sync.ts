@@ -51,7 +51,7 @@ async function syncCommands(): Promise<number> {
           ? Number((error as { status: number }).status)
           : 0;
       await db.outbox.update(item.id, {
-        lastError: status ? `HTTP ${status}` : "Falha de conexao",
+        lastError: status ? `HTTP ${status}` : "Falha de conexão",
       });
       if (status >= 400 && status < 500) break;
       if (!navigator.onLine) break;

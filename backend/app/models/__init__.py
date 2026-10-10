@@ -2,6 +2,7 @@ from app.models.audit import AuditEvent
 from app.models.base import Base
 from app.models.field import (
     AnswerType,
+    AssetSituation,
     Attachment,
     ChecklistTemplate,
     ChecklistTemplateItem,
@@ -10,10 +11,19 @@ from app.models.field import (
     SyncOperation,
     Visit,
     VisitAnswer,
+    VisitAssetSituation,
     VisitPlan,
     VisitStatus,
 )
-from app.models.identity import Membership, RefreshToken, Role, Tenant, User
+from app.models.identity import (
+    Collaborator,
+    CollaboratorGroup,
+    Membership,
+    RefreshToken,
+    Role,
+    Tenant,
+    User,
+)
 from app.models.integration import IntegrationCredential
 from app.models.legacy import LegacyStationMapping, LegacyTechnicianMapping, LegacyVisitStage
 from app.models.maintenance import (
@@ -41,14 +51,21 @@ from app.models.operations import (
     AssetStatus,
     AssetType,
     Client,
+    ClientDevelopmentContact,
     ClientMembershipAccess,
+    ContactScope,
+    ContractingParty,
     Development,
+    PersonType,
+    ProcessUnit,
+    ProcessUnitType,
     Station,
 )
 
 __all__ = [
     "AnswerType",
     "Asset",
+    "AssetSituation",
     "AssetStatus",
     "AssetType",
     "Attachment",
@@ -57,7 +74,12 @@ __all__ = [
     "ChecklistTemplate",
     "ChecklistTemplateItem",
     "Client",
+    "ClientDevelopmentContact",
     "ClientMembershipAccess",
+    "Collaborator",
+    "CollaboratorGroup",
+    "ContactScope",
+    "ContractingParty",
     "Development",
     "IntegrationCredential",
     "LegacyStationMapping",
@@ -73,6 +95,9 @@ __all__ = [
     "Occurrence",
     "OccurrenceSeverity",
     "OccurrenceStatus",
+    "PersonType",
+    "ProcessUnit",
+    "ProcessUnitType",
     "RefreshToken",
     "RequestCategory",
     "RequestPriority",
@@ -85,6 +110,7 @@ __all__ = [
     "User",
     "Visit",
     "VisitAnswer",
+    "VisitAssetSituation",
     "VisitPlan",
     "VisitReview",
     "VisitStatus",

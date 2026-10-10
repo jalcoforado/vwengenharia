@@ -61,7 +61,7 @@ export default function ClientPortal({ userName }: { userName: string }) {
     try {
       setData(await api<PortalData>("/api/v1/client-portal"));
     } catch {
-      setError("Nao foi possivel carregar o portal neste momento.");
+      setError("Não foi possível carregar o portal neste momento.");
     } finally {
       setBusy(false);
     }
@@ -86,11 +86,11 @@ export default function ClientPortal({ userName }: { userName: string }) {
       <section className="welcome client-welcome">
         <div>
           <span className="eyebrow">Portal do cliente</span>
-          <h1>Ola, {userName.split(" ")[0]}</h1>
+          <h1>Olá, {userName.split(" ")[0]}</h1>
           <p>
             {data?.clients.length
               ? data.clients.map((item) => item.name).join(" · ")
-              : "Acompanhe a operacao dos seus empreendimentos."}
+              : "Acompanhe a operação dos seus empreendimentos."}
           </p>
         </div>
         <button className="secondary-button" disabled={busy} onClick={() => void load()}>
@@ -104,8 +104,8 @@ export default function ClientPortal({ userName }: { userName: string }) {
       {!busy && data?.clients.length === 0 && (
         <section className="section-card empty-state">
           <Building2 size={26} />
-          <strong>Acesso ainda nao configurado</strong>
-          <span>Solicite a MW Engenharia para vincular seu usuario ao contrato correto.</span>
+          <strong>Acesso ainda não configurado</strong>
+          <span>Solicite a MW Engenharia para vincular seu usuário ao contrato correto.</span>
         </section>
       )}
 
@@ -115,7 +115,7 @@ export default function ClientPortal({ userName }: { userName: string }) {
             <div className="metric-card">
               <Building2 />
               <strong>{data.stations.length}</strong>
-              <span>Estacoes acompanhadas</span>
+              <span>Estações acompanhadas</span>
             </div>
             <div className="metric-card">
               <CheckCircle2 />
@@ -125,7 +125,7 @@ export default function ClientPortal({ userName }: { userName: string }) {
             <div className="metric-card">
               <AlertTriangle />
               <strong>{openOccurrences.length}</strong>
-              <span>Ocorrencias abertas</span>
+              <span>Ocorrências abertas</span>
             </div>
             <div className="metric-card">
               <Wrench />
@@ -142,7 +142,7 @@ export default function ClientPortal({ userName }: { userName: string }) {
                 {data.visits.slice(0, 12).map((visit) => (
                   <div className="ops-row client-row" key={visit.id}>
                     <div>
-                      <strong>{stationMap.get(visit.station_id)?.name ?? "Estacao"}</strong>
+                      <strong>{stationMap.get(visit.station_id)?.name ?? "Estação"}</strong>
                       <span>
                         {new Intl.DateTimeFormat("pt-BR", {
                           dateStyle: "short",
@@ -159,7 +159,7 @@ export default function ClientPortal({ userName }: { userName: string }) {
                           className="text-button"
                           onClick={() => void openApiDocument(`/api/v1/reports/visits/${visit.id}.html`)}
                         >
-                          Relatorio
+                          Relatório
                         </button>
                       )}
                     </div>
@@ -173,12 +173,12 @@ export default function ClientPortal({ userName }: { userName: string }) {
 
             <section className="section-card">
               <span className="eyebrow">Acompanhamento</span>
-              <h2>Ordens de servico</h2>
+              <h2>Ordens de serviço</h2>
               <div className="ops-list">
                 {data.work_orders.slice(0, 12).map((order) => (
                   <div className="ops-row" key={order.id}>
                     <div>
-                      <strong>{stationMap.get(order.station_id)?.name ?? "Estacao"}</strong>
+                      <strong>{stationMap.get(order.station_id)?.name ?? "Estação"}</strong>
                       <span>{order.description}</span>
                     </div>
                     <div className="ops-meta">
@@ -193,7 +193,7 @@ export default function ClientPortal({ userName }: { userName: string }) {
                   <div className="empty-state empty-state-positive">
                     <ClipboardCheck size={22} />
                     <strong>Nenhuma OS registrada</strong>
-                    <span>Nao ha ordens de servico para os seus empreendimentos.</span>
+                    <span>Não há ordens de serviço para os seus empreendimentos.</span>
                   </div>
                 )}
               </div>
@@ -201,13 +201,13 @@ export default function ClientPortal({ userName }: { userName: string }) {
           </div>
 
           <section className="section-card">
-            <span className="eyebrow">Transparencia</span>
-            <h2>Ocorrencias recentes</h2>
+            <span className="eyebrow">Transparência</span>
+            <h2>Ocorrências recentes</h2>
             <div className="ops-list">
               {data.occurrences.slice(0, 12).map((item) => (
                 <div className="ops-row" key={item.id}>
                   <div>
-                    <strong>{stationMap.get(item.station_id)?.name ?? "Estacao"}</strong>
+                    <strong>{stationMap.get(item.station_id)?.name ?? "Estação"}</strong>
                     <span>{item.description}</span>
                   </div>
                   <div className="ops-meta">
@@ -221,8 +221,8 @@ export default function ClientPortal({ userName }: { userName: string }) {
               {data.occurrences.length === 0 && (
                 <div className="empty-state empty-state-positive">
                   <CheckCircle2 size={22} />
-                  <strong>Sem ocorrencias registradas</strong>
-                  <span>Nenhuma ocorrencia foi registrada para os seus empreendimentos.</span>
+                  <strong>Sem ocorrências registradas</strong>
+                  <span>Nenhuma ocorrência foi registrada para os seus empreendimentos.</span>
                 </div>
               )}
             </div>
