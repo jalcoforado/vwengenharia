@@ -6,15 +6,27 @@ from fastapi import APIRouter, Depends, Query, Response, status
 from app.models.identity import Role
 from app.modules.auth.dependencies import AuthContext, SessionDep, require_roles
 from app.modules.team.schemas import (
+    AccessRead,
     ChangePasswordRequest,
+    CollaboratorCreate,
+    CollaboratorCredentialCreate,
+    CollaboratorRead,
+    CollaboratorUpdate,
+    PasswordResetRequest,
     TeamMemberCreate,
     TeamMemberRead,
     TeamMemberUpdate,
 )
 from app.modules.team.service import (
     change_own_password,
+    create_collaborator,
+    create_collaborator_credential,
     create_team_member,
+    list_accesses,
+    list_collaborators,
     list_team_members,
+    reset_member_password,
+    update_collaborator,
     update_team_member,
 )
 
@@ -93,6 +105,70 @@ async def patch_team_member(
     )
 
 
+@router.get("/accesses", response_model=list[AccessRead])
+async def get_accesses(
+    context: AdminContextDep,
+    session: SessionDep,
+) -> list[AccessRead]:
+    return await list_accesses(session, context)
+
+
+@router.post("/team/{membership_id}/reset-password", status_code=status.HTTP_204_NO_CONTENT)
+async def post_reset_password(
+    membership_id: UUID,
+    payload: PasswordResetRequest,
+    context: AdminContextDep,
+    session: SessionDep,
+) -> Response:
+    await reset_member_password(session, context, membership_id, payload.new_password)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/collaborators", response_model=list[CollaboratorRead])
+async def get_collaborators(
+    context: ReadContextDep,
+    session: SessionDep,
+) -> list[CollaboratorRead]:
+    return await list_collaborators(session, context)
+
+
+@router.post(
+    "/collaborators",
+    response_model=CollaboratorRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def post_collaborator(
+    payload: CollaboratorCreate,
+    context: AdminContextDep,
+    session: SessionDep,
+) -> CollaboratorRead:
+    return await create_collaborator(session, context, payload)
+
+
+@router.patch("/collaborators/{collaborator_id}", response_model=CollaboratorRead)
+async def patch_collaborator(
+    collaborator_id: UUID,
+    payload: CollaboratorUpdate,
+    context: AdminContextDep,
+    session: SessionDep,
+) -> CollaboratorRead:
+    return await update_collaborator(session, context, collaborator_id, payload)
+
+
+@router.post(
+    "/collaborators/{collaborator_id}/credential",
+    response_model=CollaboratorRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def post_collaborator_credential(
+    collaborator_id: UUID,
+    payload: CollaboratorCredentialCreate,
+    context: AdminContextDep,
+    session: SessionDep,
+) -> CollaboratorRead:
+    return await create_collaborator_credential(session, context, collaborator_id, payload)
+
+
 @router.post("/auth/change-password", status_code=status.HTTP_204_NO_CONTENT)
 async def post_change_password(
     payload: ChangePasswordRequest,
@@ -107,6 +183,7 @@ async def post_change_password(
                 Role.TECNICO.value,
                 Role.MANUTENCAO.value,
                 Role.CLIENTE.value,
+                allow_password_change_pending=True,
             )
         ),
     ],

@@ -1,14 +1,32 @@
-from uuid import UUID
+import asyncio
+from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.models.audit import AuditEvent
 from app.models.base import Base
-from app.models.operations import Asset, AssetType, Client, Development, Station
+from app.models.identity import Role
+from app.models.operations import (
+    Asset,
+    AssetType,
+    Client,
+    ClientDevelopmentContact,
+    ContactScope,
+    ContractingParty,
+    Development,
+    ProcessUnit,
+    ProcessUnitType,
+    Station,
+)
 from app.modules.auth.dependencies import AuthContext
+from app.services.storage import get_storage
+
+FACADE_PHOTO_TYPES = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
+FACADE_PHOTO_MAX_BYTES = 10 * 1024 * 1024
 
 
 async def tenant_get_or_404[ModelT: Base](
@@ -66,7 +84,27 @@ async def list_tenant_objects[ModelT: Base](
     return list((await session.execute(stmt)).scalars().all())
 
 
+async def ensure_client_document_is_unique(
+    session: AsyncSession,
+    tenant_id: UUID,
+    document: str | None,
+    *,
+    ignore_id: UUID | None = None,
+) -> None:
+    if not document:
+        return
+    stmt = select(Client.id).where(Client.tenant_id == tenant_id, Client.document == document)
+    if ignore_id is not None:
+        stmt = stmt.where(Client.id != ignore_id)
+    if (await session.execute(stmt)).first() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="client_document_already_exists",
+        )
+
+
 async def create_client(session: AsyncSession, context: AuthContext, payload) -> Client:
+    await ensure_client_document_is_unique(session, context.tenant.id, payload.document)
     client = Client(tenant_id=context.tenant.id, **payload.model_dump())
     session.add(client)
     await session.flush()
@@ -76,11 +114,431 @@ async def create_client(session: AsyncSession, context: AuthContext, payload) ->
     return client
 
 
+async def list_client_contacts(
+    session: AsyncSession,
+    tenant_id: UUID,
+    *,
+    client_id: UUID | None = None,
+    development_id: UUID | None = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> list[ClientDevelopmentContact]:
+    stmt = select(ClientDevelopmentContact).where(
+        ClientDevelopmentContact.tenant_id == tenant_id
+    )
+    if client_id is not None:
+        stmt = stmt.where(ClientDevelopmentContact.client_id == client_id)
+    if development_id is not None:
+        stmt = stmt.where(ClientDevelopmentContact.development_id == development_id)
+    stmt = (
+        stmt.order_by(ClientDevelopmentContact.created_at, ClientDevelopmentContact.id)
+        .limit(limit)
+        .offset(offset)
+    )
+    return list((await session.execute(stmt)).scalars().all())
+
+
+PORTAL_ADMIN_ROLES = {Role.SUPERADMIN.value, Role.ADMIN.value}
+
+
+def _require_portal_admin(context: AuthContext) -> None:
+    if context.membership.role not in PORTAL_ADMIN_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="portal_access_requires_admin",
+        )
+
+
+async def set_primary_contact(
+    session: AsyncSession,
+    development: Development,
+    client_id: UUID,
+) -> None:
+    """Mantem uma unica responsabilidade principal, igual a developments.client_id."""
+    rows = list(
+        (
+            await session.execute(
+                select(ClientDevelopmentContact).where(
+                    ClientDevelopmentContact.tenant_id == development.tenant_id,
+                    ClientDevelopmentContact.development_id == development.id,
+                )
+            )
+        ).scalars()
+    )
+    for row in rows:
+        if row.is_primary and row.client_id != client_id:
+            # O antigo principal segue como responsavel, mas sem visao no portal.
+            row.is_primary = False
+            row.portal_access = False
+    # Libera o indice de principal unico antes de promover o novo.
+    await session.flush()
+
+    current = next((row for row in rows if row.is_primary and row.client_id == client_id), None)
+    if current is not None:
+        return
+    general = next(
+        (
+            row
+            for row in rows
+            if row.client_id == client_id and row.scope == ContactScope.GERAL.value
+        ),
+        None,
+    )
+    if general is None:
+        session.add(
+            ClientDevelopmentContact(
+                tenant_id=development.tenant_id,
+                client_id=client_id,
+                development_id=development.id,
+                scope=ContactScope.GERAL.value,
+                is_primary=True,
+            )
+        )
+    else:
+        general.is_primary = True
+        general.is_active = True
+    await session.flush()
+
+
+async def ensure_development_document_is_unique(
+    session: AsyncSession,
+    tenant_id: UUID,
+    document: str | None,
+    *,
+    ignore_id: UUID | None = None,
+) -> None:
+    if not document:
+        return
+    stmt = select(Development.id).where(
+        Development.tenant_id == tenant_id, Development.document == document
+    )
+    if ignore_id is not None:
+        stmt = stmt.where(Development.id != ignore_id)
+    if (await session.execute(stmt)).first() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="development_document_already_exists",
+        )
+
+
+async def update_development(
+    session: AsyncSession,
+    context: AuthContext,
+    development: Development,
+    payload: BaseModel,
+) -> Development:
+    changes = payload.model_dump(exclude_unset=True)
+    await ensure_development_document_is_unique(
+        session, context.tenant.id, changes.get("document"), ignore_id=development.id
+    )
+    new_client_id = changes.get("client_id")
+    if new_client_id is not None and new_client_id != development.client_id:
+        await set_primary_contact(session, development, new_client_id)
+    return await update_object(
+        session,
+        context,
+        development,
+        payload,
+        action="DEVELOPMENT_UPDATE",
+        entity_type="development",
+    )
+
+
+def _facade_photo_prefix(development: Development) -> str:
+    return f"{development.tenant_id}/developments/{development.id}/facade-"
+
+
+def _validate_facade_photo(content_type: str | None, size_bytes: int) -> None:
+    if content_type not in FACADE_PHOTO_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="unsupported_facade_photo_type",
+        )
+    if size_bytes > FACADE_PHOTO_MAX_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="facade_photo_too_large",
+        )
+
+
+def presign_facade_photo(development: Development, payload) -> dict:
+    """Devolve a URL para o navegador enviar a foto direto ao object storage."""
+    _validate_facade_photo(payload.content_type, payload.size_bytes)
+    object_key = (
+        _facade_photo_prefix(development) + uuid4().hex + FACADE_PHOTO_TYPES[payload.content_type]
+    )
+    upload_url = get_storage().presign_put(
+        object_key=object_key, content_type=payload.content_type
+    )
+    return {
+        "upload_url": upload_url,
+        "object_key": object_key,
+        "expires_in": settings.s3_presign_seconds,
+        "required_headers": {"Content-Type": payload.content_type},
+    }
+
+
+async def complete_facade_photo(
+    session: AsyncSession,
+    context: AuthContext,
+    development: Development,
+    object_key: str,
+) -> Development:
+    # A chave precisa ser do proprio empreendimento: impede apontar para arquivo de outro tenant.
+    if not object_key.startswith(_facade_photo_prefix(development)):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="invalid_facade_photo_key",
+        )
+    storage = get_storage()
+    metadata = await asyncio.to_thread(storage.object_metadata, object_key=object_key)
+    if metadata is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="facade_photo_not_uploaded"
+        )
+    try:
+        _validate_facade_photo(
+            metadata.get("ContentType"), int(metadata.get("ContentLength", 0))
+        )
+    except HTTPException:
+        await asyncio.to_thread(storage.delete_object, object_key=object_key)
+        raise
+
+    previous_key = development.facade_photo_key
+    development.facade_photo_key = object_key
+    development.facade_photo_content_type = metadata.get("ContentType")
+    add_audit(
+        session,
+        context,
+        action="DEVELOPMENT_FACADE_PHOTO_SET",
+        entity_type="development",
+        entity_id=development.id,
+    )
+    await session.commit()
+    await session.refresh(development)
+    if previous_key and previous_key != object_key:
+        await asyncio.to_thread(storage.delete_object, object_key=previous_key)
+    return development
+
+
+def facade_photo_url(development: Development) -> dict:
+    if development.facade_photo_key is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not_found")
+    return {
+        "url": get_storage().presign_get(object_key=development.facade_photo_key),
+        "expires_in": settings.s3_presign_seconds,
+    }
+
+
+async def remove_facade_photo(
+    session: AsyncSession, context: AuthContext, development: Development
+) -> Development:
+    previous_key = development.facade_photo_key
+    if previous_key is None:
+        return development
+    development.facade_photo_key = None
+    development.facade_photo_content_type = None
+    add_audit(
+        session,
+        context,
+        action="DEVELOPMENT_FACADE_PHOTO_REMOVE",
+        entity_type="development",
+        entity_id=development.id,
+    )
+    await session.commit()
+    await session.refresh(development)
+    await asyncio.to_thread(get_storage().delete_object, object_key=previous_key)
+    return development
+
+
+async def _ensure_client_contact_is_unique(
+    session: AsyncSession,
+    tenant_id: UUID,
+    *,
+    client_id: UUID,
+    development_id: UUID,
+    scope: str,
+    ignore_id: UUID | None = None,
+) -> None:
+    stmt = select(ClientDevelopmentContact.id).where(
+        ClientDevelopmentContact.tenant_id == tenant_id,
+        ClientDevelopmentContact.client_id == client_id,
+        ClientDevelopmentContact.development_id == development_id,
+        ClientDevelopmentContact.scope == scope,
+    )
+    if ignore_id is not None:
+        stmt = stmt.where(ClientDevelopmentContact.id != ignore_id)
+    if (await session.execute(stmt)).first() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="client_contact_already_exists",
+        )
+
+
+async def create_client_contact(
+    session: AsyncSession, context: AuthContext, payload
+) -> ClientDevelopmentContact:
+    await tenant_get_or_404(session, Client, context.tenant.id, payload.client_id)
+    await tenant_get_or_404(session, Development, context.tenant.id, payload.development_id)
+    await _ensure_client_contact_is_unique(
+        session,
+        context.tenant.id,
+        client_id=payload.client_id,
+        development_id=payload.development_id,
+        scope=payload.scope.value,
+    )
+    if payload.portal_access:
+        _require_portal_admin(context)
+    contact = ClientDevelopmentContact(
+        tenant_id=context.tenant.id,
+        client_id=payload.client_id,
+        development_id=payload.development_id,
+        scope=payload.scope.value,
+        portal_access=payload.portal_access,
+    )
+    session.add(contact)
+    await session.flush()
+    add_audit(
+        session,
+        context,
+        action="CLIENT_CONTACT_CREATE",
+        entity_type="client_development_contact",
+        entity_id=contact.id,
+    )
+    await session.commit()
+    await session.refresh(contact)
+    return contact
+
+
+async def update_client_contact(
+    session: AsyncSession,
+    context: AuthContext,
+    contact: ClientDevelopmentContact,
+    payload: BaseModel,
+) -> ClientDevelopmentContact:
+    changes = payload.model_dump(exclude_unset=True, exclude_none=True)
+    if changes.get("is_active") is False:
+        if contact.is_primary:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="primary_contact_cannot_be_deactivated",
+            )
+        # Quem deixa de responder pelo empreendimento perde a visao no portal.
+        changes["portal_access"] = False
+    if changes.get("portal_access") is True and not contact.portal_access:
+        # Revogar e livre para quem cadastra; conceder exige administrador.
+        _require_portal_admin(context)
+    if "scope" in changes:
+        changes["scope"] = changes["scope"].value
+        await _ensure_client_contact_is_unique(
+            session,
+            context.tenant.id,
+            client_id=contact.client_id,
+            development_id=contact.development_id,
+            scope=changes["scope"],
+            ignore_id=contact.id,
+        )
+    for field, value in changes.items():
+        setattr(contact, field, value)
+    if changes:
+        add_audit(
+            session,
+            context,
+            action="CLIENT_CONTACT_UPDATE",
+            entity_type="client_development_contact",
+            entity_id=contact.id,
+            fields=sorted(changes),
+        )
+        await session.commit()
+        await session.refresh(contact)
+    return contact
+
+
+async def ensure_contracting_party_document_is_unique(
+    session: AsyncSession,
+    tenant_id: UUID,
+    document: str | None,
+    *,
+    ignore_id: UUID | None = None,
+) -> None:
+    if not document:
+        return
+    stmt = select(ContractingParty.id).where(
+        ContractingParty.tenant_id == tenant_id, ContractingParty.document == document
+    )
+    if ignore_id is not None:
+        stmt = stmt.where(ContractingParty.id != ignore_id)
+    if (await session.execute(stmt)).first() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="contracting_party_document_already_exists",
+        )
+
+
+async def create_contracting_party(
+    session: AsyncSession, context: AuthContext, payload
+) -> ContractingParty:
+    await ensure_contracting_party_document_is_unique(
+        session, context.tenant.id, payload.document
+    )
+    data = payload.model_dump()
+    data["person_type"] = payload.person_type.value
+    party = ContractingParty(tenant_id=context.tenant.id, **data)
+    session.add(party)
+    await session.flush()
+    add_audit(
+        session,
+        context,
+        action="CONTRACTING_PARTY_CREATE",
+        entity_type="contracting_party",
+        entity_id=party.id,
+    )
+    await session.commit()
+    await session.refresh(party)
+    return party
+
+
+async def update_contracting_party(
+    session: AsyncSession,
+    context: AuthContext,
+    party: ContractingParty,
+    payload: BaseModel,
+) -> ContractingParty:
+    changes = payload.model_dump(exclude_unset=True)
+    await ensure_contracting_party_document_is_unique(
+        session, context.tenant.id, changes.get("document"), ignore_id=party.id
+    )
+    if changes.get("person_type") is not None:
+        changes["person_type"] = changes["person_type"].value
+    for field, value in changes.items():
+        setattr(party, field, value)
+    if changes:
+        add_audit(
+            session,
+            context,
+            action="CONTRACTING_PARTY_UPDATE",
+            entity_type="contracting_party",
+            entity_id=party.id,
+            fields=sorted(changes),
+        )
+        await session.commit()
+        await session.refresh(party)
+    return party
+
+
 async def create_development(session: AsyncSession, context: AuthContext, payload) -> Development:
     await tenant_get_or_404(session, Client, context.tenant.id, payload.client_id)
+    if payload.contracting_party_id is not None:
+        await tenant_get_or_404(
+            session, ContractingParty, context.tenant.id, payload.contracting_party_id
+        )
+    await ensure_development_document_is_unique(
+        session, context.tenant.id, payload.document
+    )
     development = Development(tenant_id=context.tenant.id, **payload.model_dump())
     session.add(development)
     await session.flush()
+    await set_primary_contact(session, development, development.client_id)
     add_audit(
         session,
         context,
@@ -125,6 +583,12 @@ async def create_asset_type(session: AsyncSession, context: AuthContext, payload
 async def create_asset(session: AsyncSession, context: AuthContext, payload) -> Asset:
     await tenant_get_or_404(session, Station, context.tenant.id, payload.station_id)
     await tenant_get_or_404(session, AssetType, context.tenant.id, payload.asset_type_id)
+    await ensure_unit_belongs_to_station(
+        session,
+        context.tenant.id,
+        station_id=payload.station_id,
+        process_unit_id=payload.process_unit_id,
+    )
     data = payload.model_dump()
     data["status"] = payload.status.value
     asset = Asset(tenant_id=context.tenant.id, **data)
@@ -164,6 +628,194 @@ async def update_object[ModelT: Base](
     return obj
 
 
+async def _ensure_unique_name(
+    session: AsyncSession,
+    model,
+    *filters,
+    detail: str,
+    ignore_id: UUID | None = None,
+) -> None:
+    stmt = select(model.id).where(*filters)
+    if ignore_id is not None:
+        stmt = stmt.where(model.id != ignore_id)
+    if (await session.execute(stmt)).first() is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
+
+
+async def _ensure_unit_type_is_unique(
+    session: AsyncSession,
+    tenant_id: UUID,
+    *,
+    name: str | None,
+    code: str | None,
+    ignore_id: UUID | None = None,
+) -> None:
+    if name:
+        await _ensure_unique_name(
+            session,
+            ProcessUnitType,
+            ProcessUnitType.tenant_id == tenant_id,
+            ProcessUnitType.name == name,
+            detail="process_unit_type_name_already_exists",
+            ignore_id=ignore_id,
+        )
+    if code:
+        await _ensure_unique_name(
+            session,
+            ProcessUnitType,
+            ProcessUnitType.tenant_id == tenant_id,
+            ProcessUnitType.code == code,
+            detail="process_unit_type_code_already_exists",
+            ignore_id=ignore_id,
+        )
+
+
+async def create_process_unit_type(
+    session: AsyncSession, context: AuthContext, payload
+) -> ProcessUnitType:
+    await _ensure_unit_type_is_unique(
+        session, context.tenant.id, name=payload.name, code=payload.code
+    )
+    unit_type = ProcessUnitType(tenant_id=context.tenant.id, **payload.model_dump())
+    session.add(unit_type)
+    await session.flush()
+    add_audit(
+        session,
+        context,
+        action="PROCESS_UNIT_TYPE_CREATE",
+        entity_type="process_unit_type",
+        entity_id=unit_type.id,
+    )
+    await session.commit()
+    await session.refresh(unit_type)
+    return unit_type
+
+
+async def update_process_unit_type(
+    session: AsyncSession,
+    context: AuthContext,
+    unit_type: ProcessUnitType,
+    payload: BaseModel,
+) -> ProcessUnitType:
+    changes = payload.model_dump(exclude_unset=True)
+    await _ensure_unit_type_is_unique(
+        session,
+        context.tenant.id,
+        name=changes.get("name"),
+        code=changes.get("code"),
+        ignore_id=unit_type.id,
+    )
+    return await update_object(
+        session,
+        context,
+        unit_type,
+        payload,
+        action="PROCESS_UNIT_TYPE_UPDATE",
+        entity_type="process_unit_type",
+    )
+
+
+async def create_process_unit(
+    session: AsyncSession, context: AuthContext, payload
+) -> ProcessUnit:
+    await tenant_get_or_404(session, Station, context.tenant.id, payload.station_id)
+    await tenant_get_or_404(session, ProcessUnitType, context.tenant.id, payload.unit_type_id)
+    await _ensure_unique_name(
+        session,
+        ProcessUnit,
+        ProcessUnit.tenant_id == context.tenant.id,
+        ProcessUnit.station_id == payload.station_id,
+        ProcessUnit.name == payload.name,
+        detail="process_unit_name_already_exists",
+    )
+    unit = ProcessUnit(tenant_id=context.tenant.id, **payload.model_dump())
+    session.add(unit)
+    await session.flush()
+    add_audit(
+        session,
+        context,
+        action="PROCESS_UNIT_CREATE",
+        entity_type="process_unit",
+        entity_id=unit.id,
+    )
+    await session.commit()
+    await session.refresh(unit)
+    return unit
+
+
+async def update_process_unit(
+    session: AsyncSession,
+    context: AuthContext,
+    unit: ProcessUnit,
+    payload: BaseModel,
+) -> ProcessUnit:
+    changes = payload.model_dump(exclude_unset=True)
+    if changes.get("unit_type_id") is not None:
+        await tenant_get_or_404(
+            session, ProcessUnitType, context.tenant.id, changes["unit_type_id"]
+        )
+    if changes.get("name"):
+        await _ensure_unique_name(
+            session,
+            ProcessUnit,
+            ProcessUnit.tenant_id == context.tenant.id,
+            ProcessUnit.station_id == unit.station_id,
+            ProcessUnit.name == changes["name"],
+            detail="process_unit_name_already_exists",
+            ignore_id=unit.id,
+        )
+    return await update_object(
+        session,
+        context,
+        unit,
+        payload,
+        action="PROCESS_UNIT_UPDATE",
+        entity_type="process_unit",
+    )
+
+
+async def ensure_unit_belongs_to_station(
+    session: AsyncSession,
+    tenant_id: UUID,
+    *,
+    station_id: UUID,
+    process_unit_id: UUID | None,
+) -> None:
+    """O equipamento so pode ficar numa unidade da propria estacao."""
+    if process_unit_id is None:
+        return
+    unit = await tenant_get_or_404(session, ProcessUnit, tenant_id, process_unit_id)
+    if unit.station_id != station_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="process_unit_not_in_station",
+        )
+
+
+async def update_asset(
+    session: AsyncSession,
+    context: AuthContext,
+    asset: Asset,
+    payload: BaseModel,
+) -> Asset:
+    changes = payload.model_dump(exclude_unset=True)
+    if "station_id" in changes or "process_unit_id" in changes:
+        await ensure_unit_belongs_to_station(
+            session,
+            context.tenant.id,
+            station_id=changes.get("station_id") or asset.station_id,
+            process_unit_id=changes.get("process_unit_id", asset.process_unit_id),
+        )
+    return await update_object(
+        session,
+        context,
+        asset,
+        payload,
+        action="ASSET_UPDATE",
+        entity_type="asset",
+    )
+
+
 async def validate_update_parents(
     session: AsyncSession,
     context: AuthContext,
@@ -172,6 +824,10 @@ async def validate_update_parents(
     changes = payload.model_dump(exclude_unset=True)
     if changes.get("client_id") is not None:
         await tenant_get_or_404(session, Client, context.tenant.id, changes["client_id"])
+    if changes.get("contracting_party_id") is not None:
+        await tenant_get_or_404(
+            session, ContractingParty, context.tenant.id, changes["contracting_party_id"]
+        )
     if changes.get("development_id") is not None:
         await tenant_get_or_404(
             session, Development, context.tenant.id, changes["development_id"]

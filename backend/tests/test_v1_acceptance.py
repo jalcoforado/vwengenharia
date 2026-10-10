@@ -29,7 +29,7 @@ async def test_v1_complete_operational_journey() -> None:
 
     session_factory = get_session_factory()
     async with session_factory() as session:
-        tenant = Tenant(name=f"VW Acceptance {suffix}", slug=f"vw-accept-{suffix}")
+        tenant = Tenant(name=f"MW Acceptance {suffix}", slug=f"mw-accept-{suffix}")
         admin = User(
             email=admin_email,
             name="Gestor Acceptance",
@@ -345,6 +345,18 @@ async def test_v1_complete_operational_journey() -> None:
             json={"decision": "APROVAR", "notes": "Visita conferida."},
         )
         assert review.status_code == 200
+
+        report = await http.get(
+            f"/api/v1/reports/visits/{visit_id}.html",
+            headers=admin_headers,
+        )
+        assert report.status_code == 200
+        assert report.headers["content-type"].startswith("text/html")
+        assert "Relatório de visita técnica" in report.text
+        assert f"ETE Acceptance {suffix}" in report.text
+        assert "Grade limpa?" in report.text
+        assert "FALHA_EQUIPAMENTO" in report.text
+        assert "APROVAR" in report.text
 
         station_view = await http.get(
             f"/api/v1/stations/{station_id}/overview",

@@ -37,7 +37,7 @@ $Compose = @(
   "-f", "docker-compose.homologation.yml"
 )
 
-Write-Host "Subindo VW Engenharia ERP - Homologacao..." -ForegroundColor Cyan
+Write-Host "Subindo MW Engenharia ERP - Homologacao..." -ForegroundColor Cyan
 & docker @Compose up -d --build postgres redis s3mock migrate backend frontend
 if ($LASTEXITCODE -ne 0) {
   throw "Falha ao subir a pilha de homologacao."
@@ -97,7 +97,7 @@ $MaintEmail = if ($envMap.ContainsKey("HOMOLOGATION_MAINTENANCE_EMAIL")) {
 $Password = if ($envMap.ContainsKey("HOMOLOGATION_PASSWORD")) {
   $envMap["HOMOLOGATION_PASSWORD"]
 } else {
-  "Homologacao-VW-2026!"
+  "Homologacao-MW-2026!"
 }
 
 $loginBody = @{
@@ -117,7 +117,7 @@ if (-not ($stations | Where-Object { $_.code -eq "ETE-HML-001" })) {
 }
 
 Write-Host ""
-Write-Host "VW Engenharia ERP esta pronto para homologacao." -ForegroundColor Green
+Write-Host "MW Engenharia ERP esta pronto para homologacao." -ForegroundColor Green
 Write-Host "Endereco: $BaseUrl" -ForegroundColor Green
 Write-Host ""
 Write-Host "Usuarios demonstrativos:"
