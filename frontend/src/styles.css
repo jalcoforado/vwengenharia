@@ -2286,3 +2286,18 @@ button:not(:disabled):active { transform: translateY(1px); }
 @media (max-width: 600px) {
   .asset-situation-row { grid-template-columns: 1fr; }
 }
+
+/* Consulta do empreendimento */
+.development-details { gap: 16px; }
+.development-details section { display: grid; gap: 8px; min-width: 0; }
+.development-details section + section { padding-top: 14px; border-top: 1px solid var(--mw-border); }
+.detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px 18px; margin: 0; }
+.detail-field { display: grid; gap: 2px; min-width: 0; }
+.detail-field dt { color: var(--mw-text-secondary); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.detail-field dd { margin: 0; color: var(--mw-text); font-size: 14px; overflow-wrap: anywhere; }
+.detail-field a { color: var(--mw-primary); font-weight: 650; }
+.detail-note { margin: 0; color: var(--mw-text-secondary); font-size: 13px; }
+.detail-photo img {
+  display: block; width: 220px; max-width: 100%; height: 140px; object-fit: cover;
+  border: 1px solid var(--mw-border); border-radius: var(--mw-radius-md);
+}

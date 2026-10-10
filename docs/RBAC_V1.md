@@ -13,7 +13,7 @@ A MW trabalha com quatro cadastros:
 - **Contratantes**: quem assina com a MW (PF ou PJ, com CPF/CNPJ). Um contratante pode ter varios empreendimentos (tabela `contracting_parties`).
 - **Colaboradores**: quem trabalha na MW (diretoria, backoffice, tecnicos). A credencial de acesso e opcional.
 - **Responsaveis**: pessoas fisicas ou juridicas que respondem por um ou mais empreendimentos (tabela `clients`).
-- **Empreendimentos**: os locais atendidos, cada um ligado a um contratante e com um responsavel principal.
+- **Empreendimentos**: os locais atendidos, sempre com um responsavel principal ja cadastrado e, opcionalmente, outros responsaveis. O contratante e opcional: sem ele, o responsavel principal responde pelo contrato.
 
 Regras de credencial:
 

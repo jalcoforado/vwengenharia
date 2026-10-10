@@ -282,7 +282,7 @@ export default function ContractingPartyAdmin({
           ))}
           {parties.length === 0 && (
             <div className="empty-state">
-              Nenhum contratante cadastrado. Comece por aqui: o contratante é exigido no cadastro do empreendimento.
+              Nenhum contratante cadastrado. Ele é opcional: sem contratante, o responsável principal do empreendimento responde pelo contrato.
             </div>
           )}
           {parties.length > 0 && visible.length === 0 && (

@@ -5,6 +5,7 @@ import { api } from "../lib/api";
 import { Avatar, RowMenu, TableHead, useFormPanel, useRowMenu, useSort, type RowMenuItem } from "./AdminTable";
 import CollaboratorAdmin from "./CollaboratorAdmin";
 import ContractingPartyAdmin, { contractingPartyLabel, type ContractingPartyRecord } from "./ContractingPartyAdmin";
+import DevelopmentDetails from "./DevelopmentDetails";
 import ProcessUnitAdmin, { type ProcessUnitRecord } from "./ProcessUnitAdmin";
 import { formatDocument, isValidCpfCnpj, normalizeDocument } from "../lib/document";
 import { optimizeEvidenceImage } from "../lib/media";
@@ -193,7 +194,7 @@ export default function OperationalAdmin({
           <span className="eyebrow">Administração operacional</span>
           <h2>Estrutura da operação</h2>
           <p className="section-copy">
-            Colaboradores são a equipe da MW. Cadastre o contratante (quem assina com a MW) e o responsável, depois o empreendimento (o local atendido), suas estações, as unidades de cada estação e os ativos.
+            Colaboradores são a equipe da MW. Cadastre o responsável e, quando houver, o contratante (quem assina com a MW); depois o empreendimento (o local atendido), suas estações, as unidades de cada estação e os ativos.
           </p>
         </div>
         <div className="admin-summary">
@@ -245,7 +246,13 @@ export default function OperationalAdmin({
         />
       )}
       {tab === "EMPREENDIMENTOS" && (
-        <DevelopmentAdmin clients={clients} parties={parties} developments={developments} onChanged={onChanged} />
+        <DevelopmentAdmin
+          clients={clients}
+          parties={parties}
+          developments={developments}
+          stations={stations}
+          onChanged={onChanged}
+        />
       )}
       {tab === "ESTACOES" && (
         <StationAdmin
@@ -776,11 +783,13 @@ function DevelopmentAdmin({
   clients,
   parties,
   developments,
+  stations,
   onChanged,
 }: {
   clients: ClientRecord[];
   parties: ContractingPartyRecord[];
   developments: DevelopmentRecord[];
+  stations: AdminStation[];
   onChanged: () => Promise<void>;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -808,6 +817,7 @@ function DevelopmentAdmin({
   const [rowFeedback, setRowFeedback] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [search, setSearch] = useState("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const { sortKey, sortAsc, toggleSort, sortBy } = useSort<DevelopmentSortKey>("name");
   const { menu, openMenu, closeMenu } = useRowMenu();
   const panel = useFormPanel();
@@ -821,7 +831,7 @@ function DevelopmentAdmin({
 
   function summary(item: DevelopmentRecord): string {
     return [
-      partyName(item) ? "Contratante: " + partyName(item) : "Sem contratante",
+      partyName(item) ? "Contratante: " + partyName(item) : "Contrato com o responsável principal",
       "Responsável principal: " + (clientMap.get(item.client_id)?.name ?? "não encontrado"),
       [item.city, item.state].filter(Boolean).join("/"),
     ].filter(Boolean).join(" · ");
@@ -975,7 +985,6 @@ function DevelopmentAdmin({
 
   async function save() {
     if (name.trim().length < 2) return setFeedback("Informe o nome do empreendimento.");
-    if (!partyId) return setFeedback("Selecione o contratante.");
     if (!clientId) return setFeedback("Selecione o responsável principal.");
     if (contactPhone.trim() && !isCompletePhone(contactPhone)) {
       return setFeedback("Telefone incompleto. Informe DDD e número.");
@@ -1006,7 +1015,7 @@ function DevelopmentAdmin({
         body: JSON.stringify({
           client_id: clientId,
           name: name.trim(),
-          contracting_party_id: partyId,
+          contracting_party_id: partyId || null,
           contact_phone: contactPhone.trim() || null,
           contact_email: contactEmail.trim() || null,
           development_type: developmentType,
@@ -1058,6 +1067,7 @@ function DevelopmentAdmin({
   const menuItem = menu ? developments.find((item) => item.id === menu.id) : undefined;
   const menuItems: RowMenuItem[] = menuItem
     ? [
+        { text: expandedId === menuItem.id ? "Fechar consulta" : "Consultar", run: () => setExpandedId(expandedId === menuItem.id ? null : menuItem.id) },
         { text: "Editar", run: () => startEdit(menuItem) },
         { text: menuItem.is_active ? "Inativar" : "Reativar", run: () => void toggle(menuItem), danger: menuItem.is_active },
       ]
@@ -1077,9 +1087,9 @@ function DevelopmentAdmin({
               {developmentType && !DEVELOPMENT_TYPES.includes(developmentType) && <option value={developmentType}>{developmentType} (cadastro antigo)</option>}
             </select>
           </label>
-          <label><span>Contratante <b className="required-mark">*</b></span>
-            <select required aria-required="true" value={partyId} onChange={(e) => setPartyId(e.target.value)}>
-              <option value="">Selecione</option>
+          <label>Contratante
+            <select value={partyId} onChange={(e) => setPartyId(e.target.value)}>
+              <option value="">Sem contratante (o responsável principal responde pelo contrato)</option>
               {parties.filter((x) => x.is_active || x.id === partyId).map((x) => (
                 <option key={x.id} value={x.id}>{contractingPartyLabel(x)}{x.document ? " · " + formatDocument(x.document) : ""}</option>
               ))}
@@ -1170,6 +1180,15 @@ function DevelopmentAdmin({
                   <span className={item.is_active ? "collab-status active" : "collab-status"}>{item.is_active ? "Ativo" : "Inativo"}</span>
                 </div>
                 <div className="collab-actions" role="cell">
+                  <button
+                    className={expandedId === item.id ? "icon-action icon-action-on" : "icon-action"}
+                    title={expandedId === item.id ? "Fechar consulta" : "Consultar"}
+                    aria-label={(expandedId === item.id ? "Fechar consulta: " : "Consultar: ") + item.name}
+                    aria-expanded={expandedId === item.id}
+                    onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
+                  >
+                    <Eye size={16} />
+                  </button>
                   <button className="icon-action icon-action-edit" disabled={busy} title="Editar" aria-label={"Editar: " + item.name} onClick={() => startEdit(item)}>
                     <Pencil size={16} />
                   </button>
@@ -1186,11 +1205,19 @@ function DevelopmentAdmin({
                   </button>
                 </div>
               </div>
+              {expandedId === item.id && (
+                <DevelopmentDetails
+                  development={item}
+                  party={item.contracting_party_id ? partyMap.get(item.contracting_party_id) : undefined}
+                  clients={clients}
+                  stationNames={stations.filter((station) => station.development_id === item.id && station.is_active).map((station) => station.name)}
+                />
+              )}
             </div>
           ))}
           {developments.length === 0 && (
             <div className="empty-state">
-              Nenhum empreendimento cadastrado. Cadastre primeiro o contratante e o responsável principal, nas abas ao lado.
+              Nenhum empreendimento cadastrado. Cadastre primeiro o responsável principal, na aba Responsáveis.
             </div>
           )}
           {developments.length > 0 && visible.length === 0 && (
