@@ -44,7 +44,7 @@ async def stage_file(tenant_id: str, file_path: Path, sheet_name: str) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Stage legacy VW Engenharia visits from XLSX without normalizing them."
+        description="Stage legacy MW Engenharia visits from XLSX without normalizing them."
     )
     parser.add_argument("--tenant-id", required=True)
     parser.add_argument("--file", required=True, type=Path)

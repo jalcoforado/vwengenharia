@@ -25,7 +25,7 @@ echo "Waiting for readiness..."
 wait_for "${BASE_URL}/ready"
 
 echo "Checking SPA..."
-curl -fsS "${BASE_URL}/" | grep -q "VW Engenharia"
+curl -fsS "${BASE_URL}/" | grep -q "MW Engenharia"
 
 echo "Checking login..."
 LOGIN_BODY=$(printf '{"email":"%s","password":"%s"}' "$ADMIN_EMAIL" "$PASSWORD")

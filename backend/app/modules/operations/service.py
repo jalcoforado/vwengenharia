@@ -607,7 +607,7 @@ async def operational_alerts(
                 "kind": "VISIT_OVERDUE",
                 "severity": "ALTA",
                 "title": "Visita atrasada",
-                "message": "Visita programada ainda nao foi iniciada.",
+                "message": "Visita programada ainda não foi iniciada.",
                 "entity_type": "visit",
                 "entity_id": visit.id,
                 "due_at": visit.scheduled_for,
@@ -656,7 +656,7 @@ async def operational_alerts(
             {
                 "kind": "MAINTENANCE_OVERDUE",
                 "severity": "ALTA",
-                "title": "Manutencao preventiva vencida",
+                "title": "Manutenção preventiva vencida",
                 "message": plan.instructions or "Plano preventivo vencido.",
                 "entity_type": "maintenance_plan",
                 "entity_id": plan.id,
@@ -679,8 +679,8 @@ async def operational_alerts(
             {
                 "kind": "VISIT_REVIEW",
                 "severity": "MEDIA",
-                "title": "Visita aguardando revisao",
-                "message": "Dados de campo aguardam validacao da supervisao.",
+                "title": "Visita aguardando revisão",
+                "message": "Dados de campo aguardam validação da supervisão.",
                 "entity_type": "visit",
                 "entity_id": visit.id,
                 "due_at": visit.finished_at,

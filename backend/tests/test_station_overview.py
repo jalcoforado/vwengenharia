@@ -26,7 +26,7 @@ async def test_station_overview_aggregates_only_selected_station() -> None:
 
     session_factory = get_session_factory()
     async with session_factory() as session:
-        tenant = Tenant(name=f"VW {suffix}", slug=f"vw-overview-{suffix}")
+        tenant = Tenant(name=f"MW {suffix}", slug=f"mw-overview-{suffix}")
         user = User(
             email=email,
             name="Gestor",

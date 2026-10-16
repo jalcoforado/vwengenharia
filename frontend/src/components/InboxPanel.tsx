@@ -35,7 +35,7 @@ export default function InboxPanel({ compact = false }: { compact?: boolean }) {
       <div className="section-heading">
         <div>
           <span className="eyebrow">Minha fila</span>
-          <h2>Pendencias que exigem sua acao</h2>
+          <h2>Pendências que exigem sua ação</h2>
         </div>
         <button className="text-button" disabled={busy} onClick={() => void load()}>
           {busy ? "Atualizando..." : "Atualizar"}
@@ -66,7 +66,7 @@ export default function InboxPanel({ compact = false }: { compact?: boolean }) {
           </div>
         ))}
         {!busy && items.length === 0 && (
-          <div className="empty-state">Nenhuma pendencia para voce agora.</div>
+          <div className="empty-state">Nenhuma pendência para você agora.</div>
         )}
       </div>
     </section>

@@ -1,6 +1,6 @@
-# VW Engenharia - ERP Operacional
+# MW Engenharia - ERP Operacional
 
-ERP/PWA mobile-first e offline-first para a operacao da VW Engenharia.
+ERP/PWA mobile-first e offline-first para a operacao da MW Engenharia.
 
 O produto cobre o ciclo:
 
@@ -205,4 +205,4 @@ A jornada integrada da V1 esta em `backend/tests/test_v1_acceptance.py`.
 - comparacoes e tendencias;
 - previsoes e insights gerenciais.
 
-O ERP VW Engenharia permanece focado em executar e registrar corretamente a operacao.
+O ERP MW Engenharia permanece focado em executar e registrar corretamente a operacao.

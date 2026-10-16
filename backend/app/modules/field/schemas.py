@@ -5,7 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.models.field import AnswerType, MeasurementStatus
+from app.models.field import AnswerType, AssetSituation, MeasurementStatus
 
 
 class ORMModel(BaseModel):
@@ -211,10 +211,40 @@ class BootstrapStation(ORMModel):
     station_type: str | None
 
 
+class AssetSituationUpsert(BaseModel):
+    asset_id: UUID
+    situation: AssetSituation
+    comment: str | None = Field(default=None, max_length=500)
+    client_operation_id: UUID | None = None
+
+    @model_validator(mode="after")
+    def validate_comment(self) -> "AssetSituationUpsert":
+        if self.situation == AssetSituation.OUTRO and not (self.comment or "").strip():
+            raise ValueError("comment is required when situation is OUTRO")
+        return self
+
+
+class AssetSituationRead(ORMModel):
+    id: UUID
+    visit_id: UUID
+    asset_id: UUID
+    situation: str
+    comment: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class BootstrapUnit(ORMModel):
+    id: UUID
+    station_id: UUID
+    name: str
+
+
 class BootstrapAsset(ORMModel):
     id: UUID
     station_id: UUID
     asset_type_id: UUID
+    process_unit_id: UUID | None
     name: str
     status: str
 
@@ -223,7 +253,9 @@ class FieldBootstrapResponse(BaseModel):
     generated_at: datetime
     visits: list[VisitRead]
     stations: list[BootstrapStation]
+    units: list[BootstrapUnit]
     assets: list[BootstrapAsset]
+    asset_situations: list[AssetSituationRead]
     templates: list[ChecklistTemplateRead]
     items: list[ChecklistItemRead]
     answers: list[VisitAnswerRead]

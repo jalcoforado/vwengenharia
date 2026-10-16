@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.modules.audit.router import router as audit_router
 from app.modules.auth.router import router as auth_router
+from app.modules.client_portal.router import router as client_portal_router
 from app.modules.core_registers.router import router as core_registers_router
 from app.modules.field.router import router as field_router
 from app.modules.inbox.router import router as inbox_router
@@ -17,6 +18,7 @@ from app.modules.team.router import router as team_router
 api_router = APIRouter()
 api_router.include_router(audit_router)
 api_router.include_router(auth_router)
+api_router.include_router(client_portal_router)
 api_router.include_router(core_registers_router)
 api_router.include_router(field_router)
 api_router.include_router(inbox_router)
@@ -32,4 +34,4 @@ api_router.include_router(team_router)
 
 @api_router.get("/status", tags=["system"])
 async def status() -> dict[str, str]:
-    return {"status": "ok", "service": "vwengenharia-api"}
+    return {"status": "ok", "service": "mwengenharia-api"}
