@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import { api } from "../lib/api";
 import type { ContractingPartyRecord } from "./ContractingPartyAdmin";
-import { Field } from "./DevelopmentDetails";
+import { DetailsHead, Field } from "./DevelopmentDetails";
 import { formatDocument } from "../lib/document";
 import { formatPhone } from "../lib/phone";
 
@@ -43,10 +43,12 @@ export function ContractingPartyDetails({
   party,
   developments,
   clients,
+  onEdit,
 }: {
   party: ContractingPartyRecord;
   developments: ListedDevelopment[];
   clients: ListedClient[];
+  onEdit?: () => void;
 }) {
   const clientMap = new Map(clients.map((item) => [item.id, item]));
   const contracted = developments
@@ -56,7 +58,7 @@ export function ContractingPartyDetails({
   return (
     <div className="client-contacts development-details">
       <section>
-        <span className="eyebrow">Contratante</span>
+        <DetailsHead title="Contratante" editLabel="Editar contratante" onEdit={onEdit} />
         <dl className="detail-grid">
           <Field label="Tipo de pessoa" value={party.person_type === "PJ" ? "Pessoa jurídica" : "Pessoa física"} />
           <Field label={party.person_type === "PJ" ? "Razão social" : "Nome completo"} value={party.name} />
@@ -130,11 +132,13 @@ export function ResponsibleDetails({
   developments,
   parties,
   showPortalLogin,
+  onEdit,
 }: {
   client: ResponsibleClient;
   developments: ListedDevelopment[];
   parties: ContractingPartyRecord[];
   showPortalLogin: boolean;
+  onEdit?: () => void;
 }) {
   const [contacts, setContacts] = useState<ResponsibleContact[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -202,7 +206,7 @@ export function ResponsibleDetails({
   return (
     <div className="client-contacts development-details">
       <section>
-        <span className="eyebrow">Responsável</span>
+        <DetailsHead title="Responsável" editLabel="Editar responsável" onEdit={onEdit} />
         <dl className="detail-grid">
           <Field label="Nome" value={client.name} />
           <Field label="Função" value={client.contact_role} />

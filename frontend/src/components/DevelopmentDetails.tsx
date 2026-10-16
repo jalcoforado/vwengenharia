@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Pencil } from "lucide-react";
 
 import { api } from "../lib/api";
 import { contractingPartyLabel, type ContractingPartyRecord } from "./ContractingPartyAdmin";
@@ -55,6 +56,20 @@ const SCOPE_LABELS: Record<string, string> = {
   ADMINISTRATIVO: "Administrativo",
 };
 
+// Titulo da primeira secao da consulta, com o atalho para editar o registro consultado.
+export function DetailsHead({ title, editLabel, onEdit }: { title: string; editLabel: string; onEdit?: () => void }) {
+  return (
+    <div className="details-head">
+      <span className="eyebrow">{title}</span>
+      {onEdit && (
+        <button className="secondary-button details-edit" type="button" onClick={onEdit}>
+          <Pencil size={15} />{editLabel}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function Field({ label, value }: { label: string; value: string | null | undefined }) {
   return (
     <div className="detail-field">
@@ -77,11 +92,13 @@ export default function DevelopmentDetails({
   party,
   clients,
   stationNames,
+  onEdit,
 }: {
   development: DetailDevelopment;
   party: ContractingPartyRecord | undefined;
   clients: DetailClient[];
   stationNames: string[];
+  onEdit?: () => void;
 }) {
   const [contacts, setContacts] = useState<DetailContact[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -140,7 +157,7 @@ export default function DevelopmentDetails({
   return (
     <div className="client-contacts development-details">
       <section>
-        <span className="eyebrow">Local atendido</span>
+        <DetailsHead title="Local atendido" editLabel="Editar empreendimento" onEdit={onEdit} />
         <dl className="detail-grid">
           <Field label="Tipo" value={development.development_type} />
           <Field label="Endereço" value={address} />

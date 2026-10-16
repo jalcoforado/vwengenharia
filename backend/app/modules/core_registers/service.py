@@ -3,7 +3,7 @@ from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import ColumnElement, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -100,6 +100,31 @@ async def ensure_client_document_is_unique(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="client_document_already_exists",
+        )
+
+
+async def ensure_no_active_development(
+    session: AsyncSession, tenant_id: UUID, link: ColumnElement[bool], *, detail: str
+) -> None:
+    linked = await session.scalar(
+        select(Development.id)
+        .where(Development.tenant_id == tenant_id, Development.is_active.is_(True), link)
+        .limit(1)
+    )
+    if linked is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
+
+
+async def ensure_client_can_be_inactivated(
+    session: AsyncSession, tenant_id: UUID, client: Client, is_active: bool | None
+) -> None:
+    # Responsavel principal de empreendimento ativo nao pode ser inativado.
+    if is_active is False and client.is_active:
+        await ensure_no_active_development(
+            session,
+            tenant_id,
+            Development.client_id == client.id,
+            detail="client_is_primary_of_active_developments",
         )
 
 
@@ -508,6 +533,14 @@ async def update_contracting_party(
     await ensure_contracting_party_document_is_unique(
         session, context.tenant.id, changes.get("document"), ignore_id=party.id
     )
+    # Contrato vigente: nao inativa enquanto houver empreendimento ativo ligado ao contratante.
+    if changes.get("is_active") is False and party.is_active:
+        await ensure_no_active_development(
+            session,
+            context.tenant.id,
+            Development.contracting_party_id == party.id,
+            detail="contracting_party_has_active_developments",
+        )
     if changes.get("person_type") is not None:
         changes["person_type"] = changes["person_type"].value
     for field, value in changes.items():

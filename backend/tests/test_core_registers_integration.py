@@ -134,6 +134,20 @@ async def test_core_registers_are_tenant_scoped_and_audited() -> None:
         assert station_assets.status_code == 200
         assert [item["id"] for item in station_assets.json()] == [asset.json()["id"]]
 
+        # Responsavel principal de empreendimento ativo so inativa depois do empreendimento.
+        still_primary = await http.patch(
+            f"/api/v1/clients/{client_id}",
+            headers=headers,
+            json={"is_active": False},
+        )
+        assert still_primary.status_code == 409
+        development_off = await http.patch(
+            f"/api/v1/developments/{development.json()['id']}",
+            headers=headers,
+            json={"is_active": False},
+        )
+        assert development_off.status_code == 200
+
         deactivated = await http.patch(
             f"/api/v1/clients/{client_id}",
             headers=headers,

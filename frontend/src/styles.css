@@ -2145,6 +2145,13 @@ button:not(:disabled):active { transform: translateY(1px); }
 .collab-person { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .collab-person > div { display: grid; gap: 2px; min-width: 0; }
 .collab-person strong { color: var(--mw-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.collab-name-button {
+  display: block; max-width: 100%; padding: 0; border: 0; border-radius: 4px; background: none;
+  color: inherit; font-weight: inherit; text-align: left;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.collab-name-button:hover, .collab-name-button[aria-expanded="true"] { color: var(--mw-primary); }
+.collab-name-button:hover { text-decoration: underline; text-underline-offset: 3px; }
 .collab-person span:not(.collab-avatar) {
   color: var(--mw-text-secondary); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
@@ -2290,6 +2297,16 @@ button:not(:disabled):active { transform: translateY(1px); }
 /* Consulta do empreendimento */
 .development-details { gap: 16px; }
 .development-details section { display: grid; gap: 8px; min-width: 0; }
+.row-warning {
+  display: flex; align-items: flex-start; gap: 10px; margin: 0 14px 14px; padding: 12px 12px 12px 14px;
+  border: 1px solid var(--mw-warning-text); border-radius: var(--mw-radius-sm);
+  background: var(--mw-warning-bg); color: var(--mw-warning-text); font-size: 14px; font-weight: 650;
+}
+.row-warning > svg { flex: 0 0 auto; margin-top: 1px; }
+.row-warning > span { flex: 1; min-width: 0; }
+.row-warning .icon-action { flex: 0 0 auto; margin: -6px -4px -6px 0; color: inherit; }
+.details-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.details-edit { min-height: 36px; padding: 7px 12px; font-size: 13px; }
 .development-details section + section { padding-top: 14px; border-top: 1px solid var(--mw-border); }
 .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px 18px; margin: 0; }
 .detail-field { display: grid; gap: 2px; min-width: 0; }

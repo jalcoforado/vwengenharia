@@ -10,6 +10,7 @@ e copie a estrutura, não só a aparência.
 | Peça | Para quê |
 | --- | --- |
 | `Avatar` | Círculo com as iniciais do nome |
+| `RowName` | Nome da linha clicável que abre e fecha a consulta (mesmo estado do olho) |
 | `useSort<K>(inicial)` | Estado de ordenação e `sortBy(items, valor)` |
 | `TableHead` | Cabeçalho ordenável da tabela; recebe `[chave, rótulo, classe]` |
 | `useFormPanel()` | `open`, `ref`, `show()`, `hide()`: abre o formulário, rola até ele e foca o primeiro campo |
