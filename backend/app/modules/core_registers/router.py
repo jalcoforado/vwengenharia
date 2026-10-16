@@ -60,6 +60,7 @@ from app.modules.core_registers.service import (
     create_process_unit,
     create_process_unit_type,
     create_station,
+    ensure_client_can_be_inactivated,
     ensure_client_document_is_unique,
     facade_photo_url,
     list_client_contacts,
@@ -134,6 +135,7 @@ async def patch_client(
     await ensure_client_document_is_unique(
         session, context.tenant.id, payload.document, ignore_id=client.id
     )
+    await ensure_client_can_be_inactivated(session, context.tenant.id, client, payload.is_active)
     return await update_object(
         session,
         context,

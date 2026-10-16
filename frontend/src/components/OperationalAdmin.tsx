@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Boxes, Briefcase, Building2, EllipsisVertical, Eye, Layers, LocateFixed, Pencil, Plus, Search, Settings, User, UserPlus, Users, type LucideIcon } from "lucide-react";
 
 import { api } from "../lib/api";
-import { Avatar, RowMenu, TableHead, useFormPanel, useRowMenu, useSort, type RowMenuItem } from "./AdminTable";
+import { Avatar, RowMenu, RowName, RowWarning, TableHead, useFormPanel, useRowMenu, useSort, type RowMenuItem } from "./AdminTable";
 import CollaboratorAdmin from "./CollaboratorAdmin";
 import ContractingPartyAdmin, { contractingPartyLabel, type ContractingPartyRecord } from "./ContractingPartyAdmin";
 import DevelopmentDetails from "./DevelopmentDetails";
@@ -319,6 +319,8 @@ function ClientAdmin({
   const [portalLogin, setPortalLogin] = useState<string | null>(null);
   const [portalEmail, setPortalEmail] = useState("");
   const [portalPassword, setPortalPassword] = useState("");
+  // Aviso de inativacao barrada, mostrado logo abaixo da linha do responsavel.
+  const [blocked, setBlocked] = useState<{ id: string; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [search, setSearch] = useState("");
   const [listFeedback, setListFeedback] = useState<string | null>(null);
@@ -415,7 +417,23 @@ function ClientAdmin({
     panel.hide();
   }
 
+  function activeDevelopmentsBlocking(client: ClientRecord): string {
+    const names = developments
+      .filter((development) => development.client_id === client.id && development.is_active)
+      .map((development) => development.name)
+      .sort((a, b) => a.localeCompare(b, "pt-BR"));
+    if (names.length === 0) return "";
+    return (
+      client.name + " não pode ser inativado: é o responsável principal de " +
+      (names.length === 1 ? "um empreendimento ativo (" : names.length + " empreendimentos ativos (") +
+      names.join(", ") + "). Troque o responsável principal ou inative esses empreendimentos antes."
+    );
+  }
+
   async function toggle(client: ClientRecord) {
+    const blocking = client.is_active ? activeDevelopmentsBlocking(client) : "";
+    setBlocked(blocking ? { id: client.id, text: blocking } : null);
+    if (blocking) return setListFeedback(null);
     setBusy(true);
     try {
       await api("/api/v1/clients/" + client.id, {
@@ -424,8 +442,18 @@ function ClientAdmin({
       });
       setListFeedback(client.is_active ? "Responsável inativado." : "Responsável reativado.");
       await onChanged();
-    } catch {
-      setListFeedback("Não foi possível alterar o responsável.");
+    } catch (error) {
+      const status =
+        typeof error === "object" && error !== null && "status" in error ? error.status : null;
+      // A lista pode estar desatualizada: o servidor tambem barra a inativacao.
+      if (status === 409) {
+        setBlocked({
+          id: client.id,
+          text: client.name + " não pode ser inativado: é o responsável principal de empreendimento ativo. Atualize a página para ver quais.",
+        });
+      } else {
+        setListFeedback("Não foi possível alterar o responsável.");
+      }
     } finally {
       setBusy(false);
     }
@@ -707,7 +735,7 @@ function ClientAdmin({
               <div className="collab-person" role="cell">
                 <Avatar name={client.name} />
                 <div>
-                  <strong>{client.name}</strong>
+                  <RowName name={client.name} open={consultId === client.id} onToggle={() => toggleConsult(client)} />
                   <span title={detail}>{detail}</span>
                 </div>
               </div>
@@ -756,8 +784,9 @@ function ClientAdmin({
                 </button>
               </div>
             </div>
+            {blocked?.id === client.id && <RowWarning text={blocked.text} onClose={() => setBlocked(null)} />}
             {consultId === client.id && (
-              <ResponsibleDetails client={client} developments={developments} parties={parties} showPortalLogin={canManageAccess} />
+              <ResponsibleDetails client={client} developments={developments} parties={parties} showPortalLogin={canManageAccess} onEdit={busy ? undefined : () => { setConsultId(null); startEdit(client); }} />
             )}
             {expandedId === client.id && (
               <div className="client-contacts">
@@ -1232,7 +1261,7 @@ function DevelopmentAdmin({
                 <div className="collab-person" role="cell">
                   <Avatar name={item.name} />
                   <div>
-                    <strong>{item.name}</strong>
+                    <RowName name={item.name} open={expandedId === item.id} onToggle={() => setExpandedId(expandedId === item.id ? null : item.id)} />
                     <span title={summary(item)}>{summary(item)}</span>
                   </div>
                 </div>
@@ -1279,6 +1308,7 @@ function DevelopmentAdmin({
                   party={item.contracting_party_id ? partyMap.get(item.contracting_party_id) : undefined}
                   clients={clients}
                   stationNames={stations.filter((station) => station.development_id === item.id && station.is_active).map((station) => station.name)}
+                  onEdit={busy ? undefined : () => { setExpandedId(null); startEdit(item); }}
                 />
               )}
             </div>

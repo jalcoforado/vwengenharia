@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Briefcase, EllipsisVertical, Eye, Pencil, Search } from "lucide-react";
 
 import { api } from "../lib/api";
-import { Avatar, RowMenu, TableHead, useFormPanel, useRowMenu, useSort, type RowMenuItem } from "./AdminTable";
+import { Avatar, RowMenu, RowName, RowWarning, TableHead, useFormPanel, useRowMenu, useSort, type RowMenuItem } from "./AdminTable";
 import { ContractingPartyDetails } from "./PartyDetails";
 import { formatDocument, isValidCpfCnpj, normalizeDocument } from "../lib/document";
 import { formatPhone, isCompletePhone } from "../lib/phone";
@@ -74,6 +74,8 @@ export default function ContractingPartyAdmin({
   const [contactWhatsapp, setContactWhatsapp] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
   const [rowFeedback, setRowFeedback] = useState<string | null>(null);
+  // Aviso de inativacao barrada, mostrado logo abaixo da linha do contratante.
+  const [blocked, setBlocked] = useState<{ id: string; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const { sortKey, sortAsc, toggleSort, sortBy } = useSort<SortKey>("name");
@@ -187,7 +189,23 @@ export default function ContractingPartyAdmin({
     }
   }
 
+  function activeDevelopmentsBlocking(item: ContractingPartyRecord): string {
+    const names = developments
+      .filter((development) => development.contracting_party_id === item.id && development.is_active)
+      .map((development) => development.name)
+      .sort((a, b) => a.localeCompare(b, "pt-BR"));
+    if (names.length === 0) return "";
+    return (
+      contractingPartyLabel(item) + " não pode ser inativado: está ligado a " +
+      (names.length === 1 ? "um empreendimento ativo (" : names.length + " empreendimentos ativos (") +
+      names.join(", ") + "). Troque o contratante ou inative esses empreendimentos antes."
+    );
+  }
+
   async function toggle(item: ContractingPartyRecord) {
+    const blocking = item.is_active ? activeDevelopmentsBlocking(item) : "";
+    setBlocked(blocking ? { id: item.id, text: blocking } : null);
+    if (blocking) return setRowFeedback(null);
     setBusy(true);
     try {
       await api("/api/v1/contracting-parties/" + item.id, {
@@ -196,8 +214,18 @@ export default function ContractingPartyAdmin({
       });
       setRowFeedback(item.is_active ? "Contratante inativado." : "Contratante reativado.");
       await onChanged();
-    } catch {
-      setRowFeedback("Não foi possível alterar o contratante.");
+    } catch (error) {
+      const status =
+        typeof error === "object" && error !== null && "status" in error ? error.status : null;
+      // A lista pode estar desatualizada: o servidor tambem barra a inativacao.
+      if (status === 409) {
+        setBlocked({
+          id: item.id,
+          text: contractingPartyLabel(item) + " não pode ser inativado: está ligado a empreendimento ativo. Atualize a página para ver quais.",
+        });
+      } else {
+        setRowFeedback("Não foi possível alterar o contratante.");
+      }
     } finally {
       setBusy(false);
     }
@@ -276,7 +304,7 @@ export default function ContractingPartyAdmin({
                 <div className="collab-person" role="cell">
                   <Avatar name={contractingPartyLabel(item)} />
                   <div>
-                    <strong>{contractingPartyLabel(item)}</strong>
+                    <RowName name={contractingPartyLabel(item)} open={expandedId === item.id} onToggle={() => setExpandedId(expandedId === item.id ? null : item.id)} />
                     <span title={summary(item)}>{summary(item)}</span>
                   </div>
                 </div>
@@ -315,8 +343,9 @@ export default function ContractingPartyAdmin({
                   </button>
                 </div>
               </div>
+              {blocked?.id === item.id && <RowWarning text={blocked.text} onClose={() => setBlocked(null)} />}
               {expandedId === item.id && (
-                <ContractingPartyDetails party={item} developments={developments} clients={clients} />
+                <ContractingPartyDetails party={item} developments={developments} clients={clients} onEdit={busy ? undefined : () => { setExpandedId(null); startEdit(item); }} />
               )}
             </div>
           ))}

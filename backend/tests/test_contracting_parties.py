@@ -155,3 +155,48 @@ async def test_contracting_party_owns_many_developments() -> None:
             for item in developments.json()["items"]
             if item["id"] in development_ids
         } == {party_id}
+
+        # Com empreendimento ativo ligado, o contratante nao pode ser inativado.
+        blocked = await http.patch(
+            f"/api/v1/contracting-parties/{party_id}", headers=headers, json={"is_active": False}
+        )
+        assert blocked.status_code == 409
+        assert blocked.json()["detail"] == "contracting_party_has_active_developments"
+
+        # O responsavel principal de empreendimento ativo tambem nao pode ser inativado.
+        responsible_url = f"/api/v1/clients/{responsible.json()['id']}"
+        primary_blocked = await http.patch(
+            responsible_url, headers=headers, json={"is_active": False}
+        )
+        assert primary_blocked.status_code == 409
+        assert primary_blocked.json()["detail"] == "client_is_primary_of_active_developments"
+
+        await http.patch(
+            f"/api/v1/developments/{development_ids[0]}", headers=headers, json={"is_active": False}
+        )
+        still_blocked = await http.patch(
+            f"/api/v1/contracting-parties/{party_id}", headers=headers, json={"is_active": False}
+        )
+        assert still_blocked.status_code == 409
+
+        await http.patch(
+            f"/api/v1/developments/{development_ids[1]}", headers=headers, json={"is_active": False}
+        )
+        inactivated = await http.patch(
+            f"/api/v1/contracting-parties/{party_id}", headers=headers, json={"is_active": False}
+        )
+        assert inactivated.status_code == 200
+        assert inactivated.json()["is_active"] is False
+
+        primary_freed = await http.patch(
+            responsible_url, headers=headers, json={"is_active": False}
+        )
+        assert primary_freed.status_code == 200
+
+        # Contratante sem empreendimento algum inativa normalmente.
+        person_off = await http.patch(
+            f"/api/v1/contracting-parties/{person.json()['id']}",
+            headers=headers,
+            json={"is_active": False},
+        )
+        assert person_off.status_code == 200

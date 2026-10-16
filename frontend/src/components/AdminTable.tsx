@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ArrowUpDown } from "lucide-react";
+import { ArrowUpDown, TriangleAlert, X } from "lucide-react";
 
 // Pecas comuns das listas em tabela dos Cadastros (Colaboradores e Responsaveis).
 
@@ -19,6 +19,36 @@ export function Avatar({ name }: { name: string }) {
     <span className={"collab-avatar collab-avatar-" + avatarTone(name)} aria-hidden="true">
       {initials(name)}
     </span>
+  );
+}
+
+// Aviso logo abaixo da linha, para acao barrada (ex.: inativar com vinculo ativo).
+export function RowWarning({ text, onClose }: { text: string; onClose: () => void }) {
+  return (
+    <div className="row-warning" role="alert">
+      <TriangleAlert size={18} aria-hidden="true" />
+      <span>{text}</span>
+      <button className="icon-action" type="button" title="Fechar aviso" aria-label="Fechar aviso" onClick={onClose}>
+        <X size={16} />
+      </button>
+    </div>
+  );
+}
+
+// Nome da linha que abre e fecha a consulta, o mesmo que o icone de olho.
+export function RowName({ name, open, onToggle }: { name: string; open: boolean; onToggle: () => void }) {
+  return (
+    <strong>
+      <button
+        type="button"
+        className="collab-name-button"
+        title={open ? "Fechar consulta" : "Consultar"}
+        aria-expanded={open}
+        onClick={onToggle}
+      >
+        {name}
+      </button>
+    </strong>
   );
 }
 

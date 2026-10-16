@@ -62,7 +62,8 @@ Antes de criar um componente, procure um equivalente em `frontend/src/components
   Ação destrutiva (inativar, bloquear) fica no menu, marcada como `danger`.
 - Nada é excluído: "Inativar" e "Reativar".
 
-**Consulta (somente leitura).** Abre logo abaixo da linha, pelo ícone de olho (`Eye`), num
+**Consulta (somente leitura).** Abre logo abaixo da linha, pelo ícone de olho (`Eye`) ou clicando
+no nome (`RowName`, que usa o mesmo estado do olho), num
 `.client-contacts` com seções `<section>` e `.eyebrow`, campos em `<dl className="detail-grid">`
 com o componente `Field` (`DevelopmentDetails.tsx`). Deixe claro que é consulta: sem campos
 editáveis, e um caminho para editar (o lápis da linha). Só uma consulta ou painel aberto por linha.
