@@ -60,6 +60,7 @@ from app.models.operations import (
     ProcessUnit,
     ProcessUnitType,
     Station,
+    StationCodeSequence,
 )
 
 __all__ = [
@@ -105,6 +106,7 @@ __all__ = [
     "ReviewDecision",
     "Role",
     "Station",
+    "StationCodeSequence",
     "SyncOperation",
     "Tenant",
     "User",

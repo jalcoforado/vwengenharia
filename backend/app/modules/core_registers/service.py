@@ -1,9 +1,13 @@
 import asyncio
+import re
+import unicodedata
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy import ColumnElement, select
+from sqlalchemy import ColumnElement, func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -21,6 +25,7 @@ from app.models.operations import (
     ProcessUnit,
     ProcessUnitType,
     Station,
+    StationCodeSequence,
 )
 from app.modules.auth.dependencies import AuthContext
 from app.services.storage import get_storage
@@ -584,11 +589,143 @@ async def create_development(session: AsyncSession, context: AuthContext, payloa
     return development
 
 
+STATION_CODE_PREFIXES = {
+    "ETE": "ETE",
+    "ETA": "ETA",
+    "EEE": "EEE",
+    "ELEVATORIA": "ELV",
+    "OUTRA": "EST",
+}
+_SIGLA_STOPWORDS = {"A", "AS", "O", "OS", "DE", "DA", "DAS", "DO", "DOS", "E", "EM", "NA", "NO"}
+
+
+def _plain_words(text: str) -> list[str]:
+    plain = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode().upper()
+    return [word for word in re.split(r"[^A-Z0-9]+", plain) if word]
+
+
+def development_sigla(name: str) -> str:
+    """Iniciais do empreendimento: "Residencial Lago Azul" -> "RLA"."""
+    words = [word for word in _plain_words(name) if word not in _SIGLA_STOPWORDS]
+    if len(words) >= 2:
+        return "".join(word[0] for word in words[:4])
+    return words[0][:3] if words else "EMP"
+
+
+def station_code_prefix(station_type: str, development_name: str) -> str:
+    type_words = _plain_words(station_type)
+    type_prefix = STATION_CODE_PREFIXES.get(station_type) or (
+        type_words[0][:3] if type_words else "EST"
+    )
+    return f"{type_prefix}-{development_sigla(development_name)}-"
+
+
+async def next_station_code(
+    session: AsyncSession, tenant_id: UUID, station_type: str, development_name: str
+) -> str:
+    prefix = station_code_prefix(station_type, development_name)
+    codes = await session.scalars(
+        select(Station.code).where(Station.tenant_id == tenant_id, Station.code.startswith(prefix))
+    )
+    numbers = [int(code[len(prefix):]) for code in codes if code and code[len(prefix):].isdigit()]
+    in_use = max(numbers, default=0)
+    # O contador so sobe: um numero que ja foi de outra estacao nao volta a ser usado.
+    # O upsert trava a linha do prefixo ate o fim da transacao (cadastros simultaneos).
+    insert = pg_insert(StationCodeSequence).values(
+        tenant_id=tenant_id, prefix=prefix, last_number=in_use + 1
+    )
+    number = await session.scalar(
+        insert.on_conflict_do_update(
+            index_elements=["tenant_id", "prefix"],
+            set_={
+                "last_number": func.greatest(StationCodeSequence.last_number, in_use) + 1
+            },
+        ).returning(StationCodeSequence.last_number)
+    )
+    return f"{prefix}{number:02d}"
+
+
+async def ensure_station_code_is_unique(
+    session: AsyncSession, tenant_id: UUID, code: str
+) -> None:
+    taken = await session.scalar(
+        select(Station.id).where(Station.tenant_id == tenant_id, Station.code == code).limit(1)
+    )
+    if taken is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="station_code_already_exists"
+        )
+
+
+async def _flush_with_station_code(
+    session: AsyncSession, tenant_id: UUID, station: Station, development: Development
+) -> None:
+    # Dois cadastros simultaneos podem calcular o mesmo numero: tenta o proximo.
+    for _ in range(5):
+        station.code = await next_station_code(
+            session, tenant_id, station.station_type or "", development.name
+        )
+        try:
+            async with session.begin_nested():
+                await session.flush()
+            return
+        except IntegrityError:
+            continue
+    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="station_code_unavailable")
+
+
+async def update_station(
+    session: AsyncSession, context: AuthContext, station: Station, payload: BaseModel
+) -> Station:
+    changes = payload.model_dump(exclude_unset=True)
+    for field in ("station_type", "visit_frequency_days"):
+        if field in changes and changes[field] is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"{field}_required"
+            )
+    # O codigo representa tipo e empreendimento: e refeito so quando um deles muda
+    # (ou quando a estacao antiga ainda nao tem codigo). Nome e frequencia nao mexem nele.
+    new_type = changes.get("station_type", station.station_type)
+    new_development_id = changes.get("development_id") or station.development_id
+    moved = new_type != station.station_type or new_development_id != station.development_id
+    if moved or not station.code:
+        development = await tenant_get_or_404(
+            session, Development, context.tenant.id, new_development_id
+        )
+        prefix = station_code_prefix(new_type or "", development.name)
+        if not station.code or not station.code.startswith(prefix):
+            old_code = station.code
+            for field, value in changes.items():
+                setattr(station, field, value)
+            await _flush_with_station_code(session, context.tenant.id, station, development)
+            add_audit(
+                session,
+                context,
+                action="STATION_CODE_CHANGE",
+                entity_type="station",
+                entity_id=station.id,
+                fields=[f"code:{old_code or '-'}->{station.code}"],
+            )
+    return await update_object(
+        session, context, station, payload, action="STATION_UPDATE", entity_type="station"
+    )
+
+
 async def create_station(session: AsyncSession, context: AuthContext, payload) -> Station:
-    await tenant_get_or_404(session, Development, context.tenant.id, payload.development_id)
-    station = Station(tenant_id=context.tenant.id, **payload.model_dump())
+    development = await tenant_get_or_404(
+        session, Development, context.tenant.id, payload.development_id
+    )
+    data = payload.model_dump()
+    code = (data.pop("code") or "").strip().upper()
+    data["station_type"] = data["station_type"].strip()
+    station = Station(tenant_id=context.tenant.id, **data)
     session.add(station)
-    await session.flush()
+    if code:
+        await ensure_station_code_is_unique(session, context.tenant.id, code)
+        station.code = code
+        await session.flush()
+    else:
+        await _flush_with_station_code(session, context.tenant.id, station, development)
     add_audit(
         session, context, action="STATION_CREATE", entity_type="station", entity_id=station.id
     )

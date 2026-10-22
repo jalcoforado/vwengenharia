@@ -160,6 +160,17 @@ class Station(TimestampMixin, Base):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
 
+class StationCodeSequence(Base):
+    # Ultimo numero emitido por prefixo (ex.: "ETE-RLA-"): codigo nunca e reaproveitado.
+    __tablename__ = "station_code_sequences"
+
+    tenant_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), primary_key=True
+    )
+    prefix: Mapped[str] = mapped_column(String(40), primary_key=True)
+    last_number: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
 class AssetType(TimestampMixin, Base):
     __tablename__ = "asset_types"
     __table_args__ = (

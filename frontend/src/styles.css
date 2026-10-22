@@ -2305,6 +2305,16 @@ button:not(:disabled):active { transform: translateY(1px); }
 .row-warning > svg { flex: 0 0 auto; margin-top: 1px; }
 .row-warning > span { flex: 1; min-width: 0; }
 .row-warning .icon-action { flex: 0 0 auto; margin: -6px -4px -6px 0; color: inherit; }
+.compact-form .input-readonly {
+  background: var(--mw-surface-muted); color: var(--mw-text-secondary); cursor: default;
+  font-variant-numeric: tabular-nums;
+}
+.station-code,
+.client-contact-row span.station-code {
+  padding: 3px 8px; border: 1px solid var(--mw-border); border-radius: 6px;
+  background: var(--mw-surface-muted); color: var(--mw-text); font-size: 12px; font-weight: 700;
+  font-variant-numeric: tabular-nums; letter-spacing: .02em; white-space: nowrap;
+}
 .details-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .details-edit { min-height: 36px; padding: 7px 12px; font-size: 13px; }
 .development-details section + section { padding-top: 14px; border-top: 1px solid var(--mw-border); }

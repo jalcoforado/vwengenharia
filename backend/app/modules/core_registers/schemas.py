@@ -200,18 +200,19 @@ class FacadePhotoUrl(BaseModel):
 class StationCreate(BaseModel):
     development_id: UUID
     name: str = Field(min_length=2, max_length=200)
+    # Sem codigo, o servidor gera TIPO-SIGLA-NN; informado so em carga de dados.
     code: str | None = Field(default=None, max_length=80)
-    station_type: str | None = Field(default=None, max_length=80)
+    station_type: str = Field(min_length=2, max_length=80)
     latitude: Decimal | None = Field(default=None, ge=-90, le=90)
     longitude: Decimal | None = Field(default=None, ge=-180, le=180)
-    visit_frequency_days: int | None = Field(default=None, ge=1, le=365)
+    visit_frequency_days: int = Field(ge=1, le=365)
 
 
 class StationUpdate(BaseModel):
+    # O codigo e fixo depois de gerado: nao entra na edicao.
     development_id: UUID | None = None
     name: str | None = Field(default=None, min_length=2, max_length=200)
-    code: str | None = Field(default=None, max_length=80)
-    station_type: str | None = Field(default=None, max_length=80)
+    station_type: str | None = Field(default=None, min_length=2, max_length=80)
     latitude: Decimal | None = Field(default=None, ge=-90, le=90)
     longitude: Decimal | None = Field(default=None, ge=-180, le=180)
     visit_frequency_days: int | None = Field(default=None, ge=1, le=365)

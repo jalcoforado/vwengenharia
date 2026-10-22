@@ -71,11 +71,11 @@ async def test_process_units_sit_between_station_and_asset() -> None:
         )
         station_a = await create(
             "/api/v1/stations",
-            {"development_id": development["id"], "name": f"ETE A {suffix}", "code": f"A-{suffix}"},
+            {"development_id": development["id"], "name": f"ETE A {suffix}", "code": f"A-{suffix}", "station_type": "ETE", "visit_frequency_days": 7},
         )
         station_b = await create(
             "/api/v1/stations",
-            {"development_id": development["id"], "name": f"ETE B {suffix}", "code": f"B-{suffix}"},
+            {"development_id": development["id"], "name": f"ETE B {suffix}", "code": f"B-{suffix}", "station_type": "ETE", "visit_frequency_days": 7},
         )
 
         uasb = await create(
