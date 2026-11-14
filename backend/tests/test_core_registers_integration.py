@@ -104,6 +104,7 @@ async def test_core_registers_are_tenant_scoped_and_audited() -> None:
                 "development_id": development.json()["id"],
                 "name": f"ETE {suffix}",
                 "code": f"ETE-{suffix}",
+                "station_type": "ETE",
                 "visit_frequency_days": 7,
             },
         )

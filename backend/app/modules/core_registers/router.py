@@ -75,6 +75,7 @@ from app.modules.core_registers.service import (
     update_object,
     update_process_unit,
     update_process_unit_type,
+    update_station,
     validate_update_parents,
 )
 
@@ -356,14 +357,7 @@ async def patch_station(
 ) -> Station:
     station = await tenant_get_or_404(session, Station, context.tenant.id, station_id)
     await validate_update_parents(session, context, payload)
-    return await update_object(
-        session,
-        context,
-        station,
-        payload,
-        action="STATION_UPDATE",
-        entity_type="station",
-    )
+    return await update_station(session, context, station, payload)
 
 
 @router.get("/process-unit-types", response_model=list[ProcessUnitTypeRead])

@@ -91,13 +91,13 @@ export default function DevelopmentDetails({
   development,
   party,
   clients,
-  stationNames,
+  stations,
   onEdit,
 }: {
   development: DetailDevelopment;
   party: ContractingPartyRecord | undefined;
   clients: DetailClient[];
-  stationNames: string[];
+  stations: { id: string; name: string; code: string | null }[];
   onEdit?: () => void;
 }) {
   const [contacts, setContacts] = useState<DetailContact[] | null>(null);
@@ -246,9 +246,19 @@ export default function DevelopmentDetails({
 
       <section>
         <span className="eyebrow">Estações</span>
-        <p className="detail-note">
-          {stationNames.length ? stationNames.join(" · ") : "Nenhuma estação cadastrada neste empreendimento."}
-        </p>
+        {stations.length === 0 && (
+          <p className="detail-note">Nenhuma estação ativa neste empreendimento. As estações são cadastradas na aba Estações.</p>
+        )}
+        {[...stations].sort((a, b) => a.name.localeCompare(b.name, "pt-BR")).map((station) => (
+          <div className="client-contact-row" key={station.id}>
+            <div>
+              <strong>{station.name}</strong>
+            </div>
+            <div className="admin-actions">
+              <span className="station-code">{station.code ?? "Sem código"}</span>
+            </div>
+          </div>
+        ))}
       </section>
     </div>
   );

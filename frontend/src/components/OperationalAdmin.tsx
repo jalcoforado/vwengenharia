@@ -8,6 +8,7 @@ import ContractingPartyAdmin, { contractingPartyLabel, type ContractingPartyReco
 import DevelopmentDetails from "./DevelopmentDetails";
 import { ResponsibleDetails, responsibilityCountLabel } from "./PartyDetails";
 import ProcessUnitAdmin, { type ProcessUnitRecord } from "./ProcessUnitAdmin";
+import StationDetails from "./StationDetails";
 import { formatDocument, isValidCpfCnpj, normalizeDocument } from "../lib/document";
 import { optimizeEvidenceImage } from "../lib/media";
 import { formatPhone, isCompletePhone } from "../lib/phone";
@@ -108,6 +109,8 @@ export type AdminStation = {
   code: string | null;
   station_type: string | null;
   visit_frequency_days: number | null;
+  latitude?: string | number | null;
+  longitude?: string | number | null;
   is_active: boolean;
 };
 
@@ -267,6 +270,8 @@ export default function OperationalAdmin({
         <StationAdmin
           developments={developments}
           stations={stations}
+          units={units}
+          assets={assets}
           onChanged={onChanged}
           onOpenStation={onOpenStation}
         />
@@ -1307,7 +1312,7 @@ function DevelopmentAdmin({
                   development={item}
                   party={item.contracting_party_id ? partyMap.get(item.contracting_party_id) : undefined}
                   clients={clients}
-                  stationNames={stations.filter((station) => station.development_id === item.id && station.is_active).map((station) => station.name)}
+                  stations={stations.filter((station) => station.development_id === item.id && station.is_active)}
                   onEdit={busy ? undefined : () => { setExpandedId(null); startEdit(item); }}
                 />
               )}
@@ -1362,11 +1367,15 @@ function frequencyLabel(days: number | null): string {
 function StationAdmin({
   developments,
   stations,
+  units,
+  assets,
   onChanged,
   onOpenStation,
 }: {
   developments: DevelopmentRecord[];
   stations: AdminStation[];
+  units: ProcessUnitRecord[];
+  assets: AssetRecord[];
   onChanged: () => Promise<void>;
   onOpenStation?: (stationId: string) => void;
 }) {
@@ -1374,8 +1383,9 @@ function StationAdmin({
   const [developmentId, setDevelopmentId] = useState("");
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
-  const [stationType, setStationType] = useState("ETE");
-  const [frequencyDays, setFrequencyDays] = useState("7");
+  const [stationType, setStationType] = useState("");
+  const [frequencyDays, setFrequencyDays] = useState("");
+  const [expandedId, setExpandedId] = useState<string | null>(null); // consulta aberta
   const [search, setSearch] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
   const [rowFeedback, setRowFeedback] = useState<string | null>(null);
@@ -1409,9 +1419,13 @@ function StationAdmin({
     return station.name;
   });
 
+  function toggleConsult(stationId: string) {
+    setExpandedId(expandedId === stationId ? null : stationId);
+  }
+
   function resetForm() {
     setEditingId(null);
-    setDevelopmentId(""); setName(""); setCode(""); setStationType("ETE"); setFrequencyDays("7");
+    setDevelopmentId(""); setName(""); setCode(""); setStationType(""); setFrequencyDays("");
   }
 
   function openNew() {
@@ -1431,8 +1445,8 @@ function StationAdmin({
     setDevelopmentId(station.development_id);
     setName(station.name);
     setCode(station.code ?? "");
-    setStationType(station.station_type ?? "OUTRA");
-    setFrequencyDays(station.visit_frequency_days ? String(station.visit_frequency_days) : "7");
+    setStationType(station.station_type ?? "");
+    setFrequencyDays(station.visit_frequency_days ? String(station.visit_frequency_days) : "");
     setFeedback(null);
     panel.show();
   }
@@ -1453,32 +1467,53 @@ function StationAdmin({
     }
   }
 
+  // O codigo e refeito pelo servidor quando o tipo ou o empreendimento mudam.
+  const editingStation = editingId ? stations.find((item) => item.id === editingId) : undefined;
+  const codeWillChange = Boolean(
+    editingStation && (stationType !== (editingStation.station_type ?? "") || developmentId !== editingStation.development_id),
+  );
+
   async function save() {
     if (!developmentId) return setFeedback("Selecione o empreendimento.");
     if (name.trim().length < 2) return setFeedback("Informe o nome da estação.");
+    if (!stationType) return setFeedback("Selecione o tipo da estação.");
+    if (!frequencyDays) return setFeedback("Selecione a frequência de visita.");
     setBusy(true);
     try {
-      await api(editingId ? "/api/v1/stations/" + editingId : "/api/v1/stations", {
+      // O codigo e gerado pelo servidor (TIPO-SIGLA-NN) e nao muda depois.
+      const saved = await api<AdminStation>(editingId ? "/api/v1/stations/" + editingId : "/api/v1/stations", {
         method: editingId ? "PATCH" : "POST",
         body: JSON.stringify({
           development_id: developmentId,
           name: name.trim(),
-          code: code.trim() || null,
           station_type: stationType,
-          visit_frequency_days: Number(frequencyDays) || null,
+          visit_frequency_days: Number(frequencyDays),
         }),
       });
       if (editingId) {
-        setRowFeedback("Estação atualizada.");
+        const previousCode = editingStation?.code;
+        setRowFeedback(
+          previousCode && saved.code !== previousCode
+            ? "Estação atualizada. O código mudou de " + previousCode + " para " + saved.code + "."
+            : "Estação " + (saved.code ?? "") + " atualizada.",
+        );
         closeForm();
       } else {
-        // Mantem o empreendimento para cadastrar as proximas estacoes do mesmo local.
+        // Mantem empreendimento, tipo e frequencia para cadastrar as proximas estacoes do mesmo local.
         setName(""); setCode("");
-        setFeedback("Estação cadastrada. O formulário segue aberto para a próxima do mesmo empreendimento.");
+        setFeedback("Estação cadastrada com o código " + saved.code + ". O formulário segue aberto para a próxima do mesmo empreendimento.");
       }
       await onChanged();
-    } catch {
-      setFeedback("Não foi possível salvar a estação. Confira se o código já é usado por outra estação.");
+    } catch (error) {
+      const status =
+        typeof error === "object" && error !== null && "status" in error ? error.status : null;
+      setFeedback(
+        status === 422
+          ? "Confira os dados informados: tipo e frequência de visita são obrigatórios."
+          : status === 409
+            ? "Não foi possível gerar o código da estação agora. Tente salvar de novo."
+            : "Não foi possível salvar a estação.",
+      );
     } finally {
       setBusy(false);
     }
@@ -1487,7 +1522,8 @@ function StationAdmin({
   const menuItem = menu ? stations.find((item) => item.id === menu.id) : undefined;
   const menuItems: RowMenuItem[] = menuItem
     ? [
-        ...(onOpenStation ? [{ text: "Ver estação", run: () => onOpenStation(menuItem.id) }] : []),
+        { text: expandedId === menuItem.id ? "Fechar consulta" : "Consultar", run: () => toggleConsult(menuItem.id) },
+        ...(onOpenStation ? [{ text: "Abrir Visão 360", run: () => onOpenStation(menuItem.id) }] : []),
         { text: "Editar", run: () => startEdit(menuItem) },
         { text: menuItem.is_active ? "Inativar" : "Reativar", run: () => void toggle(menuItem), danger: menuItem.is_active },
       ]
@@ -1506,22 +1542,32 @@ function StationAdmin({
               </select>
             </label>
             <label className="form-span-2"><span>Nome <b className="required-mark">*</b></span><input required aria-required="true" placeholder="Como a equipe chama esta estação" value={name} onChange={(e) => setName(e.target.value)} /></label>
-            <label>Código<input placeholder="Opcional, ex.: ETE-LAGO-01" value={code} onChange={(e) => setCode(e.target.value)} /></label>
-            <label>Tipo
-              <select value={stationType} onChange={(e) => setStationType(e.target.value)}>
+            <label>Código
+              <input
+                readOnly
+                aria-readonly="true"
+                className="input-readonly"
+                value={codeWillChange ? "Novo código ao salvar (hoje " + (code || "sem código") + ")" : code || "Gerado ao cadastrar"}
+                title="Gerado automaticamente: tipo + sigla do empreendimento + sequência, ex.: ETE-RLA-01. É refeito se o tipo ou o empreendimento mudarem."
+              />
+            </label>
+            <label><span>Tipo <b className="required-mark">*</b></span>
+              <select required aria-required="true" value={stationType} onChange={(e) => setStationType(e.target.value)}>
+                <option value="">Selecione</option>
                 {STATION_TYPES.map(([value, text]) => <option key={value} value={value}>{text}</option>)}
-                {!STATION_TYPES.some(([value]) => value === stationType) && <option value={stationType}>{stationType} (cadastro antigo)</option>}
+                {stationType && !STATION_TYPES.some(([value]) => value === stationType) && <option value={stationType}>{stationType} (cadastro antigo)</option>}
               </select>
             </label>
-            <label>Frequência de visita
-              <select value={frequencyDays} onChange={(e) => setFrequencyDays(e.target.value)}>
+            <label><span>Frequência de visita <b className="required-mark">*</b></span>
+              <select required aria-required="true" value={frequencyDays} onChange={(e) => setFrequencyDays(e.target.value)}>
+                <option value="">Selecione</option>
                 {VISIT_FREQUENCIES.map(([value, text]) => <option key={value} value={value}>{text}</option>)}
-                {!VISIT_FREQUENCIES.some(([value]) => value === frequencyDays) && <option value={frequencyDays}>A cada {frequencyDays} dias</option>}
+                {frequencyDays && !VISIT_FREQUENCIES.some(([value]) => value === frequencyDays) && <option value={frequencyDays}>A cada {frequencyDays} dias</option>}
               </select>
             </label>
           </div>
           <p className="required-hint">
-            <b className="required-mark">*</b> Obrigatório. As unidades e os equipamentos da estação são cadastrados nas abas ao lado.
+            <b className="required-mark">*</b> Obrigatório. O código é gerado automaticamente (tipo + sigla do empreendimento + sequência, ex.: ETE-RLA-01) e só muda se o tipo ou o empreendimento mudarem. As unidades e os equipamentos da estação são cadastrados nas abas ao lado.
           </p>
           <div className="admin-actions form-submit">
             <button className="primary-button" disabled={busy} onClick={() => void save()}>
@@ -1557,7 +1603,7 @@ function StationAdmin({
                 <div className="collab-person" role="cell">
                   <Avatar name={station.name} />
                   <div>
-                    <strong>{station.name}</strong>
+                    <RowName name={station.name} open={expandedId === station.id} onToggle={() => toggleConsult(station.id)} />
                     <span title={summary(station)}>{summary(station)}</span>
                   </div>
                 </div>
@@ -1569,11 +1615,15 @@ function StationAdmin({
                   <span className={station.is_active ? "collab-status active" : "collab-status"}>{station.is_active ? "Ativa" : "Inativa"}</span>
                 </div>
                 <div className="collab-actions" role="cell">
-                  {onOpenStation && (
-                    <button className="icon-action" title="Ver estação" aria-label={"Ver estação: " + station.name} onClick={() => onOpenStation(station.id)}>
-                      <Eye size={16} />
-                    </button>
-                  )}
+                  <button
+                    className={expandedId === station.id ? "icon-action icon-action-on" : "icon-action"}
+                    title={expandedId === station.id ? "Fechar consulta" : "Consultar"}
+                    aria-label={(expandedId === station.id ? "Fechar consulta: " : "Consultar: ") + station.name}
+                    aria-expanded={expandedId === station.id}
+                    onClick={() => toggleConsult(station.id)}
+                  >
+                    <Eye size={16} />
+                  </button>
                   <button className="icon-action icon-action-edit" disabled={busy} title="Editar" aria-label={"Editar: " + station.name} onClick={() => startEdit(station)}>
                     <Pencil size={16} />
                   </button>
@@ -1590,6 +1640,19 @@ function StationAdmin({
                   </button>
                 </div>
               </div>
+              {expandedId === station.id && (
+                <StationDetails
+                  station={station}
+                  developmentName={developmentMap.get(station.development_id)?.name ?? ""}
+                  typeLabel={typeLabel(station)}
+                  frequencyLabel={frequencyLabel(station.visit_frequency_days)}
+                  units={units.filter((unit) => unit.station_id === station.id)}
+                  assets={assets.filter((asset) => asset.station_id === station.id)}
+                  assetStatusLabel={(asset) => ASSET_STATUSES.find(([value]) => value === asset.status)?.[1] ?? asset.status}
+                  onEdit={busy ? undefined : () => { setExpandedId(null); startEdit(station); }}
+                  onOpenOverview={onOpenStation ? () => onOpenStation(station.id) : undefined}
+                />
+              )}
             </div>
           ))}
           {stations.length === 0 && (

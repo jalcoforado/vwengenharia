@@ -95,6 +95,7 @@ async def test_field_flow_is_offline_safe_and_scoped_to_assigned_technician() ->
                 "development_id": development.json()["id"],
                 "name": f"ETE Field {suffix}",
                 "code": f"FIELD-{suffix}",
+                "station_type": "ETE",
                 "visit_frequency_days": 7,
             },
         )

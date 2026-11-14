@@ -70,11 +70,11 @@ async def test_asset_situation_is_recorded_per_visit_and_updates_asset_status() 
         )
         station = await create(
             "/api/v1/stations",
-            {"development_id": development["id"], "name": f"ETE {suffix}", "code": f"S-{suffix}"},
+            {"development_id": development["id"], "name": f"ETE {suffix}", "code": f"S-{suffix}", "station_type": "ETE", "visit_frequency_days": 7},
         )
         other_station = await create(
             "/api/v1/stations",
-            {"development_id": development["id"], "name": f"EEB {suffix}", "code": f"O-{suffix}"},
+            {"development_id": development["id"], "name": f"EEB {suffix}", "code": f"O-{suffix}", "station_type": "ETE", "visit_frequency_days": 7},
         )
         unit_type = await create("/api/v1/process-unit-types", {"name": f"Aeracao {suffix}"})
         unit = await create(
