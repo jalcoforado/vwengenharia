@@ -208,6 +208,45 @@ class Measurement(TimestampMixin, Base):
     client_operation_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
 
 
+class AssetSituation(str, enum.Enum):
+    """Situacao do equipamento encontrada na visita (lista do formulario de campo)."""
+
+    FUNCIONANDO = "FUNCIONANDO"
+    DESLIGADO = "DESLIGADO"
+    NECESSARIO_VERIFICAR = "NECESSARIO_VERIFICAR"
+    AGUARDANDO_RETIRADA = "AGUARDANDO_RETIRADA"
+    RETIRADO_AGUARDANDO_MANUTENCAO = "RETIRADO_AGUARDANDO_MANUTENCAO"
+    EM_MANUTENCAO = "EM_MANUTENCAO"
+    AGUARDANDO_INSTALACAO = "AGUARDANDO_INSTALACAO"
+    NAO_POSSUI = "NAO_POSSUI"
+    OUTRO = "OUTRO"
+
+
+class VisitAssetSituation(TimestampMixin, Base):
+    """Uma linha por visita e equipamento: como o tecnico encontrou o equipamento."""
+
+    __tablename__ = "visit_asset_situations"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id", "visit_id", "asset_id", name="uq_visit_asset_situations_visit_asset"
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    visit_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("visits.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    asset_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("assets.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    situation: Mapped[str] = mapped_column(String(40), nullable=False)
+    comment: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    client_operation_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
+
+
 class SyncOperation(Base):
     __tablename__ = "sync_operations"
     __table_args__ = (

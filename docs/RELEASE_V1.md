@@ -1,4 +1,4 @@
-# VW Engenharia ERP - Release Readiness V1
+# MW Engenharia ERP - Release Readiness V1
 
 ## Status alvo
 
@@ -142,7 +142,7 @@ Executar em ambiente de homologacao com navegador desktop e um telefone/tablet:
 17. Criar chave iAnalisys, consultar recursos e revogar a chave.
 18. Importar uma copia da planilha em staging e conferir contagens antes de materializar.
 
-## 5. Dados historicos VW
+## 5. Dados historicos MW
 
 Antes da carga definitiva:
 
@@ -153,7 +153,7 @@ Antes da carga definitiva:
 - materializar primeiro uma amostra;
 - reconciliar estacoes, tecnicos, datas e quantidade de visitas;
 - importar o restante em lotes;
-- manter `preserve_source_review_status=false` salvo decisao expressa da VW.
+- manter `preserve_source_review_status=false` salvo decisao expressa da MW.
 
 A planilha historica conhecida possui aproximadamente 13,8 mil registros. A contagem definitiva de migracao deve ser obtida pelo proprio staging da versao usada na carga.
 

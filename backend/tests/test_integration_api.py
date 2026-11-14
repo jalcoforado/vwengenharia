@@ -62,7 +62,7 @@ async def test_integration_key_is_tenant_scoped_incremental_and_revocable() -> N
         assert created.status_code == 201
         secret = created.json()["secret"]
         key_id = created.json()["id"]
-        assert secret.startswith("vwk_")
+        assert secret.startswith("mwk_")
         assert created.json()["key_prefix"] == secret[:12]
 
         listed = await http.get("/api/v1/integration-keys", headers=admin_headers)
@@ -84,7 +84,7 @@ async def test_integration_key_is_tenant_scoped_incremental_and_revocable() -> N
 
         invalid = await http.get(
             "/api/v1/integration/v1/clients",
-            headers={"X-Integration-Key": "vwk_invalid"},
+            headers={"X-Integration-Key": "mwk_invalid"},
         )
         assert invalid.status_code == 401
 

@@ -121,4 +121,5 @@ async def me(context: AuthContextDep) -> MeResponse:
         ),
         membership_id=context.membership.id,
         role=context.membership.role,
+        must_change_password=context.user.must_change_password,
     )

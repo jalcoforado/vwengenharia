@@ -2,7 +2,7 @@
 
 ## Visao
 
-O VW Engenharia e um ERP operacional, nao uma plataforma de IA.
+O MW Engenharia e um ERP operacional, nao uma plataforma de IA.
 
 Arquitetura inicial em monolito modular, separando dominios de negocio e evitando microservicos prematuros.
 
@@ -30,7 +30,7 @@ PostgreSQL          Redis     S3/MinIO
 
 ## Fronteira entre os produtos
 
-### ERP VW Engenharia
+### ERP MW Engenharia
 
 Responsavel por:
 

@@ -1,3 +1,4 @@
+import { Search } from "lucide-react";
 import { useState } from "react";
 
 import { api } from "../lib/api";
@@ -49,7 +50,7 @@ const TRANSITIONS: Record<string, Array<{ value: string; label: string }>> = {
     { value: "CANCELADA", label: "Cancelar" },
   ],
   PLANEJADA: [
-    { value: "EM_EXECUCAO", label: "Iniciar execucao" },
+    { value: "EM_EXECUCAO", label: "Iniciar execução" },
     { value: "AGUARDANDO_MATERIAL", label: "Aguardar material" },
     { value: "AGUARDANDO_TERCEIRO", label: "Aguardar terceiro" },
     { value: "CANCELADA", label: "Cancelar" },
@@ -61,12 +62,12 @@ const TRANSITIONS: Record<string, Array<{ value: string; label: string }>> = {
     { value: "CANCELADA", label: "Cancelar" },
   ],
   AGUARDANDO_MATERIAL: [
-    { value: "EM_EXECUCAO", label: "Retomar execucao" },
+    { value: "EM_EXECUCAO", label: "Retomar execução" },
     { value: "CONCLUIDA", label: "Concluir" },
     { value: "CANCELADA", label: "Cancelar" },
   ],
   AGUARDANDO_TERCEIRO: [
-    { value: "EM_EXECUCAO", label: "Retomar execucao" },
+    { value: "EM_EXECUCAO", label: "Retomar execução" },
     { value: "CONCLUIDA", label: "Concluir" },
     { value: "CANCELADA", label: "Cancelar" },
   ],
@@ -101,6 +102,9 @@ export default function WorkOrdersAdmin({
   const [description, setDescription] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [priorityFilter, setPriorityFilter] = useState("ALL");
 
   const stationMap = new Map(stations.map((item) => [item.id, item]));
   const assetMap = new Map(assets.map((item) => [item.id, item]));
@@ -135,7 +139,7 @@ export default function WorkOrdersAdmin({
 
   async function createOrder() {
     if (!stationId || description.trim().length < 3) {
-      setFeedback("Selecione a estacao e descreva o servico.");
+      setFeedback("Selecione a estação e descreva o serviço.");
       return;
     }
     setBusyId("new");
@@ -157,10 +161,10 @@ export default function WorkOrdersAdmin({
       setAssignedId("");
       setPriority("MEDIA");
       setDescription("");
-      setFeedback("Ordem de servico criada.");
+      setFeedback("Ordem de serviço criada.");
       await onChanged();
     } catch {
-      setFeedback("Nao foi possivel criar a ordem de servico.");
+      setFeedback("Não foi possível criar a ordem de serviço.");
     } finally {
       setBusyId(null);
     }
@@ -175,10 +179,10 @@ export default function WorkOrdersAdmin({
           assigned_membership_id: membershipId || null,
         }),
       });
-      setFeedback("Responsavel atualizado.");
+      setFeedback("Responsável atualizado.");
       await onChanged();
     } catch {
-      setFeedback("Nao foi possivel atribuir a OS.");
+      setFeedback("Não foi possível atribuir a OS.");
     } finally {
       setBusyId(null);
     }
@@ -192,13 +196,13 @@ export default function WorkOrdersAdmin({
         method: "POST",
         body: JSON.stringify({
           status: target,
-          note: "Atualizacao pelo cockpit operacional.",
+          note: "Atualização pelo cockpit operacional.",
         }),
       });
       setFeedback("Status da OS atualizado.");
       await onChanged();
     } catch {
-      setFeedback("Nao foi possivel alterar o status da OS.");
+      setFeedback("Não foi possível alterar o status da OS.");
     } finally {
       setBusyId(null);
     }
@@ -207,13 +211,30 @@ export default function WorkOrdersAdmin({
   const sortedOrders = [...orders].sort(
     (a, b) => new Date(a.sla_due_at).getTime() - new Date(b.sla_due_at).getTime(),
   );
+  const filteredOrders = sortedOrders.filter((order) => {
+    const haystack = [
+      stationMap.get(order.station_id)?.name,
+      assetMap.get(order.asset_id ?? "")?.name,
+      memberMap.get(order.assigned_membership_id ?? "")?.name,
+      order.description,
+      order.status,
+      order.priority,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+    const matchesSearch = !search.trim() || haystack.includes(search.trim().toLowerCase());
+    const matchesStatus = statusFilter === "ALL" || order.status === statusFilter;
+    const matchesPriority = priorityFilter === "ALL" || order.priority === priorityFilter;
+    return matchesSearch && matchesStatus && matchesPriority;
+  });
 
   return (
     <section className="section-card">
       <div className="section-heading">
         <div>
-          <span className="eyebrow">Execucao</span>
-          <h2>Ordens de servico</h2>
+          <span className="eyebrow">Execução</span>
+          <h2>Ordens de serviço</h2>
           <p className="section-copy">
             Abra, atribua, execute e valide a OS sem sair do cockpit.
           </p>
@@ -232,17 +253,46 @@ export default function WorkOrdersAdmin({
         </div>
       </div>
 
+      <div className="list-toolbar work-order-toolbar">
+        <label className="search-field">
+          <Search size={16} />
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Buscar estação, ativo, responsável ou descrição"
+          />
+        </label>
+        <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+          <option value="ALL">Todos os status</option>
+          <option value="ABERTA">Aberta</option>
+          <option value="TRIAGEM">Triagem</option>
+          <option value="PLANEJADA">Planejada</option>
+          <option value="EM_EXECUCAO">Em execução</option>
+          <option value="AGUARDANDO_MATERIAL">Aguardando material</option>
+          <option value="AGUARDANDO_TERCEIRO">Aguardando terceiro</option>
+          <option value="CONCLUIDA">Concluída</option>
+          <option value="VALIDADA">Validada</option>
+        </select>
+        <select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)}>
+          <option value="ALL">Todas as prioridades</option>
+          <option value="CRITICA">Crítica</option>
+          <option value="ALTA">Alta</option>
+          <option value="MEDIA">Média</option>
+          <option value="BAIXA">Baixa</option>
+        </select>
+      </div>
+
       <div className="work-order-layout">
         <div className="ops-list">
-          {sortedOrders.slice(0, 30).map((order) => (
+          {filteredOrders.slice(0, 30).map((order) => (
             <div className="work-order-card" key={order.id}>
               <div className="work-order-main">
                 <div>
-                  <strong>{stationMap.get(order.station_id)?.name ?? "Estacao"}</strong>
+                  <strong>{stationMap.get(order.station_id)?.name ?? "Estação"}</strong>
                   <span>{order.description}</span>
                   <span>
                     {(order.asset_id ? assetMap.get(order.asset_id)?.name + " · " : "") +
-                      (memberMap.get(order.assigned_membership_id ?? "")?.name ?? "Sem responsavel")}
+                      (memberMap.get(order.assigned_membership_id ?? "")?.name ?? "Sem responsável")}
                   </span>
                 </div>
                 <div className="ops-meta">
@@ -255,13 +305,13 @@ export default function WorkOrdersAdmin({
 
               <div className="work-order-controls">
                 <label>
-                  Responsavel
+                  Responsável
                   <select
                     value={order.assigned_membership_id ?? ""}
                     disabled={busyId === order.id}
                     onChange={(event) => void assign(order, event.target.value)}
                   >
-                    <option value="">Sem responsavel</option>
+                    <option value="">Sem responsável</option>
                     {assignableTeam.map((member) => (
                       <option key={member.membership_id} value={member.membership_id}>
                         {member.name + " · " + member.role}
@@ -270,7 +320,7 @@ export default function WorkOrdersAdmin({
                   </select>
                 </label>
                 <label>
-                  Proxima etapa
+                  Próxima etapa
                   <select
                     value=""
                     disabled={busyId === order.id || !(TRANSITIONS[order.status]?.length)}
@@ -287,25 +337,47 @@ export default function WorkOrdersAdmin({
               </div>
             </div>
           ))}
-          {orders.length === 0 && <div className="empty-state">Nenhuma ordem de servico.</div>}
+          {orders.length === 0 && (
+            <div className="empty-state empty-state-positive">
+              <strong>Nenhuma ordem de serviço</strong>
+              <span>A operação não possui OS registrada neste momento.</span>
+            </div>
+          )}
+          {orders.length > 0 && filteredOrders.length === 0 && (
+            <div className="empty-state">
+              <Search size={22} />
+              <strong>Nenhuma OS encontrada</strong>
+              <span>Altere a busca ou os filtros para ampliar os resultados.</span>
+              <button
+                className="small-button"
+                onClick={() => {
+                  setSearch("");
+                  setStatusFilter("ALL");
+                  setPriorityFilter("ALL");
+                }}
+              >
+                Limpar filtros
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="compact-form admin-create-form">
-          <h3>Nova ordem de servico</h3>
+          <h3>Nova ordem de serviço</h3>
           <label>
-            Ocorrencia
+            Ocorrência
             <select value={occurrenceId} onChange={(event) => selectOccurrence(event.target.value)}>
               <option value="">OS avulsa</option>
               {openOccurrences.map((item) => (
                 <option key={item.id} value={item.id}>
-                  {(stationMap.get(item.station_id)?.name ?? "Estacao") + " · " + item.description}
+                  {(stationMap.get(item.station_id)?.name ?? "Estação") + " · " + item.description}
                 </option>
               ))}
             </select>
           </label>
           <div className="compact-form-grid">
             <label>
-              Estacao
+              Estação
               <select
                 value={stationId}
                 disabled={Boolean(occurrenceId)}
@@ -323,7 +395,7 @@ export default function WorkOrdersAdmin({
             <label>
               Ativo
               <select value={assetId} onChange={(event) => setAssetId(event.target.value)}>
-                <option value="">Sem ativo especifico</option>
+                <option value="">Sem ativo específico</option>
                 {assets
                   .filter((item) => item.is_active && item.station_id === stationId)
                   .map((item) => (
@@ -335,13 +407,13 @@ export default function WorkOrdersAdmin({
               Prioridade
               <select value={priority} onChange={(event) => setPriority(event.target.value)}>
                 <option value="BAIXA">Baixa</option>
-                <option value="MEDIA">Media</option>
+                <option value="MEDIA">Média</option>
                 <option value="ALTA">Alta</option>
-                <option value="CRITICA">Critica</option>
+                <option value="CRITICA">Crítica</option>
               </select>
             </label>
             <label>
-              Responsavel
+              Responsável
               <select value={assignedId} onChange={(event) => setAssignedId(event.target.value)}>
                 <option value="">Definir depois</option>
                 {assignableTeam.map((member) => (
@@ -353,7 +425,7 @@ export default function WorkOrdersAdmin({
             </label>
           </div>
           <label className="full-field">
-            Descricao
+            Descrição
             <textarea rows={4} value={description} onChange={(event) => setDescription(event.target.value)} />
           </label>
           <button className="small-button" disabled={busyId === "new"} onClick={() => void createOrder()}>

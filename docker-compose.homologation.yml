@@ -3,7 +3,7 @@ services:
     image: adobe/s3mock:5.2.2
     restart: unless-stopped
     environment:
-      COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS: ${S3_BUCKET:-vwengenharia}
+      COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS: ${S3_BUCKET:-mwengenharia}
       COM_ADOBE_TESTING_S3MOCK_STORE_ROOT: /s3mockroot
       COM_ADOBE_TESTING_S3MOCK_STORE_RETAIN_FILES_ON_EXIT: "true"
     ports:
@@ -44,17 +44,17 @@ services:
         condition: service_started
     environment:
       APP_ENV: homologation
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-vw}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-vwengenharia}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-mw}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mwengenharia}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       S3_ENDPOINT: http://s3mock:9090
       S3_PUBLIC_ENDPOINT: http://127.0.0.1:${HOMOLOGATION_S3_PORT:-19000}
       S3_REGION: ${S3_REGION:-us-east-1}
-      S3_BUCKET: ${S3_BUCKET:-vwengenharia}
+      S3_BUCKET: ${S3_BUCKET:-mwengenharia}
       S3_ACCESS_KEY: ${S3_ACCESS_KEY:-dummy}
       S3_SECRET_KEY: ${S3_SECRET_KEY:-dummy}
       HOMOLOGATION_PASSWORD: ${HOMOLOGATION_PASSWORD:?HOMOLOGATION_PASSWORD is required}
-      HOMOLOGATION_TENANT_NAME: ${HOMOLOGATION_TENANT_NAME:-VW Engenharia - Homologacao}
-      HOMOLOGATION_TENANT_SLUG: ${HOMOLOGATION_TENANT_SLUG:-vw-homologacao}
+      HOMOLOGATION_TENANT_NAME: ${HOMOLOGATION_TENANT_NAME:-MW Engenharia - Homologacao}
+      HOMOLOGATION_TENANT_SLUG: ${HOMOLOGATION_TENANT_SLUG:-mw-homologacao}
       HOMOLOGATION_ADMIN_EMAIL: ${HOMOLOGATION_ADMIN_EMAIL:-gestor.homologacao@example.com}
       HOMOLOGATION_TECH_EMAIL: ${HOMOLOGATION_TECH_EMAIL:-tecnico.homologacao@example.com}
       HOMOLOGATION_MAINTENANCE_EMAIL: ${HOMOLOGATION_MAINTENANCE_EMAIL:-manutencao.homologacao@example.com}

@@ -1,0 +1,354 @@
+from fastapi import HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.field import Visit
+from app.models.identity import Membership, Role, User
+from app.models.maintenance import Occurrence, WorkOrder
+from app.models.operations import (
+    Client,
+    ClientDevelopmentContact,
+    ClientMembershipAccess,
+    Development,
+    Station,
+)
+from app.modules.auth.dependencies import AuthContext
+from app.modules.core_registers.service import add_audit
+from app.modules.team.schemas import TeamMemberCreate
+from app.modules.team.service import create_team_member
+
+
+def _granted_development_ids(context: AuthContext, client_ids):
+    """Empreendimentos liberados explicitamente para os responsaveis deste login."""
+    return select(ClientDevelopmentContact.development_id).where(
+        ClientDevelopmentContact.tenant_id == context.tenant.id,
+        ClientDevelopmentContact.client_id.in_(client_ids),
+        ClientDevelopmentContact.portal_access.is_(True),
+        ClientDevelopmentContact.is_active.is_(True),
+    )
+
+
+async def client_can_view_development(
+    session: AsyncSession,
+    context: AuthContext,
+    development_id,
+) -> bool:
+    client_ids = select(ClientMembershipAccess.client_id).where(
+        ClientMembershipAccess.tenant_id == context.tenant.id,
+        ClientMembershipAccess.membership_id == context.membership.id,
+    )
+    granted = _granted_development_ids(context, client_ids).where(
+        ClientDevelopmentContact.development_id == development_id
+    )
+    return (await session.execute(granted.limit(1))).first() is not None
+
+
+async def build_client_portal(
+    session: AsyncSession,
+    context: AuthContext,
+) -> dict:
+    client_ids = list(
+        (
+            await session.execute(
+                select(ClientMembershipAccess.client_id).where(
+                    ClientMembershipAccess.tenant_id == context.tenant.id,
+                    ClientMembershipAccess.membership_id == context.membership.id,
+                )
+            )
+        ).scalars()
+    )
+    if not client_ids:
+        return {
+            "clients": [],
+            "stations": [],
+            "visits": [],
+            "occurrences": [],
+            "work_orders": [],
+        }
+
+    clients = list(
+        (
+            await session.execute(
+                select(Client).where(
+                    Client.tenant_id == context.tenant.id,
+                    Client.id.in_(client_ids),
+                )
+            )
+        ).scalars()
+    )
+    development_rows = list(
+        (
+            await session.execute(
+                select(Development).where(
+                    Development.tenant_id == context.tenant.id,
+                    Development.id.in_(_granted_development_ids(context, client_ids)),
+                )
+            )
+        ).scalars()
+    )
+    development_ids = [item.id for item in development_rows]
+    development_map = {item.id: item for item in development_rows}
+    stations = (
+        list(
+            (
+                await session.execute(
+                    select(Station).where(
+                        Station.tenant_id == context.tenant.id,
+                        Station.development_id.in_(development_ids),
+                    )
+                )
+            ).scalars()
+        )
+        if development_ids
+        else []
+    )
+    station_ids = [item.id for item in stations]
+
+    visits = (
+        list(
+            (
+                await session.execute(
+                    select(Visit)
+                    .where(
+                        Visit.tenant_id == context.tenant.id,
+                        Visit.station_id.in_(station_ids),
+                    )
+                    .order_by(Visit.scheduled_for.desc())
+                    .limit(200)
+                )
+            ).scalars()
+        )
+        if station_ids
+        else []
+    )
+    occurrences = (
+        list(
+            (
+                await session.execute(
+                    select(Occurrence)
+                    .where(
+                        Occurrence.tenant_id == context.tenant.id,
+                        Occurrence.station_id.in_(station_ids),
+                    )
+                    .order_by(Occurrence.detected_at.desc())
+                    .limit(200)
+                )
+            ).scalars()
+        )
+        if station_ids
+        else []
+    )
+    work_orders = (
+        list(
+            (
+                await session.execute(
+                    select(WorkOrder)
+                    .where(
+                        WorkOrder.tenant_id == context.tenant.id,
+                        WorkOrder.station_id.in_(station_ids),
+                    )
+                    .order_by(WorkOrder.created_at.desc())
+                    .limit(200)
+                )
+            ).scalars()
+        )
+        if station_ids
+        else []
+    )
+
+    return {
+        "clients": [{"id": item.id, "name": item.name} for item in clients],
+        "stations": [
+            {
+                "id": item.id,
+                "development_id": item.development_id,
+                "development_name": development_map[item.development_id].name,
+                "name": item.name,
+                "code": item.code,
+                "station_type": item.station_type,
+            }
+            for item in stations
+        ],
+        "visits": [
+            {
+                "id": item.id,
+                "station_id": item.station_id,
+                "scheduled_for": item.scheduled_for,
+                "finished_at": item.finished_at,
+                "status": item.status,
+            }
+            for item in visits
+        ],
+        "occurrences": [
+            {
+                "id": item.id,
+                "station_id": item.station_id,
+                "occurrence_type": item.occurrence_type,
+                "severity": item.severity,
+                "status": item.status,
+                "description": item.description,
+                "detected_at": item.detected_at,
+            }
+            for item in occurrences
+        ],
+        "work_orders": [
+            {
+                "id": item.id,
+                "station_id": item.station_id,
+                "asset_id": item.asset_id,
+                "priority": item.priority,
+                "status": item.status,
+                "description": item.description,
+                "sla_due_at": item.sla_due_at,
+                "completed_at": item.completed_at,
+            }
+            for item in work_orders
+        ],
+    }
+
+
+
+async def grant_client_access(
+    session: AsyncSession,
+    context: AuthContext,
+    *,
+    membership_id,
+    client_id,
+):
+    membership = (
+        await session.execute(
+            select(Membership).where(
+                Membership.id == membership_id,
+                Membership.tenant_id == context.tenant.id,
+                Membership.is_active.is_(True),
+            )
+        )
+    ).scalar_one_or_none()
+    if membership is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="membership_not_found")
+    if membership.role != Role.CLIENTE.value:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="membership_is_not_client_role",
+        )
+
+    client = (
+        await session.execute(
+            select(Client).where(
+                Client.id == client_id,
+                Client.tenant_id == context.tenant.id,
+                Client.is_active.is_(True),
+            )
+        )
+    ).scalar_one_or_none()
+    if client is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="client_not_found")
+
+    existing = (
+        await session.execute(
+            select(ClientMembershipAccess).where(
+                ClientMembershipAccess.tenant_id == context.tenant.id,
+                ClientMembershipAccess.membership_id == membership.id,
+                ClientMembershipAccess.client_id == client.id,
+            )
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        return existing
+
+    access = ClientMembershipAccess(
+        tenant_id=context.tenant.id,
+        membership_id=membership.id,
+        client_id=client.id,
+    )
+    session.add(access)
+    await session.flush()
+    add_audit(
+        session,
+        context,
+        action="CLIENT_PORTAL_ACCESS_GRANT",
+        entity_type="client_membership_access",
+        entity_id=access.id,
+        fields=["membership_id", "client_id"],
+    )
+    await session.commit()
+    await session.refresh(access)
+    return access
+
+
+async def list_client_access(
+    session: AsyncSession,
+    context: AuthContext,
+):
+    stmt = (
+        select(ClientMembershipAccess, User)
+        .join(Membership, Membership.id == ClientMembershipAccess.membership_id)
+        .join(User, User.id == Membership.user_id)
+        .where(ClientMembershipAccess.tenant_id == context.tenant.id)
+        .order_by(ClientMembershipAccess.created_at.desc())
+    )
+    return [
+        {
+            "id": access.id,
+            "membership_id": access.membership_id,
+            "client_id": access.client_id,
+            "user_name": user.name,
+            "user_email": user.email,
+        }
+        for access, user in (await session.execute(stmt)).all()
+    ]
+
+
+async def create_portal_credential(
+    session: AsyncSession,
+    context: AuthContext,
+    *,
+    client_id,
+    email: str,
+    password: str,
+) -> dict:
+    """Cria o login de portal de um responsavel ja cadastrado."""
+    client = (
+        await session.execute(
+            select(Client).where(
+                Client.id == client_id,
+                Client.tenant_id == context.tenant.id,
+                Client.is_active.is_(True),
+            )
+        )
+    ).scalar_one_or_none()
+    if client is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="client_not_found")
+    existing = (
+        await session.execute(
+            select(ClientMembershipAccess.id).where(
+                ClientMembershipAccess.tenant_id == context.tenant.id,
+                ClientMembershipAccess.client_id == client.id,
+            )
+        )
+    ).first()
+    if existing is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="client_already_has_portal_credential",
+        )
+
+    membership = await create_team_member(
+        session,
+        context,
+        TeamMemberCreate(email=email, name=client.name, password=password, role=Role.CLIENTE),
+        allow_client_role=True,
+    )
+    access = await grant_client_access(
+        session,
+        context,
+        membership_id=membership.id,
+        client_id=client.id,
+    )
+    return {
+        "id": access.id,
+        "membership_id": access.membership_id,
+        "client_id": access.client_id,
+        "user_name": membership.user.name,
+        "user_email": membership.user.email,
+    }

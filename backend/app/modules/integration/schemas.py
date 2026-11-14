@@ -25,11 +25,16 @@ class IntegrationKeyCreated(IntegrationKeyRead):
 
 class IntegrationResource(StrEnum):
     CLIENTS = "clients"
+    CLIENT_CONTACTS = "client-contacts"
+    CONTRACTING_PARTIES = "contracting-parties"
     DEVELOPMENTS = "developments"
     STATIONS = "stations"
+    PROCESS_UNIT_TYPES = "process-unit-types"
+    PROCESS_UNITS = "process-units"
     ASSETS = "assets"
     VISIT_PLANS = "visit-plans"
     VISITS = "visits"
+    VISIT_ASSET_SITUATIONS = "visit-asset-situations"
     MEASUREMENTS = "measurements"
     OCCURRENCES = "occurrences"
     WORK_ORDERS = "work-orders"

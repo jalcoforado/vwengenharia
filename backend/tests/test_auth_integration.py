@@ -57,7 +57,7 @@ async def test_login_tenant_boundary_and_refresh_rotation() -> None:
         assert tokens["tenant_id"] == str(tenant_a_id)
         assert tokens["role"] == Role.ADMIN.value
         set_cookie = login.headers.get("set-cookie", "")
-        assert "vw_refresh=" in set_cookie
+        assert "mw_refresh=" in set_cookie
         assert "HttpOnly" in set_cookie
 
         me = await client.get(

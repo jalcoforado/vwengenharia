@@ -49,7 +49,7 @@ export default function ChecklistAdmin({ templates, onChanged }: Props) {
     }
     void api<ChecklistItem[]>("/api/v1/checklist-templates/" + selectedId + "/items")
       .then(setItems)
-      .catch(() => setFeedback("Nao foi possivel carregar os itens do checklist."));
+      .catch(() => setFeedback("Não foi possível carregar os itens do checklist."));
   }, [selectedId]);
 
   async function createTemplate() {
@@ -72,7 +72,7 @@ export default function ChecklistAdmin({ templates, onChanged }: Props) {
       setFeedback("Checklist criado.");
       await onChanged();
     } catch {
-      setFeedback("Nao foi possivel criar o checklist.");
+      setFeedback("Não foi possível criar o checklist.");
     } finally {
       setBusy(false);
     }
@@ -80,7 +80,7 @@ export default function ChecklistAdmin({ templates, onChanged }: Props) {
 
   async function addItem() {
     if (!selectedId || code.trim().length < 1 || label.trim().length < 2) {
-      setFeedback("Selecione o checklist e informe codigo e pergunta.");
+      setFeedback("Selecione o checklist e informe código e pergunta.");
       return;
     }
 
@@ -90,7 +90,7 @@ export default function ChecklistAdmin({ templates, onChanged }: Props) {
         : null;
 
     if (answerType === "SELECT" && !optionList?.length) {
-      setFeedback("Informe ao menos uma opcao para o campo de selecao.");
+      setFeedback("Informe ao menos uma opção para o campo de seleção.");
       return;
     }
 
@@ -114,7 +114,7 @@ export default function ChecklistAdmin({ templates, onChanged }: Props) {
       setFeedback("Campo adicionado.");
       setItems(await api<ChecklistItem[]>("/api/v1/checklist-templates/" + selectedId + "/items"));
     } catch {
-      setFeedback("Nao foi possivel adicionar o campo.");
+      setFeedback("Não foi possível adicionar o campo.");
     } finally {
       setBusy(false);
     }
@@ -126,10 +126,10 @@ export default function ChecklistAdmin({ templates, onChanged }: Props) {
     <section className="section-card">
       <div className="section-heading">
         <div>
-          <span className="eyebrow">Configuracao</span>
+          <span className="eyebrow">Configuração</span>
           <h2>Checklists de campo</h2>
           <p className="section-copy">
-            Versoes publicadas permanecem historicas; alteracoes relevantes devem criar uma nova versao.
+            Versões publicadas permanecem históricas; alterações relevantes devem criar uma nova versão.
           </p>
         </div>
       </div>
@@ -155,14 +155,14 @@ export default function ChecklistAdmin({ templates, onChanged }: Props) {
                   <strong>{item.label}</strong>
                   <span>
                     {item.code + " · " + item.answer_type.replaceAll("_", " ") +
-                      (item.required ? " · obrigatorio" : "")}
+                      (item.required ? " · obrigatório" : "")}
                   </span>
                 </div>
                 <span className="status">{item.position}</span>
               </div>
             ))}
             {selected && items.length === 0 && (
-              <div className="empty-state">Esse checklist ainda nao possui campos.</div>
+              <div className="empty-state">Esse checklist ainda não possui campos.</div>
             )}
           </div>
         </div>
@@ -176,7 +176,7 @@ export default function ChecklistAdmin({ templates, onChanged }: Props) {
                 <input value={templateName} onChange={(event) => setTemplateName(event.target.value)} />
               </label>
               <label>
-                Versao
+                Versão
                 <input
                   inputMode="numeric"
                   value={templateVersion}
@@ -193,16 +193,16 @@ export default function ChecklistAdmin({ templates, onChanged }: Props) {
             <h3>Adicionar campo</h3>
             <div className="compact-form-grid">
               <label>
-                Codigo
+                Código
                 <input value={code} onChange={(event) => setCode(event.target.value)} placeholder="GRADE_LIMPA" />
               </label>
               <label>
                 Tipo
                 <select value={answerType} onChange={(event) => setAnswerType(event.target.value)}>
-                  <option value="BOOLEAN">Sim / Nao</option>
-                  <option value="NUMBER">Numero</option>
+                  <option value="BOOLEAN">Sim / Não</option>
+                  <option value="NUMBER">Número</option>
                   <option value="TEXT">Texto</option>
-                  <option value="SELECT">Selecao</option>
+                  <option value="SELECT">Seleção</option>
                   <option value="ASSET_STATUS">Status de equipamento</option>
                 </select>
               </label>
@@ -213,7 +213,7 @@ export default function ChecklistAdmin({ templates, onChanged }: Props) {
             </label>
             {answerType === "SELECT" && (
               <label className="full-field">
-                Opcoes separadas por virgula
+                Opções separadas por vírgula
                 <input value={options} onChange={(event) => setOptions(event.target.value)} />
               </label>
             )}
@@ -223,7 +223,7 @@ export default function ChecklistAdmin({ templates, onChanged }: Props) {
                 checked={required}
                 onChange={(event) => setRequired(event.target.checked)}
               />
-              Campo obrigatorio para finalizar a visita
+              Campo obrigatório para finalizar a visita
             </label>
             <button className="small-button" disabled={busy || !selectedId} onClick={() => void addItem()}>
               Adicionar campo

@@ -25,6 +25,8 @@ from app.models.maintenance import (
 )
 from app.models.materials import MaterialRequest
 from app.models.operations import Asset, AssetType, Client, Development, Station
+from app.modules.core_registers.service import set_primary_contact
+from app.modules.team.service import ensure_collaborator_for_membership
 
 
 def required(name: str) -> str:
@@ -83,6 +85,7 @@ async def get_or_create_user(
     else:
         membership.role = role
         membership.is_active = True
+    await ensure_collaborator_for_membership(session, membership, user)
     return membership
 
 
@@ -91,10 +94,10 @@ async def main() -> None:
     if len(password) < 12:
         raise RuntimeError("HOMOLOGATION_PASSWORD must contain at least 12 characters")
 
-    tenant_slug = os.getenv("HOMOLOGATION_TENANT_SLUG", "vw-homologacao").strip()
+    tenant_slug = os.getenv("HOMOLOGATION_TENANT_SLUG", "mw-homologacao").strip()
     tenant_name = os.getenv(
         "HOMOLOGATION_TENANT_NAME",
-        "VW Engenharia - Homologacao",
+        "MW Engenharia - Homologacao",
     ).strip()
 
     admin_email = os.getenv(
@@ -191,6 +194,7 @@ async def main() -> None:
             )
             session.add(development)
             await session.flush()
+        await set_primary_contact(session, development, development.client_id)
 
         station = (
             await session.execute(

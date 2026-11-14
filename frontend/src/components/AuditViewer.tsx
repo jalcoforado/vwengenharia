@@ -43,7 +43,7 @@ export default function AuditViewer({ team }: { team: TeamMember[] }) {
       const suffix = params.toString() ? "?" + params.toString() : "";
       setEvents(await api<AuditEvent[]>("/api/v1/audit-events" + suffix));
     } catch {
-      setError("Nao foi possivel carregar a auditoria.");
+      setError("Não foi possível carregar a auditoria.");
     } finally {
       setBusy(false);
     }
@@ -61,10 +61,10 @@ export default function AuditViewer({ team }: { team: TeamMember[] }) {
     <section className="section-card">
       <div className="section-heading">
         <div>
-          <span className="eyebrow">Governanca</span>
+          <span className="eyebrow">Governança</span>
           <h2>Auditoria</h2>
           <p className="section-copy">
-            Historico de alteracoes e acoes relevantes realizadas no ERP.
+            Histórico de alterações e ações relevantes realizadas no ERP.
           </p>
         </div>
         <button className="secondary-button" disabled={busy} onClick={() => void load()}>
@@ -74,7 +74,7 @@ export default function AuditViewer({ team }: { team: TeamMember[] }) {
 
       <div className="audit-filters">
         <label>
-          Acao
+          Ação
           <select value={action} onChange={(event) => setAction(event.target.value)}>
             <option value="">Todas</option>
             {actions.map((item) => <option key={item} value={item}>{item}</option>)}
@@ -88,7 +88,7 @@ export default function AuditViewer({ team }: { team: TeamMember[] }) {
           </select>
         </label>
         <label>
-          Usuario
+          Usuário
           <select value={actorId} onChange={(event) => setActorId(event.target.value)}>
             <option value="">Todos</option>
             {team.map((member) => (
@@ -118,7 +118,7 @@ export default function AuditViewer({ team }: { team: TeamMember[] }) {
             <div className="audit-meta">
               <span>
                 {event.actor_user_id
-                  ? userMap.get(event.actor_user_id)?.name ?? "Usuario"
+                  ? userMap.get(event.actor_user_id)?.name ?? "Usuário"
                   : "Sistema"}
               </span>
               <time>

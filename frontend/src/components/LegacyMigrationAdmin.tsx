@@ -49,7 +49,7 @@ export default function LegacyMigrationAdmin({
     try {
       setSummary(await api<Summary>("/api/v1/legacy-migration/summary"));
     } catch {
-      setFeedback("Nao foi possivel carregar o estado da migracao.");
+      setFeedback("Não foi possível carregar o estado da migração.");
     }
   }
 
@@ -75,13 +75,13 @@ export default function LegacyMigrationAdmin({
         result.staged +
           " linha(s) adicionada(s) ao staging; " +
           result.skipped_existing +
-          " ja existiam; " +
+          " já existiam; " +
           result.errors +
           " com erro.",
       );
       await load();
     } catch {
-      setFeedback("Nao foi possivel processar o arquivo.");
+      setFeedback("Não foi possível processar o arquivo.");
     } finally {
       setBusy(false);
     }
@@ -103,7 +103,7 @@ export default function LegacyMigrationAdmin({
       );
       await load();
     } catch {
-      setFeedback("Nao foi possivel executar o auto-mapeamento.");
+      setFeedback("Não foi possível executar o auto-mapeamento.");
     } finally {
       setBusy(false);
     }
@@ -154,7 +154,7 @@ export default function LegacyMigrationAdmin({
       );
       await load();
     } catch {
-      setFeedback("Nao foi possivel materializar o lote.");
+      setFeedback("Não foi possível materializar o lote.");
     } finally {
       setBusy(false);
     }
@@ -164,10 +164,10 @@ export default function LegacyMigrationAdmin({
     <section className="section-card">
       <div className="section-heading">
         <div>
-          <span className="eyebrow">Migracao</span>
-          <h2>Historico da planilha</h2>
+          <span className="eyebrow">Migração</span>
+          <h2>Histórico da planilha</h2>
           <p className="section-copy">
-            O staging preserva o registro bruto antes de qualquer normalizacao.
+            O staging preserva o registro bruto antes de qualquer normalização.
           </p>
         </div>
       </div>
@@ -198,7 +198,7 @@ export default function LegacyMigrationAdmin({
 
       <div className="migration-map-grid">
         <section>
-          <h3>Estacoes ainda sem mapeamento</h3>
+          <h3>Estações ainda sem mapeamento</h3>
           <div className="mapping-list">
             {(summary?.unmapped_station_labels ?? []).slice(0, 30).map((label) => (
               <label className="mapping-row" key={label}>
@@ -212,13 +212,13 @@ export default function LegacyMigrationAdmin({
               </label>
             ))}
             {summary?.unmapped_station_labels.length === 0 && (
-              <div className="empty-state">Todas as estacoes estao mapeadas.</div>
+              <div className="empty-state">Todas as estações estão mapeadas.</div>
             )}
           </div>
         </section>
 
         <section>
-          <h3>Tecnicos ainda sem mapeamento</h3>
+          <h3>Técnicos ainda sem mapeamento</h3>
           <div className="mapping-list">
             {(summary?.unmapped_technician_labels ?? []).slice(0, 30).map((label) => (
               <label className="mapping-row" key={label}>
@@ -234,7 +234,7 @@ export default function LegacyMigrationAdmin({
               </label>
             ))}
             {summary?.unmapped_technician_labels.length === 0 && (
-              <div className="empty-state">Todos os tecnicos estao mapeados.</div>
+              <div className="empty-state">Todos os técnicos estão mapeados.</div>
             )}
           </div>
         </section>
@@ -247,14 +247,14 @@ export default function LegacyMigrationAdmin({
             checked={preserveReview}
             onChange={(event) => setPreserveReview(event.target.checked)}
           />
-          Preservar "Aguardando Revisao" como backlog operacional
+          Preservar "Aguardando Revisão" como backlog operacional
         </label>
         <p>
-          Recomendacao: deixe desmarcado na primeira migracao. O status original continua
-          preservado no staging, mas registros historicos nao poluem a fila atual.
+          Recomendação: deixe desmarcado na primeira migração. O status original continua
+          preservado no staging, mas registros históricos não poluem a fila atual.
         </p>
         <button className="small-button" disabled={busy} onClick={() => void materialize()}>
-          Importar proximo lote de 1.000
+          Importar próximo lote de 1.000
         </button>
       </div>
 

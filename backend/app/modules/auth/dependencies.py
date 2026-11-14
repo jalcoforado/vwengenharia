@@ -66,10 +66,16 @@ async def get_auth_context(
 AuthContextDep = Annotated[AuthContext, Depends(get_auth_context)]
 
 
-def require_roles(*roles: str):
+def require_roles(*roles: str, allow_password_change_pending: bool = False):
     async def dependency(context: AuthContextDep) -> AuthContext:
         if context.membership.role not in roles:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="insufficient_role")
+        # Com senha provisoria, so a troca de senha fica disponivel.
+        if context.user.must_change_password and not allow_password_change_pending:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="password_change_required",
+            )
         return context
 
     return dependency

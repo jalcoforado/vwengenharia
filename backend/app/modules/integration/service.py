@@ -4,10 +4,10 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.field import Measurement, Visit, VisitPlan
+from app.models.field import Measurement, Visit, VisitAssetSituation, VisitPlan
 from app.models.integration import IntegrationCredential
 from app.models.maintenance import (
     Occurrence,
@@ -15,7 +15,16 @@ from app.models.maintenance import (
     WorkOrder,
     WorkOrderStatusHistory,
 )
-from app.models.operations import Asset, Client, Development, Station
+from app.models.operations import (
+    Asset,
+    Client,
+    ClientDevelopmentContact,
+    ContractingParty,
+    Development,
+    ProcessUnit,
+    ProcessUnitType,
+    Station,
+)
 from app.modules.auth.dependencies import AuthContext
 from app.modules.core_registers.service import add_audit
 from app.modules.integration.dependencies import IntegrationContext
@@ -46,7 +55,7 @@ async def create_integration_key(
             detail="integration_key_name_exists",
         )
 
-    secret = "vwk_" + secrets.token_urlsafe(32)
+    secret = "mwk_" + secrets.token_urlsafe(32)
     credential = IntegrationCredential(
         tenant_id=context.tenant.id,
         name=name,
@@ -133,6 +142,21 @@ def _serialize(resource: IntegrationResource, row) -> dict:
                 "contact_name": row.contact_name,
                 "contact_email": row.contact_email,
                 "contact_phone": row.contact_phone,
+                "contact_role": row.contact_role,
+                "contact_whatsapp": row.contact_whatsapp,
+                "is_active": row.is_active,
+            }
+        )
+    elif resource == IntegrationResource.CONTRACTING_PARTIES:
+        payload.update(
+            {
+                "person_type": row.person_type,
+                "name": row.name,
+                "trade_name": row.trade_name,
+                "document": row.document,
+                "contact_email": row.contact_email,
+                "contact_phone": row.contact_phone,
+                "contact_whatsapp": row.contact_whatsapp,
                 "is_active": row.is_active,
             }
         )
@@ -140,7 +164,11 @@ def _serialize(resource: IntegrationResource, row) -> dict:
         payload.update(
             {
                 "client_id": row.client_id,
+                "contracting_party_id": row.contracting_party_id,
                 "name": row.name,
+                "document": row.document,
+                "contact_phone": row.contact_phone,
+                "contact_email": row.contact_email,
                 "address_line": row.address_line,
                 "city": row.city,
                 "state": row.state,
@@ -161,11 +189,30 @@ def _serialize(resource: IntegrationResource, row) -> dict:
                 "is_active": row.is_active,
             }
         )
+    elif resource == IntegrationResource.PROCESS_UNIT_TYPES:
+        payload.update(
+            {
+                "name": row.name,
+                "code": row.code,
+                "stage": row.stage,
+                "is_active": row.is_active,
+            }
+        )
+    elif resource == IntegrationResource.PROCESS_UNITS:
+        payload.update(
+            {
+                "station_id": row.station_id,
+                "unit_type_id": row.unit_type_id,
+                "name": row.name,
+                "is_active": row.is_active,
+            }
+        )
     elif resource == IntegrationResource.ASSETS:
         payload.update(
             {
                 "station_id": row.station_id,
                 "asset_type_id": row.asset_type_id,
+                "process_unit_id": row.process_unit_id,
                 "name": row.name,
                 "manufacturer": row.manufacturer,
                 "model": row.model,
@@ -202,6 +249,15 @@ def _serialize(resource: IntegrationResource, row) -> dict:
                 "finished_at": row.finished_at,
                 "status": row.status,
                 "notes": row.notes,
+            }
+        )
+    elif resource == IntegrationResource.VISIT_ASSET_SITUATIONS:
+        payload.update(
+            {
+                "visit_id": row.visit_id,
+                "asset_id": row.asset_id,
+                "situation": row.situation,
+                "comment": row.comment,
             }
         )
     elif resource == IntegrationResource.MEASUREMENTS:
@@ -273,11 +329,21 @@ def _serialize(resource: IntegrationResource, row) -> dict:
 
 _RESOURCE_CONFIG = {
     IntegrationResource.CLIENTS: (Client, Client.updated_at),
+    IntegrationResource.CONTRACTING_PARTIES: (
+        ContractingParty,
+        ContractingParty.updated_at,
+    ),
     IntegrationResource.DEVELOPMENTS: (Development, Development.updated_at),
     IntegrationResource.STATIONS: (Station, Station.updated_at),
+    IntegrationResource.PROCESS_UNIT_TYPES: (ProcessUnitType, ProcessUnitType.updated_at),
+    IntegrationResource.PROCESS_UNITS: (ProcessUnit, ProcessUnit.updated_at),
     IntegrationResource.ASSETS: (Asset, Asset.updated_at),
     IntegrationResource.VISIT_PLANS: (VisitPlan, VisitPlan.updated_at),
     IntegrationResource.VISITS: (Visit, Visit.updated_at),
+    IntegrationResource.VISIT_ASSET_SITUATIONS: (
+        VisitAssetSituation,
+        VisitAssetSituation.updated_at,
+    ),
     IntegrationResource.MEASUREMENTS: (Measurement, Measurement.updated_at),
     IntegrationResource.OCCURRENCES: (Occurrence, Occurrence.updated_at),
     IntegrationResource.WORK_ORDERS: (WorkOrder, WorkOrder.updated_at),
@@ -287,6 +353,58 @@ _RESOURCE_CONFIG = {
     ),
     IntegrationResource.REVIEWS: (VisitReview, VisitReview.reviewed_at),
 }
+
+
+async def _fetch_client_contacts(
+    session: AsyncSession,
+    tenant_id: UUID,
+    *,
+    generated_at: datetime,
+    updated_since: datetime | None,
+    limit: int,
+    offset: int,
+) -> list[dict]:
+    # A linha muda quando o vinculo ou os dados do cliente mudam.
+    watermark = func.greatest(ClientDevelopmentContact.updated_at, Client.updated_at)
+    stmt = (
+        select(ClientDevelopmentContact, Client, watermark)
+        .join(
+            Client,
+            and_(
+                Client.id == ClientDevelopmentContact.client_id,
+                Client.tenant_id == ClientDevelopmentContact.tenant_id,
+            ),
+        )
+        .where(
+            ClientDevelopmentContact.tenant_id == tenant_id,
+            watermark <= generated_at,
+        )
+    )
+    if updated_since is not None:
+        stmt = stmt.where(watermark > updated_since)
+    stmt = (
+        stmt.order_by(watermark, ClientDevelopmentContact.id)
+        .limit(limit + 1)
+        .offset(offset)
+    )
+    return [
+        {
+            "id": contact.id,
+            "created_at": contact.created_at,
+            "updated_at": changed_at,
+            "client_id": contact.client_id,
+            "development_id": contact.development_id,
+            "scope": contact.scope,
+            "is_primary": contact.is_primary,
+            "name": client.name,
+            "contact_role": client.contact_role,
+            "contact_phone": client.contact_phone,
+            "contact_whatsapp": client.contact_whatsapp,
+            "contact_email": client.contact_email,
+            "is_active": contact.is_active,
+        }
+        for contact, client, changed_at in (await session.execute(stmt)).all()
+    ]
 
 
 async def export_resource(
@@ -316,23 +434,32 @@ async def export_resource(
             detail="snapshot_at_cannot_be_future",
         )
     generated_at = snapshot_at or now
-    model, watermark_column = _RESOURCE_CONFIG[resource]
 
-    stmt = select(model).where(
-        model.tenant_id == context.tenant_id,
-        watermark_column <= generated_at,
-    )
-    if updated_since is not None:
-        stmt = stmt.where(watermark_column > updated_since)
-
-    stmt = (
-        stmt.order_by(watermark_column, model.id)
-        .limit(limit + 1)
-        .offset(offset)
-    )
-    fetched = list((await session.execute(stmt)).scalars().all())
+    if resource == IntegrationResource.CLIENT_CONTACTS:
+        fetched = await _fetch_client_contacts(
+            session,
+            context.tenant_id,
+            generated_at=generated_at,
+            updated_since=updated_since,
+            limit=limit,
+            offset=offset,
+        )
+    else:
+        model, watermark_column = _RESOURCE_CONFIG[resource]
+        stmt = select(model).where(
+            model.tenant_id == context.tenant_id,
+            watermark_column <= generated_at,
+        )
+        if updated_since is not None:
+            stmt = stmt.where(watermark_column > updated_since)
+        stmt = (
+            stmt.order_by(watermark_column, model.id)
+            .limit(limit + 1)
+            .offset(offset)
+        )
+        rows = (await session.execute(stmt)).scalars().all()
+        fetched = [_serialize(resource, row) for row in rows]
     has_more = len(fetched) > limit
-    rows = fetched[:limit]
 
     return {
         "schema_version": "1",
@@ -342,5 +469,5 @@ async def export_resource(
         "offset": offset,
         "limit": limit,
         "next_offset": offset + limit if has_more else None,
-        "items": [_serialize(resource, row) for row in rows],
+        "items": fetched[:limit],
     }

@@ -20,7 +20,7 @@ async def test_team_management_and_password_change() -> None:
 
     session_factory = get_session_factory()
     async with session_factory() as session:
-        tenant = Tenant(name=f"VW Team {suffix}", slug=f"vw-team-{suffix}")
+        tenant = Tenant(name=f"MW Team {suffix}", slug=f"mw-team-{suffix}")
         admin = User(
             email=admin_email,
             name="Administrador",
